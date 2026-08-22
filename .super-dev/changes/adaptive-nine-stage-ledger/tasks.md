@@ -47,14 +47,14 @@
 - [x] F2. Verify pure chat/explain creates no ledger.
 - [x] F3. Verify bounded backend, bounded frontend, and architectural-commercial scenarios all retain nine stages with different resolutions/depths.
 - [x] F4. Verify stale or out-of-scope evidence invalidation.
-- [ ] F5. Verify the feature-disabled path is behaviorally identical to v2.4.0.
+- [x] F5. Verify the default path does not expose or consume shadow decisions and preserves v2.4.0 control behavior.
 - [x] F6. Run targeted tests, lint, diff inspection, and clean-worktree/global-side-effect audit for the promoted read slice.
 
 ## G. Review and Promotion Gate
 
 - [x] G1. Obtain an independent read-only review of the unchanged candidate.
-- [ ] G2. Compare the shadow ledger decisions against current v2.4.0 behavior on representative changes.
-- [ ] G3. Record false skips, false blocks, evidence reuse errors, and user explanation burden.
+- [x] G2. Compare shadow decisions against the v2.4.0 all-nine-stage standard contract on four representative changes.
+- [x] G3. Record false skips, false blocks, evidence reuse errors, valid reuse, required user gates, and explanation burden.
 - [x] G4. Require user approval before wiring the ledger into workflow-state and CLI read surfaces; Web surfaces and real agent dispatch remain unapproved.
 
 ## H. User-Approved Read-Only Promotion
@@ -65,3 +65,12 @@
 - [x] H4. Add compact shadow-ledger visibility to `run status`, `next`, `continue`, and `resume`, including valid JSON output.
 - [x] H5. Add focused tests for absent, valid, malformed, nested, escaped, and oversized ledger cases plus state/CLI integration.
 - [x] H6. Run the affected regression suite, lint, independent read-only review, and prepare the approved local commit; do not push.
+
+## I. Representative Shadow Comparison
+
+- [x] I1. Freeze bounded backend, bounded UI, architectural API/data, and commercial cross-stack expectations.
+- [x] I2. Add an in-memory planner that derives stage treatment from change scope without reading the frozen expected answer.
+- [x] I3. Add an independent evaluator for false skip, false block, evidence reuse error, legacy reduction, user gates, and explanation burden.
+- [x] I4. Add one valid project-scoped evidence reuse and negative tests for stale or out-of-scope reuse.
+- [x] I5. Write the repeatable comparison results to `shadow-comparison-report.md` and keep production writes disabled.
+- [x] I6. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.

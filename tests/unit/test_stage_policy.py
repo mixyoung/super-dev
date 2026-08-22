@@ -213,6 +213,50 @@ def test_ui_contract_change_requires_docs_confirmation() -> None:
         )
 
 
+def test_ui_change_cannot_skip_the_docs_that_user_must_confirm() -> None:
+    ledger = _ledger()
+    with pytest.raises(StagePolicyError, match="cannot skip the docs"):
+        apply_stage_resolution(
+            ledger.get_stage("docs"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=StagePolicyContext(
+                change_id=ledger.change_id,
+                changed_surfaces=frozenset({"ui"}),
+            ),
+            reason="No docs needed",
+        )
+
+
+@pytest.mark.parametrize("surface", ["frontend", "route", "style", "component"])
+def test_user_visible_frontend_surface_cannot_skip_docs_or_confirmation(surface: str) -> None:
+    ledger = _ledger()
+    context = StagePolicyContext(
+        change_id=ledger.change_id,
+        changed_surfaces=frozenset({surface}),
+    )
+
+    with pytest.raises(StagePolicyError, match="cannot skip the docs"):
+        apply_stage_resolution(
+            ledger.get_stage("docs"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=context,
+            reason="No docs needed",
+        )
+    with pytest.raises(StagePolicyError, match="require docs confirmation"):
+        apply_stage_resolution(
+            ledger.get_stage("docs_confirm"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=context,
+            reason="No confirmation needed",
+        )
+
+
 def test_depth_upgrade_invalidates_shortcut_decisions() -> None:
     ledger = _ledger()
     apply_stage_resolution(

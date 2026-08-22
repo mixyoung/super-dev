@@ -129,13 +129,29 @@ def validate_stage_resolution(
         if surfaces & {"backend", "api", "data", "authorization"}:
             raise StagePolicyError("Backend or contract changes cannot skip the backend stage")
     if entry.stage == "docs" and resolution == StageResolution.NOT_APPLICABLE:
-        if surfaces & {"product", "architecture", "uiux", "api", "data", "authorization"}:
+        if surfaces & {
+            "product",
+            "architecture",
+            "uiux",
+            "ui",
+            "frontend",
+            "route",
+            "style",
+            "component",
+            "api",
+            "data",
+            "authorization",
+        }:
             raise StagePolicyError("Contract changes cannot skip the docs stage")
     if entry.stage == "docs_confirm" and surfaces & {
         "product",
         "architecture",
         "uiux",
         "ui",
+        "frontend",
+        "route",
+        "style",
+        "component",
         "api",
         "data",
         "authorization",

@@ -71,7 +71,7 @@ Each agent assignment contains:
 ## Non-Goals
 
 - no real subagent, Orca, OMP, or worktree dispatch;
-- no CLI commands that create or mutate ledgers, and no Web UI changes;
+- no CLI commands that create or mutate ledgers, and no other user-interface changes;
 - no external BMAD, Superpowers, UmaDev, or Grill method integration;
 - no replacement of `.super-dev/workflow-state.json`;
 - no change to existing pipeline-contract JSON/Markdown output;
@@ -93,7 +93,7 @@ Each agent assignment contains:
 
 - the read layer exposes no create, save, update, gate, dispatch, merge, or promotion API;
 - it does not change `workflow_status`, `recommended_command`, gate decisions, confirmations, or run-state ownership;
-- shared Web, proof-pack, release-readiness, and host-runtime callers do not receive the field unless separately approved;
+- other shared status, delivery-evidence, release-readiness, and host-runtime callers do not receive the field unless separately approved;
 - missing ledgers remain quiet and preserve the existing v2.4.0 behavior;
 - malformed or oversized ledgers are visible as diagnostics but never become workflow authority.
 
@@ -133,4 +133,32 @@ Each agent assignment contains:
 - changed source and tests passed Ruff; diff whitespace check passed;
 - the control-plane comparison confirms that opt-in observation does not change workflow status, recommended action, current stage, action card, stages, document/preview confirmation, quality revision, or gate outcomes;
 - independent Grok Build read-only review returned `VERDICT=ACCEPT` with no mandatory fixes; its optional findings were used to make shared consumers opt-in, avoid selecting an active ledger after truncated discovery, clarify the read-only terminal message, and expand safety/control tests;
-- no ledger create/save/update API, Web presentation, gate control, agent dispatch, merge, push, or deployment was added.
+- no ledger create/save/update API, other interface presentation, gate control, agent dispatch, merge, push, or deployment was added.
+
+## Third-Slice Shadow Comparison
+
+The third slice adds an in-memory comparison lab and no production write path. A scope planner derives its decision without reading the frozen expected answer; a separate evaluator checks the plan against four representative expectations and the v2.4.0 all-nine-stage standard contract.
+
+The representative set covers a bounded backend patch, a bounded user-visible UI change, an architectural API/data-contract change with one valid research-evidence reuse, and a commercial cross-stack change. The report records false skips, false blocks, evidence reuse errors, legacy reductions, required user gates, and explanation items.
+
+The first comparison run produced:
+
+- 4 of 4 representative scenarios passed;
+- 0 false skips;
+- 0 false blocks;
+- 0 evidence reuse errors;
+- 1 valid evidence reuse;
+- 10 system-generated scope explanation items across the four scenarios;
+- no production ledger write, workflow-state mutation, gate decision, or agent dispatch.
+
+The comparison also exposed and fixed one first-slice policy inconsistency: a user-visible UI change could previously mark `docs` not applicable while `docs_confirm` remained required. UI changes now retain both the core document work and its confirmation gate.
+
+After independent review, the final comparison contract was tightened further:
+
+- reusable stages are declared by the scenario contract rather than selected by scenario-name special cases;
+- mandatory execution is distinct from explicitly allowed evidence reuse;
+- frontend, route, style, and component changes retain both core-document work and document confirmation, not only preview confirmation;
+- expired, out-of-scope, and undeclared reuse are rejected directly by the planner path;
+- each evaluation produces one concise coaching summary instead of exposing raw stage reasons as user questions.
+
+Final affected regression: 110 passed and one existing Windows symbolic-link permission test skipped. Changed source and tests passed Ruff and diff whitespace checks. Independent Grok Build review returned `VERDICT=ACCEPT` with no mandatory fixes, and the follow-up review confirmed its three medium findings were resolved.
