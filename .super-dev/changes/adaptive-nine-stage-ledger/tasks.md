@@ -48,11 +48,20 @@
 - [x] F3. Verify bounded backend, bounded frontend, and architectural-commercial scenarios all retain nine stages with different resolutions/depths.
 - [x] F4. Verify stale or out-of-scope evidence invalidation.
 - [ ] F5. Verify the feature-disabled path is behaviorally identical to v2.4.0.
-- [ ] F6. Run targeted tests, lint, diff inspection, and clean-worktree/global-side-effect audit.
+- [x] F6. Run targeted tests, lint, diff inspection, and clean-worktree/global-side-effect audit for the promoted read slice.
 
 ## G. Review and Promotion Gate
 
 - [x] G1. Obtain an independent read-only review of the unchanged candidate.
 - [ ] G2. Compare the shadow ledger decisions against current v2.4.0 behavior on representative changes.
 - [ ] G3. Record false skips, false blocks, evidence reuse errors, and user explanation burden.
-- [ ] G4. Require user approval before wiring the ledger into workflow state, CLI/Web surfaces, or real agent dispatch.
+- [x] G4. Require user approval before wiring the ledger into workflow-state and CLI read surfaces; Web surfaces and real agent dispatch remain unapproved.
+
+## H. User-Approved Read-Only Promotion
+
+- [x] H1. Add a bounded, project-local shadow-ledger reader with size, path, schema, Harness-identity, and nine-stage validation.
+- [x] H2. Report malformed ledgers as read diagnostics without breaking existing workflow-state reads.
+- [x] H3. Add `shadow_ledger` to the workflow-state summary without changing workflow status, recommendation, or gates.
+- [x] H4. Add compact shadow-ledger visibility to `run status`, `next`, `continue`, and `resume`, including valid JSON output.
+- [x] H5. Add focused tests for absent, valid, malformed, nested, escaped, and oversized ledger cases plus state/CLI integration.
+- [x] H6. Run the affected regression suite, lint, independent read-only review, and prepare the approved local commit; do not push.

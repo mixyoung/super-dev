@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from super_dev.change_ledger import ChangeLedger
 from super_dev.review_state import save_baseline_confirmation, save_resume_gate
 from super_dev.workflow_guard import record_stage_progress, save_bound_docs_confirmation
 from super_dev.workflow_state import (
@@ -123,6 +124,70 @@ def test_detect_pipeline_summary_seeai_skips_preview_gate(temp_project_dir: Path
     assert summary["flow_variant"] == "seeai"
     assert summary["workflow_status"] == "missing_backend"
     assert "SEEAI" in summary["recommended_command"]
+
+
+def test_detect_pipeline_summary_includes_read_only_shadow_ledger(
+    temp_project_dir: Path,
+) -> None:
+    ledger = ChangeLedger.create(
+        change_id="summary-ledger",
+        harness_version="2.4.0",
+        intent="quick_edit",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "summary-ledger" / "ledger.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    summary = detect_pipeline_summary(temp_project_dir, include_shadow_ledger=True)
+
+    assert summary["shadow_ledger"]["active_change_id"] == "summary-ledger"
+    assert summary["shadow_ledger"]["read_only"] is True
+    assert summary["shadow_ledger"]["control_authority"] == "none"
+
+
+def test_shadow_ledger_does_not_change_workflow_control_fields(
+    temp_project_dir: Path,
+) -> None:
+    without_shadow = detect_pipeline_summary(temp_project_dir)
+    assert "shadow_ledger" not in without_shadow
+    ledger = ChangeLedger.create(
+        change_id="control-check",
+        harness_version="2.4.0",
+        intent="build",
+        governance_depth="commercial",
+        work_mode="evolve",
+    )
+    ledger_path = (
+        temp_project_dir / ".super-dev" / "changes" / "control-check" / "ledger.json"
+    )
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(json.dumps(ledger.to_dict()), encoding="utf-8")
+
+    with_shadow = detect_pipeline_summary(temp_project_dir, include_shadow_ledger=True)
+    observation = with_shadow.pop("shadow_ledger")
+
+    assert observation["control_authority"] == "none"
+    for key in (
+        "workflow_status",
+        "recommended_command",
+        "current_stage_id",
+        "blocker",
+        "action_card",
+        "stages",
+        "docs_confirmation",
+        "preview_confirmation",
+        "quality_revision",
+    ):
+        assert with_shadow[key] == without_shadow[key]
+    for gate_name in ("docs_gate", "preview_gate"):
+        for key in ("confirmed", "status", "reason", "binding_matches_current"):
+            assert with_shadow[gate_name].get(key) == without_shadow[gate_name].get(key)
+    assert with_shadow["artifacts"]["quality"] == without_shadow["artifacts"]["quality"]
 
 
 def test_detect_pipeline_summary_includes_expert_governance(temp_project_dir: Path):

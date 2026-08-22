@@ -17,6 +17,7 @@ from .review_state import (
     load_ui_revision,
     load_workflow_state,
 )
+from .shadow_ledger_store import build_shadow_ledger_summary
 from .work_mode import detect_work_mode
 from .work_mode import work_mode_label as describe_work_mode
 from .workflow_guard import docs_gate_status, preview_gate_status
@@ -813,7 +814,12 @@ def build_workflow_scenario_cards(summary: dict[str, Any]) -> list[dict[str, Any
     return deduped
 
 
-def detect_pipeline_summary(project_dir: Path, run: dict[str, Any] | None = None) -> dict[str, Any]:
+def detect_pipeline_summary(
+    project_dir: Path,
+    run: dict[str, Any] | None = None,
+    *,
+    include_shadow_ledger: bool = False,
+) -> dict[str, Any]:
     project_dir = Path(project_dir).resolve()
     output_dir = project_dir / "output"
     changes_dir = project_dir / ".super-dev" / "changes"
@@ -1377,5 +1383,7 @@ def detect_pipeline_summary(project_dir: Path, run: dict[str, Any] | None = None
         "evidence": evidence,
         "action_card": action_card,
     }
+    if include_shadow_ledger:
+        summary["shadow_ledger"] = build_shadow_ledger_summary(project_dir)
     summary["scenario_cards"] = build_workflow_scenario_cards(summary)
     return summary

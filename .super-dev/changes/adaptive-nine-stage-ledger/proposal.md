@@ -6,6 +6,8 @@ Evolve Super Dev without creating a second lifecycle: every real code or product
 
 The first slice is a shadow-only domain model. Super Dev v2.4.0 remains the lifecycle authority and the new ledger cannot advance gates, approve itself, dispatch external agents, or change existing workflow behavior.
 
+The user-approved second slice promotes only read visibility: bounded shadow-ledger discovery and validation feed compact summaries into existing workflow-state and CLI read paths. The summary explicitly declares `read_only=true` and `control_authority=none`.
+
 ## Motivation
 
 The current standard workflow preserves commercial-delivery completeness but treats stage existence, stage execution, artifact depth, and gate requirements as one fixed chain. This makes small changes feel over-governed and leaves skip/reuse decisions implicit. At the same time, removing stages would create multiple lifecycle identities and weaken auditability.
@@ -69,19 +71,38 @@ Each agent assignment contains:
 ## Non-Goals
 
 - no real subagent, Orca, OMP, or worktree dispatch;
-- no CLI or Web UI changes;
+- no CLI commands that create or mutate ledgers, and no Web UI changes;
 - no external BMAD, Superpowers, UmaDev, or Grill method integration;
 - no replacement of `.super-dev/workflow-state.json`;
 - no change to existing pipeline-contract JSON/Markdown output;
 - no change to existing docs/preview/quality gate behavior;
 - no automatic commit, merge, push, deployment, or global installation.
 
+## Second-Slice Read Promotion
+
+### Added read surface
+
+- discover only `.super-dev/changes/<change-id>/ledger.json`, without recursive scanning;
+- enforce project-bound paths, a one-megabyte file limit, JSON-object shape, the active Super Dev Harness identity, shadow-only mode, and the canonical nine-stage contract;
+- select the most recently modified valid ledger as the active observation;
+- report invalid ledger files as bounded diagnostics without failing the existing status read;
+- make `detect_pipeline_summary` expose the observation only when an approved caller opts in, and include it in CLI `run status`, `next`, `continue`, and `resume` payloads;
+- use direct standard-output writing for the existing `run status --json` path so long status payloads remain valid JSON.
+
+### Authority boundary
+
+- the read layer exposes no create, save, update, gate, dispatch, merge, or promotion API;
+- it does not change `workflow_status`, `recommended_command`, gate decisions, confirmations, or run-state ownership;
+- shared Web, proof-pack, release-readiness, and host-runtime callers do not receive the field unless separately approved;
+- missing ledgers remain quiet and preserve the existing v2.4.0 behavior;
+- malformed or oversized ledgers are visible as diagnostics but never become workflow authority.
+
 ## Compatibility and Rollback
 
 - The feature is disabled by default with `adaptive_ledger.enabled=false`.
 - Old projects without a ledger continue on the v2.4.0 path.
 - Shadow ledgers are additive artifacts and never become the only recovery source.
-- Rollback is removal/disablement of the shadow ledger path; existing workflow and review state remain authoritative.
+- Rollback is removal of the summary calls and `shadow_ledger_store.py`; existing workflow and review state remain authoritative and ledger files need not be deleted.
 
 ## Acceptance
 
@@ -104,3 +125,12 @@ Each agent assignment contains:
 - existing pipeline-contract JSON/Markdown output remains unchanged;
 - known pre-existing Windows `PlanExecutor` baseline remains outside this slice: fixed Bash invocation and POSIX-path expectation produce 2 failures when that test file is included;
 - Black and mypy executables are not installed in the current environment, so those checks were not claimed.
+
+## Second-Slice Evidence
+
+- affected nine-stage, workflow-state, work-mode, and CLI regression: 91 passed;
+- one symbolic-link test is retained but skipped because the current Windows host does not permit test symbolic-link creation; direct path escape, nested discovery, oversized payload, malformed JSON, foreign shadow mode, and directory-limit behavior passed;
+- changed source and tests passed Ruff; diff whitespace check passed;
+- the control-plane comparison confirms that opt-in observation does not change workflow status, recommended action, current stage, action card, stages, document/preview confirmation, quality revision, or gate outcomes;
+- independent Grok Build read-only review returned `VERDICT=ACCEPT` with no mandatory fixes; its optional findings were used to make shared consumers opt-in, avoid selecting an active ledger after truncated discovery, clarify the read-only terminal message, and expand safety/control tests;
+- no ledger create/save/update API, Web presentation, gate control, agent dispatch, merge, push, or deployment was added.

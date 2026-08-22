@@ -92,6 +92,7 @@ from .review_state import (
     workflow_event_log_file,
     workflow_state_file,
 )
+from .shadow_ledger_store import build_shadow_ledger_summary
 from .terminal import (
     create_console,
 )
@@ -848,6 +849,15 @@ class SuperDevCLI(
             self.console.print(f"  最近快照: {updated_at} · {step}")
         if payload.get("evidence"):
             self.console.print(f"  依据: {payload['evidence']}")
+        shadow_ledger = payload.get("shadow_ledger", {})
+        if (
+            isinstance(shadow_ledger, dict)
+            and shadow_ledger.get("present")
+            and str(shadow_ledger.get("summary", "")).strip()
+        ):
+            self.console.print(
+                f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
+            )
 
     def _workflow_mode_label(self, workflow_mode: str) -> str:
         return workflow_mode_label(workflow_mode)
@@ -1021,7 +1031,7 @@ class SuperDevCLI(
                     "status": "not_initialized",
                     "recommended_next": "super-dev init <项目名>",
                 }
-                self.console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+                sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
                 return 0
             self.console.print("[cyan]Super Dev 流程状态: 尚未开始[/cyan]")
             self.console.print("  运行 'super-dev init <项目名>' 初始化项目")
@@ -1036,7 +1046,9 @@ class SuperDevCLI(
                     if isinstance(current_snapshot, dict) and current_snapshot:
                         recent_snapshots = [current_snapshot]
                 if not recent_snapshots:
-                    pipeline_summary = detect_pipeline_summary(project_dir)
+                    pipeline_summary = detect_pipeline_summary(
+                        project_dir, include_shadow_ledger=True
+                    )
                     if isinstance(pipeline_summary, dict) and pipeline_summary:
                         recent_snapshots = [pipeline_summary]
                 recent_events = load_recent_workflow_events(project_dir, limit=3)
@@ -1075,6 +1087,7 @@ class SuperDevCLI(
                         project_dir, write_reports=False
                     ),
                     "operational_focus": derive_operational_focus(project_dir),
+                    "shadow_ledger": build_shadow_ledger_summary(project_dir),
                 }
                 if getattr(args, "json", False):
                     sys.stdout.write(
@@ -1115,6 +1128,15 @@ class SuperDevCLI(
                 focus = initialized_payload.get("operational_focus", {})
                 if isinstance(focus, dict) and str(focus.get("summary", "")).strip():
                     self.console.print(f"  当前治理焦点: {focus.get('summary')}")
+                shadow_ledger = initialized_payload.get("shadow_ledger", {})
+                if (
+                    isinstance(shadow_ledger, dict)
+                    and shadow_ledger.get("present")
+                    and str(shadow_ledger.get("summary", "")).strip()
+                ):
+                    self.console.print(
+                        f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
+                    )
                 self.console.print("")
                 self.console.print("  下一步: 在宿主中输入 /super-dev <你的需求> 开始")
                 return 0
@@ -1176,9 +1198,10 @@ class SuperDevCLI(
                 project_dir, write_reports=False
             ),
             "operational_focus": derive_operational_focus(project_dir),
+            "shadow_ledger": build_shadow_ledger_summary(project_dir),
         }
         if getattr(args, "json", False):
-            self.console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+            sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
             return 0
         self.console.print("[cyan]Super Dev 流程状态[/cyan]")
         self.console.print(f"  运行状态: {payload['status']}")
@@ -1231,6 +1254,15 @@ class SuperDevCLI(
             action = str(focus.get("recommended_action", "")).strip()
             if action:
                 self.console.print(f"  建议先做: {action}")
+        shadow_ledger = payload.get("shadow_ledger", {})
+        if (
+            isinstance(shadow_ledger, dict)
+            and shadow_ledger.get("present")
+            and str(shadow_ledger.get("summary", "")).strip()
+        ):
+            self.console.print(
+                f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
+            )
         recent_snapshots = payload.get("recent_snapshots", [])
         if isinstance(recent_snapshots, list) and recent_snapshots:
             first = recent_snapshots[0] if isinstance(recent_snapshots[0], dict) else {}
@@ -2147,6 +2179,11 @@ class SuperDevCLI(
             supports_slash=self._supports_slash_for_prompt(preferred_host),
         )
         enriched = dict(payload)
+        shadow_ledger = (
+            payload.get("shadow_ledger")
+            if isinstance(payload.get("shadow_ledger"), dict)
+            else build_shadow_ledger_summary(project_dir)
+        )
         enriched.update(
             {
                 "current_step_label": current_step_label,
@@ -2186,6 +2223,7 @@ class SuperDevCLI(
                     action_card=action_card,
                 ),
                 "recent_snapshots": load_recent_workflow_snapshots(project_dir, limit=3),
+                "shadow_ledger": shadow_ledger,
             }
         )
         return enriched
@@ -2204,7 +2242,9 @@ class SuperDevCLI(
             )
 
         summary = detect_pipeline_summary(
-            project_dir, self._read_pipeline_run_state(project_dir) or {}
+            project_dir,
+            self._read_pipeline_run_state(project_dir) or {},
+            include_shadow_ledger=True,
         )
         checkpoint_status = str(summary.get("workflow_status", "")).strip() or "ready"
         recommended_command = (

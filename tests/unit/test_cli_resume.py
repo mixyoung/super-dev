@@ -1,6 +1,8 @@
+import json
 from types import SimpleNamespace
 
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
+from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
 
 
@@ -231,6 +233,18 @@ def test_run_status_recommendation_treats_missing_scope_status_as_unknown() -> N
     assert recommendation == "在宿主里继续当前流程，并优先补齐缺失范围与高优先级功能项"
 
 
+def test_run_status_not_initialized_json_is_valid(
+    temp_project_dir, monkeypatch, capsys
+) -> None:
+    cli = SuperDevCLI()
+    monkeypatch.chdir(temp_project_dir)
+
+    code = cli._cmd_run_status(type("Args", (), {"json": True})())
+
+    assert code == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "not_initialized"
+
+
 def test_run_status_uses_running_for_existing_confirmation_only_state(
     temp_project_dir, monkeypatch, capsys
 ) -> None:
@@ -253,6 +267,70 @@ def test_run_status_uses_running_for_existing_confirmation_only_state(
     assert code == 0
     output = capsys.readouterr().out
     assert '"status": "running"' in output
+
+
+def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
+    temp_project_dir, monkeypatch, capsys
+) -> None:
+    cli = SuperDevCLI()
+    monkeypatch.chdir(temp_project_dir)
+    cli._write_pipeline_run_state(temp_project_dir, {"status": "running"})
+    ledger = ChangeLedger.create(
+        change_id="cli-ledger",
+        harness_version="2.4.0",
+        intent="debug",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "cli-ledger" / "ledger.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    code = cli._cmd_run_status(type("Args", (), {"json": True})())
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["shadow_ledger"]["active_change_id"] == "cli-ledger"
+    assert payload["shadow_ledger"]["read_only"] is True
+    assert payload["shadow_ledger"]["control_authority"] == "none"
+
+
+def test_finalized_next_step_payload_includes_shadow_ledger(
+    temp_project_dir, monkeypatch
+) -> None:
+    cli = SuperDevCLI()
+    ledger = ChangeLedger.create(
+        change_id="next-ledger",
+        harness_version="2.4.0",
+        intent="quick_edit",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "next-ledger" / "ledger.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "_preferred_host_target_for_project", lambda _path: "codex-cli")
+    monkeypatch.setattr(cli, "_project_has_super_dev_context", lambda _path: True)
+    monkeypatch.setattr(cli, "_build_host_continue_instruction", lambda **_kwargs: "continue")
+    monkeypatch.setattr(cli, "_build_host_continue_prompt", lambda **_kwargs: "continue")
+
+    payload = cli._finalize_next_step_payload(
+        project_dir=temp_project_dir,
+        payload={
+            "status": "ready",
+            "recommended_command": "继续",
+            "action_card": {},
+        },
+    )
+
+    assert payload["shadow_ledger"]["active_change_id"] == "next-ledger"
+    assert payload["shadow_ledger"]["control_authority"] == "none"
 
 
 def test_status_alias_routes_to_run_status(monkeypatch) -> None:
