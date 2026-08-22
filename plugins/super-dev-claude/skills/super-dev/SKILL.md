@@ -43,17 +43,29 @@ hooks:
 - 你的职责是利用宿主现有能力，严格执行 Super Dev 的流程规范、设计约束、质量门禁与交付标准。
 - 不要把 Super Dev 当作独立编码平台；真正的实现动作仍在当前宿主上下文完成。
 
+## 沟通与环境适配（强制）
+
+- 默认使用Skill使用者的母语、文字习惯和熟悉程度；面向消费者的产品文案服从目标用户语言，不因内部工具使用英语就强迫用户理解英语。
+- 先用通俗说法解释作用，第一次出现必要专用词时放入括号，例如：完整开发流程（Harness）、隔离工作区（worktree）、唯一写入者（single writer）；后续优先使用已经解释过的通俗说法。
+- 编程语言专用词、代码名和字段使用“中文含义（`LITERAL_NAME`）”，例如：任务编号（`TASK_ID`）、安排负责人（`PLACEMENT_OWNER`）；命令和代码继续使用代码格式。
+- 适配实际操作系统、Shell、路径形式、仓库约定和已安装运行环境。Windows环境不得默认给出只能在Bash执行的命令；要求用户决定前，先说明机制做什么、影响什么和不决定的代价。
+
+## 分层编排与工作区所有权（强制）
+
+- Super Dev是当前任务唯一的完整开发流程（Harness）和阶段状态所有者。宿主可以使用子代理（subagent）、Orca、OMP或其他已验证工具完成互不干扰的有界任务，但它们只是同一流程里的执行者，不是第二套Harness。
+- 目标、验收条件、权限、仓库规则和工作区安排从外层向内层继承；每往下一层，范围和权限只能缩小，不能自行扩大。
+- 只有已声明的安排负责人（`PLACEMENT_OWNER`）可以创建分支和工作区。若执行者已由Orca、Super Dev或上层代理放入指定工作区，默认不得再创建分支、工作区、协调器或下一级执行者，除非任务契约明确授权。
+- 每个可变工作区同时只能有一个生产写入者。只读研究和评审只有在范围与副作用互不干扰时才可并行。
+- 执行者向上回传产物、测试证据、风险和结果回执；只有上层整合负责人合并候选，只有Super Dev Core推进持久化阶段状态。
+- 默认下一级分派（`MAY_SPAWN_SUBWORKERS`）为`no`。已经被安排的执行者不得用新的分支或工作区重复上层已完成的隔离工作。
+
 ## 触发方式与命令路由（强制）
 
-用户只需在宿主中输入 `/super-dev <参数>`。
-宿主通过 Bash 工具自动执行对应的 CLI 命令，用户无需打开终端。
-唯一需要用户在终端手动执行的命令是 `pip install super-dev`（安装/升级）。
+普通用户只需要记住 3 个终端命令：`super-dev`、`super-dev update`、`super-dev uninstall`。
+真正的开发交互都应回到宿主里完成。
 
-### 路由规则
+宿主公开交互面只有 5 个：
 
-**规则 1 — 已知子命令 → 用 Bash 工具执行 `super-dev <完整参数>`**
-
-普通用户优先只记住这些宿主表达：
 ```
 /super-dev <goal>
 /super-dev-seeai <goal>
@@ -61,27 +73,29 @@ hooks:
 现在下一步是什么
 ```
 
-示例：
-- `/super-dev 做一个电商系统`
-- `/super-dev 在当前项目里新增会员体系`
-- `/super-dev 继续当前流程`
-- `/super-dev baseline 确认，可以继续当前流程`
-- `/super-dev 预览确认，可以继续当前流程`
+非 slash 宿主优先回退为：`super-dev:`、`super-dev-seeai:`，恢复与查询优先直接说“继续当前流程”“现在下一步是什么”。
 
-维护/治理场景才显式进入：
-- `/super-dev-work <mode> <goal>`
-- `/super-dev-run <stage|resume|status|next>`
-- `/super-dev-review <target> <action>`
+维护/治理场景才显式进入：`/super-dev-work`、`/super-dev-run`、`/super-dev-review`。
 
-**规则 2 — 自然语言（中文/英文描述）→ 进入 pipeline 模式**
+### 路由规则
 
-示例：
-- `/super-dev 做一个电商系统`
-- `/super-dev Build a user auth system`
-- `super-dev: 做一个电商系统`（冒号触发，等效）
-- `super-dev：做一个电商系统`（中文冒号也识别）
+**规则 1 — 默认主入口**：`/super-dev <goal>` 或 `super-dev: <goal>`
 
-**规则 3 — 无参数 → 返回当前恢复卡片与建议下一句**
+系统应自动判断当前是 `new / evolve / patch / variant / resume`。
+
+**规则 2 — 显式工作模式（维护/治理面）**：`/super-dev-work <mode> <goal>`
+
+用于自动判断不准或用户明确要求时，支持 `new / evolve / patch / variant`。
+
+**规则 3 — 阶段与恢复（维护/治理面）**：`/super-dev-run <stage|resume|status|next>`
+
+公开执行阶段只推荐：`research / docs / spec / frontend / backend / quality / delivery`。
+
+**规则 4 — gate / 返工（维护/治理面）**：`/super-dev-review <target> <action>`
+
+推荐 target：`docs / preview / ui / architecture / quality`。
+
+**规则 5 — 无参数**：如果用户只输入 `/super-dev` 或 `super-dev:`，默认返回当前恢复卡片与推荐下一句。
 
 ## Runtime Contract（强制）
 
@@ -94,9 +108,9 @@ hooks:
 - 需要研究、设计、编码、运行、调试时，优先使用宿主自身的 browse/search/terminal/edit 能力。
 - 不要等待用户解释"Super Dev 是什么"；你要把它理解为当前项目已经安装好的开发治理协议。
 
-## 终端维护命令边界
+## 宿主交互边界
 
-终端公开命令只有：
+普通用户只需要记住 3 个终端命令：
 
 ```bash
 super-dev
@@ -104,15 +118,52 @@ super-dev update
 super-dev uninstall
 ```
 
-真正的开发、返工、恢复与阶段切换都应留在宿主里完成，而不是让用户再去手敲一长串内部 CLI 子命令。
+普通用户优先只记住这些宿主表达：
 
-其余 CLI 能力仍然存在，但只属于维护 / 治理层，例如：
+```text
+/super-dev <goal>
+/super-dev-seeai <goal>
+继续当前流程
+现在下一步是什么
+```
 
-- `doctor / detect / onboard / integrate / skill`：宿主接入与排障
-- `review / quality / release`：门禁同步与交付证据
-- `config / enforce / generate / spec / task`：内部维护与高级调试
+文本回退宿主优先使用：
 
-这些能力不应再作为普通用户的公开命令目录。
+```text
+super-dev: <goal>
+super-dev-seeai: <goal>
+```
+
+维护/治理场景才显式进入：
+
+```text
+/super-dev-work <mode> <goal>
+/super-dev-run <stage|resume|status|next>
+/super-dev-review <target> <action>
+```
+
+工作模式固定为：
+
+- `new`：从 0 到 1
+- `evolve`：已有项目增量迭代
+- `variant`：从现有项目派生新版本
+- `patch`：在现有项目上修 bug / 做整改
+- `resume`：继续当前中断流程
+
+硬规则：
+
+- `new` 才能直接从 `research -> docs` 开始
+- `evolve / variant / patch` 必须先 `baseline`
+- baseline 必须先分析现有功能、架构、代码、路由/API、UI 与约束，再进入差量 research 和三文档
+- `resume` 是默认场景，不是异常场景
+
+恢复是默认场景，不是补充场景。优先理解这些表达：
+
+- `继续当前流程`
+- `现在下一步是什么`
+- `/super-dev 继续当前流程`
+
+内部 CLI 能力仍可存在，但不应再被当成普通用户主心智。
 
 ## 首轮响应契约（强制）
 
@@ -123,7 +174,7 @@ super-dev uninstall
 
 ### research 双引擎
 
-**引擎 1: 本地知识发现** — 优先读取 `knowledge/` 和 knowledge-bundle.json，并在宿主里把结论沉入 `output/*-research.md`。
+**引擎 1: 本地知识发现** — 优先读取 `knowledge/` 和 knowledge-bundle.json，并在当前宿主里把结论沉入 `output/*-research.md`。
 
 **引擎 2: 宿主联网研究** — WebFetch/WebSearch 搜索同类产品、竞品和官方文档，写入 `output/*-research.md`。
 

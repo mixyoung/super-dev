@@ -101,8 +101,8 @@ class SkillFrontmatter:
             )
             lines.append("          timeout: 5")
         elif host in {"codex", "codex-cli"}:
-            lines.append(f"when_to_use: {self.when_to_use}")
-            lines.append(f"version: {self.version}")
+            lines.append("metadata:")
+            lines.append(f'  version: "{self.version}"')
         else:
             # Generic format — underscore keys
             lines.append(f"when_to_use: {self.when_to_use}")
@@ -163,6 +163,8 @@ class SuperDevSkillContent:
             f"# {self.skill_name} for Codex CLI",
             self._section_critical_reminders(),
             self._section_activation_rules_codex(),
+            self._section_language_and_environment(),
+            self._section_nested_coordination(),
             self._section_trigger_codex(),
             self._section_runtime_contract_codex(),
             self._section_cli_command_guide(),
@@ -186,6 +188,8 @@ class SuperDevSkillContent:
             "# Super Dev SEEAI - 赛事极速版 (Codex)",
             self._section_critical_reminders(),
             self._section_seeai_activation_rules_codex(),
+            self._section_language_and_environment(),
+            self._section_nested_coordination(),
             self._section_seeai_trigger_codex(),
             self._section_seeai_runtime_contract_codex(),
             self._section_seeai_first_response_contract(),
@@ -356,6 +360,8 @@ class SuperDevSkillContent:
             "---",
             self._section_role_definition(),
             self._section_positioning(),
+            self._section_language_and_environment(),
+            self._section_nested_coordination(),
             self._section_trigger_generic(),
             self._section_runtime_contract_generic(),
             self._section_cli_command_guide(),
@@ -376,6 +382,8 @@ class SuperDevSkillContent:
         sections = [
             "# Super Dev SEEAI - 赛事极速版",
             self._section_critical_reminders(),
+            self._section_language_and_environment(),
+            self._section_nested_coordination(),
             self._section_seeai_trigger_generic(),
             self._section_seeai_runtime_contract_generic(),
             self._section_seeai_first_response_contract(),
@@ -515,9 +523,9 @@ class SuperDevSkillContent:
 
     def _section_cli_command_guide(self) -> str:
         return (
-            "## Super Dev CLI 命令边界\n"
+            "## 宿主交互边界\n"
             "\n"
-            "终端公开命令只有：\n"
+            "普通用户只需要记住 3 个终端命令：\n"
             "\n"
             "```bash\n"
             "super-dev\n"
@@ -525,12 +533,53 @@ class SuperDevSkillContent:
             "super-dev uninstall\n"
             "```\n"
             "\n"
-            "其余 CLI 能力允许保留，但属于：\n"
-            "- 宿主接入维护面\n"
-            "- 治理内核\n"
-            "- 高级调试面\n"
+            "普通用户优先只记住这些宿主表达：\n"
             "\n"
-            "不要再把它们包装成普通用户的第一层心智。"
+            "```text\n"
+            "/super-dev <goal>\n"
+            "/super-dev-seeai <goal>\n"
+            "继续当前流程\n"
+            "现在下一步是什么\n"
+            "```\n"
+            "\n"
+            "文本回退宿主优先使用：\n"
+            "\n"
+            "```text\n"
+            "super-dev: <goal>\n"
+            "super-dev-seeai: <goal>\n"
+            "```\n"
+            "\n"
+            "维护/治理场景才显式进入：\n"
+            "\n"
+            "```text\n"
+            "/super-dev-work <mode> <goal>\n"
+            "/super-dev-run <stage|resume|status|next>\n"
+            "/super-dev-review <target> <action>\n"
+            "```\n"
+            "\n"
+            "工作模式固定为：\n"
+            "\n"
+            "- `new`：从 0 到 1\n"
+            "- `evolve`：已有项目增量迭代\n"
+            "- `variant`：从现有项目派生新版本\n"
+            "- `patch`：在现有项目上修 bug / 做整改\n"
+            "- `resume`：继续当前中断流程\n"
+            "\n"
+            "硬规则：\n"
+            "\n"
+            "- `new` 才能直接从 `research -> docs` 开始\n"
+            "- `evolve / variant / patch` 必须先 `baseline`\n"
+            "- baseline 必须先分析现有功能、架构、代码、路由/API、UI 与约束，"
+            "再进入差量 research 和三文档\n"
+            "- `resume` 是默认场景，不是异常场景\n"
+            "\n"
+            "恢复是默认场景，不是补充场景。优先理解这些表达：\n"
+            "\n"
+            "- `继续当前流程`\n"
+            "- `现在下一步是什么`\n"
+            "- `/super-dev 继续当前流程`\n"
+            "\n"
+            "内部 CLI 能力仍可存在，但不应再被当成普通用户主心智。"
         )
 
     # ------------------------------------------------------------------
@@ -559,6 +608,42 @@ class SuperDevSkillContent:
             "发现后先替换为正式图标库再继续。"
         )
 
+    def _section_language_and_environment(self) -> str:
+        return (
+            "## 沟通与环境适配（强制）\n"
+            "\n"
+            "- 默认使用Skill使用者的母语、文字习惯和熟悉程度；面向消费者的产品文案"
+            "服从目标用户语言，不因内部工具使用英语就强迫用户理解英语。\n"
+            "- 先用通俗说法解释作用，第一次出现必要专用词时放入括号，例如："
+            "完整开发流程（Harness）、隔离工作区（worktree）、唯一写入者（single writer）；"
+            "后续优先使用已经解释过的通俗说法。\n"
+            "- 编程语言专用词、代码名和字段使用“中文含义（`LITERAL_NAME`）”，例如："
+            "任务编号（`TASK_ID`）、安排负责人（`PLACEMENT_OWNER`）；命令和代码继续使用代码格式。\n"
+            "- 适配实际操作系统、Shell、路径形式、仓库约定和已安装运行环境。"
+            "Windows环境不得默认给出只能在Bash执行的命令；要求用户决定前，先说明机制做什么、"
+            "影响什么和不决定的代价。"
+        )
+
+    def _section_nested_coordination(self) -> str:
+        return (
+            "## 分层编排与工作区所有权（强制）\n"
+            "\n"
+            "- Super Dev是当前任务唯一的完整开发流程（Harness）和阶段状态所有者。"
+            "宿主可以使用子代理（subagent）、Orca、OMP或其他已验证工具完成互不干扰的有界任务，"
+            "但它们只是同一流程里的执行者，不是第二套Harness。\n"
+            "- 目标、验收条件、权限、仓库规则和工作区安排从外层向内层继承；每往下一层，"
+            "范围和权限只能缩小，不能自行扩大。\n"
+            "- 只有已声明的安排负责人（`PLACEMENT_OWNER`）可以创建分支和工作区。"
+            "若执行者已由Orca、Super Dev或上层代理放入指定工作区，默认不得再创建分支、工作区、"
+            "协调器或下一级执行者，除非任务契约明确授权。\n"
+            "- 每个可变工作区同时只能有一个生产写入者。只读研究和评审只有在范围与副作用"
+            "互不干扰时才可并行。\n"
+            "- 执行者向上回传产物、测试证据、风险和结果回执；只有上层整合负责人合并候选，"
+            "只有Super Dev Core推进持久化阶段状态。\n"
+            "- 默认下一级分派（`MAY_SPAWN_SUBWORKERS`）为`no`。已经被安排的执行者不得用新的分支"
+            "或工作区重复上层已完成的隔离工作。"
+        )
+
     def _section_first_response_contract(self) -> str:
         return (
             "## 首轮响应契约（强制）\n"
@@ -572,7 +657,7 @@ class SuperDevSkillContent:
             "### research 双引擎\n"
             "\n"
             "**引擎 1: 本地知识发现** — 优先读取 `knowledge/`"
-            " 和 knowledge-bundle.json，并把结论沉入 `output/*-research.md`。\n"
+            " 和 knowledge-bundle.json，并在当前宿主里把结论沉入 `output/*-research.md`。\n"
             "\n"
             "**引擎 2: 宿主联网研究** — WebFetch/WebSearch 搜索同类产品、"
             "竞品和官方文档，写入 `output/*-research.md`。\n"
@@ -1408,9 +1493,10 @@ class SuperDevSkillContent:
             "- 读取 output/*-architecture.md 中的 API 定义\n"
             "- 读取 output/*-uiux.md 中的设计 token\n"
             "\n"
-            "### 第 5 步：建立页面结构与共享类型并验证构建\n"
-            "- 根据 architecture / UIUX 产出页面结构、组件实现参考与共享类型\n"
-            "- 运行构建命令确认零错误后才开始写业务代码\n"
+            "### 第 5 步：在宿主里建立页面结构与共享类型并验证构建\n"
+            "- 按 `output/*-architecture.md` 与 `output/*-uiux.md` 直接在宿主里"
+            "生成/更新页面结构、组件实现参考与共享类型\n"
+            "- 运行宿主原生构建命令确认零错误后才开始写业务代码\n"
         )
 
     def _section_phase_enforcement(self) -> str:
@@ -1642,7 +1728,10 @@ class SkillTemplate:
         if host in {"codex", "codex-cli"}:
             fm = SkillFrontmatter(
                 name=skill_name,
-                description="Activate the Super Dev pipeline inside Codex CLI.",
+                description=(
+                    "Use when the user explicitly enters or resumes the Super Dev pipeline"
+                    " in Codex for research-first, commercial-grade delivery."
+                ),
             )
         else:
             fm = SkillFrontmatter(

@@ -4,7 +4,7 @@ description: Super Dev pipeline governance for research-first, commercial-grade 
 when-to-use: Use when the user says /super-dev, super-dev:, or super-dev： followed by a requirement. Activate the Super Dev pipeline for research-first, commercial-grade project delivery.
 allowed-tools: Read, Edit, Write, Bash
 user-invocable: true
-version: 2.3.2
+version: 2.4.0
 argument-hint: requirement description
 hooks:
   PreToolUse:
@@ -28,7 +28,7 @@ hooks:
 
 4. **自检规则**: 在向用户展示任何 UI 代码或预览前，必须自检源码中不存在任何 emoji 字符（Unicode range U+2600-U+27BF, U+1F300-U+1FAFF）。发现后先替换为正式图标库再继续。
 
-> 版本: 2.3.2 | 适用工具: Claude Code, Codex CLI, OpenCode, Cursor, Antigravity 等所有 AI Coding 工具
+> 版本: 2.4.0 | 适用工具: Claude Code, Codex CLI, OpenCode, Cursor, Antigravity 等所有 AI Coding 工具
 
 ---
 
@@ -43,51 +43,59 @@ hooks:
 - 你的职责是利用宿主现有能力，严格执行 Super Dev 的流程规范、设计约束、质量门禁与交付标准。
 - 不要把 Super Dev 当作独立编码平台；真正的实现动作仍在当前宿主上下文完成。
 
+## 沟通与环境适配（强制）
+
+- 默认使用Skill使用者的母语、文字习惯和熟悉程度；面向消费者的产品文案服从目标用户语言，不因内部工具使用英语就强迫用户理解英语。
+- 先用通俗说法解释作用，第一次出现必要专用词时放入括号，例如：完整开发流程（Harness）、隔离工作区（worktree）、唯一写入者（single writer）；后续优先使用已经解释过的通俗说法。
+- 编程语言专用词、代码名和字段使用“中文含义（`LITERAL_NAME`）”，例如：任务编号（`TASK_ID`）、安排负责人（`PLACEMENT_OWNER`）；命令和代码继续使用代码格式。
+- 适配实际操作系统、Shell、路径形式、仓库约定和已安装运行环境。Windows环境不得默认给出只能在Bash执行的命令；要求用户决定前，先说明机制做什么、影响什么和不决定的代价。
+
+## 分层编排与工作区所有权（强制）
+
+- Super Dev是当前任务唯一的完整开发流程（Harness）和阶段状态所有者。宿主可以使用子代理（subagent）、Orca、OMP或其他已验证工具完成互不干扰的有界任务，但它们只是同一流程里的执行者，不是第二套Harness。
+- 目标、验收条件、权限、仓库规则和工作区安排从外层向内层继承；每往下一层，范围和权限只能缩小，不能自行扩大。
+- 只有已声明的安排负责人（`PLACEMENT_OWNER`）可以创建分支和工作区。若执行者已由Orca、Super Dev或上层代理放入指定工作区，默认不得再创建分支、工作区、协调器或下一级执行者，除非任务契约明确授权。
+- 每个可变工作区同时只能有一个生产写入者。只读研究和评审只有在范围与副作用互不干扰时才可并行。
+- 执行者向上回传产物、测试证据、风险和结果回执；只有上层整合负责人合并候选，只有Super Dev Core推进持久化阶段状态。
+- 默认下一级分派（`MAY_SPAWN_SUBWORKERS`）为`no`。已经被安排的执行者不得用新的分支或工作区重复上层已完成的隔离工作。
+
 ## 触发方式与命令路由（强制）
 
-用户只需在宿主中输入 `/super-dev <参数>`。
-宿主通过 Bash 工具自动执行对应的 CLI 命令，用户无需打开终端。
-唯一需要用户在终端手动执行的命令是 `pip install super-dev`（安装/升级）。
+普通用户只需要记住 3 个终端命令：`super-dev`、`super-dev update`、`super-dev uninstall`。
+真正的开发交互都应回到宿主里完成。
+
+宿主公开交互面只有 5 个：
+
+```
+/super-dev <goal>
+/super-dev-seeai <goal>
+继续当前流程
+现在下一步是什么
+```
+
+非 slash 宿主优先回退为：`super-dev:`、`super-dev-seeai:`，恢复与查询优先直接说“继续当前流程”“现在下一步是什么”。
+
+维护/治理场景才显式进入：`/super-dev-work`、`/super-dev-run`、`/super-dev-review`。
 
 ### 路由规则
 
-**规则 1 — 已知子命令 → 用 Bash 工具执行 `super-dev <完整参数>`**
+**规则 1 — 默认主入口**：`/super-dev <goal>` 或 `super-dev: <goal>`
 
-已知子命令完整列表：
-```
-init, bootstrap, setup, install, start, onboard, detect, doctor, migrate,
-run, status, next, continue, resume, jump, confirm,
-review, release, quality, enforce,
-spec, task, config, policy, governance, knowledge,
-memory, hooks, experts, compact,
-analyze, repo-map, impact, regression-guard, dependency-graph,
-feature-checklist, product-audit,
-create, pipeline, fix, wizard,
-generate, design, deploy, preview, expert, metrics,
-skill, integrate, update, clean, completion, feedback
-```
+系统应自动判断当前是 `new / evolve / patch / variant / resume`。
 
-示例：
-- `/super-dev init` → Bash: `super-dev init`
-- `/super-dev status` → Bash: `super-dev status`
-- `/super-dev run research` → Bash: `super-dev run research`
-- `/super-dev enforce validate` → Bash: `super-dev enforce validate`
-- `/super-dev quality` → Bash: `super-dev quality`
-- `/super-dev review docs --status confirmed` → Bash: `super-dev review docs --status confirmed`
-- `/super-dev release proof-pack` → Bash: `super-dev release proof-pack`
-- `/super-dev detect --auto` → Bash: `super-dev detect --auto`
-- `/super-dev setup claude-code` → Bash: `super-dev setup claude-code`
-- `/super-dev doctor --fix` → Bash: `super-dev doctor --fix`
+**规则 2 — 显式工作模式（维护/治理面）**：`/super-dev-work <mode> <goal>`
 
-**规则 2 — 自然语言（中文/英文描述）→ 进入 pipeline 模式**
+用于自动判断不准或用户明确要求时，支持 `new / evolve / patch / variant`。
 
-示例：
-- `/super-dev 做一个电商系统`
-- `/super-dev Build a user auth system`
-- `super-dev: 做一个电商系统`（冒号触发，等效）
-- `super-dev：做一个电商系统`（中文冒号也识别）
+**规则 3 — 阶段与恢复（维护/治理面）**：`/super-dev-run <stage|resume|status|next>`
 
-**规则 3 — 无参数 → 运行 `super-dev` 查看当前状态并继续**
+公开执行阶段只推荐：`research / docs / spec / frontend / backend / quality / delivery`。
+
+**规则 4 — gate / 返工（维护/治理面）**：`/super-dev-review <target> <action>`
+
+推荐 target：`docs / preview / ui / architecture / quality`。
+
+**规则 5 — 无参数**：如果用户只输入 `/super-dev` 或 `super-dev:`，默认返回当前恢复卡片与推荐下一句。
 
 ## Runtime Contract（强制）
 
@@ -100,50 +108,62 @@ skill, integrate, update, clean, completion, feedback
 - 需要研究、设计、编码、运行、调试时，优先使用宿主自身的 browse/search/terminal/edit 能力。
 - 不要等待用户解释"Super Dev 是什么"；你要把它理解为当前项目已经安装好的开发治理协议。
 
-## Super Dev CLI 命令速查
+## 宿主交互边界
 
-以下所有命令均在宿主内通过 `/super-dev <command>` 输入。
-宿主会通过 Bash 工具自动执行，无需打开终端。
+普通用户只需要记住 3 个终端命令：
 
 ```bash
-# 项目初始化与宿主接入
-super-dev init                          # 初始化项目配置
-super-dev detect --auto                 # 探测已安装宿主
-super-dev setup <host>                  # 一步接入指定宿主
-super-dev doctor --fix                  # 诊断并修复接入问题
-super-dev migrate                       # 迁移到最新版本
-
-# 流水线控制
-super-dev run <phase>                   # 跳转到指定阶段
-super-dev status                        # 查看当前流程状态
-super-dev next                          # 推荐下一步
-super-dev continue                      # 继续当前流程
-super-dev confirm <phase>               # 确认指定阶段
-
-# 治理与质量
-super-dev enforce install               # 安装 enforcement hooks
-super-dev enforce validate              # 运行验证检查
-super-dev quality                       # 运行质量门禁
-super-dev review docs                   # 查看三文档确认状态
-super-dev review ui                     # 查看 UI 审查状态
-super-dev review preview                # 查看预览确认状态
-
-# 交付
-super-dev release proof-pack            # 生成交付证据包
-super-dev release readiness             # 发布就绪度检查
-
-# 查询
-super-dev memory list                   # 查看记忆条目
-super-dev experts list                  # 查看专家角色
-super-dev hooks list                    # 查看 hook 事件
-super-dev hooks history                 # 查看最近 hook 历史
-super-dev harness status                # 查看 workflow/framework/hook harness
-super-dev compact list                  # 查看压缩摘要
-super-dev config list                   # 查看项目配置
-super-dev spec list                     # 查看规范与变更
+super-dev
+super-dev update
+super-dev uninstall
 ```
 
-**重要**: 这些命令是治理执行层，宿主自身能力无法替代。
+普通用户优先只记住这些宿主表达：
+
+```text
+/super-dev <goal>
+/super-dev-seeai <goal>
+继续当前流程
+现在下一步是什么
+```
+
+文本回退宿主优先使用：
+
+```text
+super-dev: <goal>
+super-dev-seeai: <goal>
+```
+
+维护/治理场景才显式进入：
+
+```text
+/super-dev-work <mode> <goal>
+/super-dev-run <stage|resume|status|next>
+/super-dev-review <target> <action>
+```
+
+工作模式固定为：
+
+- `new`：从 0 到 1
+- `evolve`：已有项目增量迭代
+- `variant`：从现有项目派生新版本
+- `patch`：在现有项目上修 bug / 做整改
+- `resume`：继续当前中断流程
+
+硬规则：
+
+- `new` 才能直接从 `research -> docs` 开始
+- `evolve / variant / patch` 必须先 `baseline`
+- baseline 必须先分析现有功能、架构、代码、路由/API、UI 与约束，再进入差量 research 和三文档
+- `resume` 是默认场景，不是异常场景
+
+恢复是默认场景，不是补充场景。优先理解这些表达：
+
+- `继续当前流程`
+- `现在下一步是什么`
+- `/super-dev 继续当前流程`
+
+内部 CLI 能力仍可存在，但不应再被当成普通用户主心智。
 
 ## 首轮响应契约（强制）
 
@@ -154,7 +174,7 @@ super-dev spec list                     # 查看规范与变更
 
 ### research 双引擎
 
-**引擎 1: CLI 知识推送** — `super-dev run research` 触发本地知识发现，读取 `knowledge/` 和 knowledge-bundle.json。
+**引擎 1: 本地知识发现** — 优先读取 `knowledge/` 和 knowledge-bundle.json，并在当前宿主里把结论沉入 `output/*-research.md`。
 
 **引擎 2: 宿主联网研究** — WebFetch/WebSearch 搜索同类产品、竞品和官方文档，写入 `output/*-research.md`。
 
@@ -190,73 +210,9 @@ super-dev spec list                     # 查看规范与变更
 - 读取 output/*-architecture.md 中的 API 定义
 - 读取 output/*-uiux.md 中的设计 token
 
-### 第 5 步：生成脚手架并验证构建
-- `super-dev generate components` + `super-dev generate types`
-- 运行构建命令确认零错误后才开始写业务代码
-
-## Plan-Execute 与 Overseer 模式（v2.3.3+）
-
-### 执行模式
-
-Super Dev 支持两种执行模式（通过 `super-dev.yaml` 的 `execution_mode` 配置）：
-
-**standard（默认）**: 传统的阶段顺序执行模式。
-
-**plan-execute**: 每个阶段执行前先生成结构化计划（步骤、依赖、验证闸门），按拓扑排序的 Wave 执行，每步独立验证。
-
-### Claude Code + Codex 混合模式
-
-当 `codex_review_enabled: true` 时，启用 Claude-Codex 协作模式：
-
-- **Claude Code** 作为主执行者：负责实现代码、生成文档、运行命令
-- **Codex CLI** 作为独立审查者：通过 `codex --quiet --prompt` 非交互调用
-- 审查时机：在 `codex_review_phases` 配置的阶段完成后自动触发
-- 审查结果持久化到 `.super-dev/plans/` 供追溯
-
-执行流程：
-1. Claude Code 完成阶段实现
-2. Codex 独立审查产出物
-3. 发现问题 → Claude Code 修复
-4. 循环直到 Codex 审查通过或达到失败预算
-
-### Overseer Agent（质量监督者）
-
-当 `overseer_enabled: true` 时，启用独立质量观测：
-
-- **角色**: 第 12 位专家 — 不参与实现，只做观测和判定
-- **检查点**: 每个阶段/步骤完成后自动触发审查
-- **偏差追踪**: 记录计划与实际执行的偏差（spec-drift、quality-drop、codex-unresolved 等）
-- **暂停机制**: `overseer_halt_on_critical: true` 时发现 Critical 偏差自动暂停流水线
-- **审查报告**: 持久化到 `.super-dev/overseer/` 目录
-
-偏差严重级别：
-- **INFO**: 信息提示，不影响执行
-- **WARNING**: 警告，流水线继续但需关注
-- **HIGH**: 高风险，建议暂停修正
-- **CRITICAL**: 阻断级，自动暂停流水线
-
-### 配置示例
-
-```yaml
-# super-dev.yaml
-execution_mode: plan-execute
-overseer_enabled: true
-codex_review_enabled: true
-codex_review_phases:
-  - drafting
-  - redteam
-  - qa
-overseer_halt_on_critical: true
-plan_failure_budget: 3
-```
-
-### 相关 CLI 命令
-
-```bash
-super-dev config set execution_mode plan-execute
-super-dev config set overseer_enabled true
-super-dev config set codex_review_enabled true
-```
+### 第 5 步：在宿主里建立页面结构与共享类型并验证构建
+- 按 `output/*-architecture.md` 与 `output/*-uiux.md` 直接在宿主里生成/更新页面结构、组件实现参考与共享类型
+- 运行宿主原生构建命令确认零错误后才开始写业务代码
 
 
 ## 会话连续性契约（强制）
@@ -329,7 +285,7 @@ super-dev config set codex_review_enabled true
 
 **阶段 3 -- 暴露错误（无法恢复）**
 - 提供: 什么失败了 + 为什么 + 下一步建议
-- 运行 `super-dev doctor --fix` 尝试自动修复
+- 回到终端重新运行 `super-dev` 校验宿主接入；若本地版本或注入面不一致，再执行 `super-dev update`
 
 永远不要在尝试阶段 1-2 之前就暴露错误给用户。
 

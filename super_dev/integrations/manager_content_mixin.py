@@ -569,56 +569,8 @@ class IntegrationManagerContentMixin:
         )
 
     def _build_codex_plugin_skill_content(self, *, skill_name: str) -> str:
-        if skill_name == "super-dev-seeai":
-            return (
-                "---\n"
-                "name: super-dev-seeai\n"
-                "description: Super Dev SEEAI Codex App/Desktop competition entry.\n"
-                "when_to_use: Use when the user wants the fast competition flow inside Codex App/Desktop.\n"
-                f"version: {__version__}\n"
-                "---\n\n"
-                "# Super Dev SEEAI for Codex Plugin\n\n"
-                "- Treat this as the competition-fast mode for showcase builds.\n"
-                "- Enter research first, then compact PRD / architecture / UIUX, wait for docs confirmation, create compact Spec, and move into one integrated build sprint.\n"
-                "- Do not expand back into the standard preview gate unless the user explicitly switches modes.\n"
-                "- Keep the result demoable, visually intentional, and runnable.\n"
-            )
-        return (
-            "---\n"
-            "name: super-dev\n"
-            "description: Super Dev Codex App/Desktop plugin entry.\n"
-            "when_to_use: Use when the user wants to enter or resume the Super Dev pipeline inside Codex App/Desktop.\n"
-            f"version: {__version__}\n"
-            "---\n\n"
-            "# Super Dev for Codex Plugin\n\n"
-            "## Activation Contract\n\n"
-            "- If this plugin skill is invoked, Super Dev pipeline mode is already active.\n"
-            "- Do not explain the skill or summarize what it is before acting.\n"
-            "- Treat the Codex App/Desktop `/`-list entry `super-dev` as equivalent to Codex CLI `$super-dev`.\n"
-            "- If `AGENTS.md` or `.super-dev/SESSION_BRIEF.md` exists, read them before replying.\n\n"
-            "## Required First Reply\n\n"
-            "- State that Super Dev pipeline mode is active.\n"
-            "- State that the current phase is `research`, unless `.super-dev/SESSION_BRIEF.md` shows an active confirmation or revision gate.\n"
-            "- Promise to stop after research + PRD + architecture + UIUX for explicit confirmation before implementation.\n\n"
-            "## Required Workflow\n\n"
-            "1. Detect whether the work is `new`, `evolve`, `variant`, `patch`, or `resume`.\n"
-            "2. For `evolve`, `variant`, and `patch`, baseline the current repository first and write `output/*-baseline-audit.md` / `.json` before docs/spec.\n"
-            "3. Read `knowledge/` and `output/knowledge-cache/*-knowledge-bundle.json` when present.\n"
-            "4. Produce `output/*-research.md`.\n"
-            "5. Produce `output/*-prd.md`, `output/*-architecture.md`, and `output/*-uiux.md`.\n"
-            "6. Wait for explicit confirmation.\n"
-            "7. Only then create `.super-dev/changes/*/proposal.md` and `.super-dev/changes/*/tasks.md`.\n"
-            "8. Implement frontend first, then backend, then quality and delivery.\n\n"
-            "## Continuity Rules\n\n"
-            "- If the workflow is already waiting for docs confirmation, preview confirmation, UI revision, architecture revision, or quality revision, stay inside the current Super Dev gate.\n"
-            "- User replies like `修改`, `补充`, `继续改`, `确认`, `通过`, `继续` remain inside the current gate.\n"
-            "- Resume is a normal path: after reopening the host, continue from `.super-dev/SESSION_BRIEF.md`, workflow state, review state, and `output/*` rather than restarting from scratch.\n"
-            "- Do not silently fall back to ordinary chat.\n\n"
-            "## UI Rules\n\n"
-            "- Lock icon library, typography, design token system, component ecosystem, and page skeleton from `output/*-uiux.md` before any UI implementation.\n"
-            "- Do not use emoji as functional icons or placeholders.\n"
-            "- For non-conversational AI products, avoid Claude / ChatGPT-style chat shells unless the UI plan explicitly justifies them.\n"
-        )
+        template = SkillTemplate.for_builtin(skill_name, "codex")
+        return template.render("codex")
 
     def _build_claude_repo_marketplace_content(self) -> str:
         payload = {

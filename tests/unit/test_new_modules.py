@@ -36,7 +36,9 @@ class TestSkillTemplate:
         fm = SkillFrontmatter(name="test-skill")
         lines = fm.to_yaml_lines("codex-cli")
         text = "\n".join(lines)
-        assert "when_to_use:" in text
+        assert "metadata:" in text
+        assert 'version: "2.4.0"' in text
+        assert "when_to_use:" not in text
         # codex-cli should NOT have allowed-tools
         assert "allowed-tools:" not in text
 
@@ -64,6 +66,8 @@ class TestSkillTemplate:
         tpl = SkillTemplate.for_builtin("super-dev", "codex-cli")
         output = tpl.render("codex-cli")
         assert "Codex CLI" in output
+        assert "## 沟通与环境适配（强制）" in output
+        assert "## 分层编排与工作区所有权（强制）" in output
 
     def test_skill_template_generic(self):
         from super_dev.skills.skill_template import SkillTemplate

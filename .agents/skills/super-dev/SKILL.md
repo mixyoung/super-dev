@@ -1,8 +1,8 @@
 ---
 name: super-dev
-description: Activate the Super Dev pipeline inside Codex CLI.
-when_to_use: Use when the user says /super-dev, super-dev:, or super-dev： followed by a requirement. Activate the Super Dev pipeline for research-first, commercial-grade project delivery.
-version: 2.4.0
+description: Use when the user explicitly enters or resumes the Super Dev pipeline in Codex for research-first, commercial-grade delivery.
+metadata:
+  version: "2.4.0"
 ---
 # super-dev for Codex CLI
 
@@ -24,6 +24,22 @@ version: 2.4.0
 - Do not spend a turn saying you will read the skill first, explain the skill, or decide whether to enter the workflow.
 - Do not answer with variants of "我先读取 skill 再判断流程".
 - If this file is loaded from `~/.codex/skills`, treat it as the compatibility mirror of the same Super Dev contract.
+
+## 沟通与环境适配（强制）
+
+- 默认使用Skill使用者的母语、文字习惯和熟悉程度；面向消费者的产品文案服从目标用户语言，不因内部工具使用英语就强迫用户理解英语。
+- 先用通俗说法解释作用，第一次出现必要专用词时放入括号，例如：完整开发流程（Harness）、隔离工作区（worktree）、唯一写入者（single writer）；后续优先使用已经解释过的通俗说法。
+- 编程语言专用词、代码名和字段使用“中文含义（`LITERAL_NAME`）”，例如：任务编号（`TASK_ID`）、安排负责人（`PLACEMENT_OWNER`）；命令和代码继续使用代码格式。
+- 适配实际操作系统、Shell、路径形式、仓库约定和已安装运行环境。Windows环境不得默认给出只能在Bash执行的命令；要求用户决定前，先说明机制做什么、影响什么和不决定的代价。
+
+## 分层编排与工作区所有权（强制）
+
+- Super Dev是当前任务唯一的完整开发流程（Harness）和阶段状态所有者。宿主可以使用子代理（subagent）、Orca、OMP或其他已验证工具完成互不干扰的有界任务，但它们只是同一流程里的执行者，不是第二套Harness。
+- 目标、验收条件、权限、仓库规则和工作区安排从外层向内层继承；每往下一层，范围和权限只能缩小，不能自行扩大。
+- 只有已声明的安排负责人（`PLACEMENT_OWNER`）可以创建分支和工作区。若执行者已由Orca、Super Dev或上层代理放入指定工作区，默认不得再创建分支、工作区、协调器或下一级执行者，除非任务契约明确授权。
+- 每个可变工作区同时只能有一个生产写入者。只读研究和评审只有在范围与副作用互不干扰时才可并行。
+- 执行者向上回传产物、测试证据、风险和结果回执；只有上层整合负责人合并候选，只有Super Dev Core推进持久化阶段状态。
+- 默认下一级分派（`MAY_SPAWN_SUBWORKERS`）为`no`。已经被安排的执行者不得用新的分支或工作区重复上层已完成的隔离工作。
 
 ## 触发方式（强制）
 
