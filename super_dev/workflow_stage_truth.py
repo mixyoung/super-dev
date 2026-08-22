@@ -2,17 +2,11 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
+from .workflow_contract import CANONICAL_NINE_STAGE_IDS
+
 CANONICAL_WORKFLOW_STAGE_CHAIN: tuple[str, ...] = (
     "baseline",
-    "research",
-    "docs",
-    "docs_confirm",
-    "spec",
-    "frontend",
-    "preview_confirm",
-    "backend",
-    "quality",
-    "delivery",
+    *CANONICAL_NINE_STAGE_IDS,
 )
 
 SEEAI_WORKFLOW_STAGE_CHAIN: tuple[str, ...] = (

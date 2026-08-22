@@ -37,7 +37,6 @@ The new contract keeps one Harness and nine stable stage names while making the 
 
 - `super_dev/workflow_contract.py`
 - `super_dev/workflow_stage_truth.py`
-- `super_dev/orchestrator/contracts.py`
 - `super_dev/work_mode.py`
 
 ### Tests
@@ -73,6 +72,7 @@ Each agent assignment contains:
 - no CLI or Web UI changes;
 - no external BMAD, Superpowers, UmaDev, or Grill method integration;
 - no replacement of `.super-dev/workflow-state.json`;
+- no change to existing pipeline-contract JSON/Markdown output;
 - no change to existing docs/preview/quality gate behavior;
 - no automatic commit, merge, push, deployment, or global installation.
 
@@ -94,3 +94,13 @@ Each agent assignment contains:
 - UI/API/data/architecture scope changes invalidate the relevant prior decisions;
 - quality and delivery cannot be marked not applicable;
 - all existing v2.4.0 workflow tests remain behaviorally unchanged when the feature is disabled.
+
+## First-Slice Evidence
+
+- safe affected-workflow regression: 82 passed;
+- lint: changed source and tests passed Ruff;
+- diff check: passed;
+- independent Grok Build review: `VERDICT=ACCEPT` after resolving stage-kind, evidence-expiry, shadow-bypass, authority-narrowing, and compatibility findings;
+- existing pipeline-contract JSON/Markdown output remains unchanged;
+- known pre-existing Windows `PlanExecutor` baseline remains outside this slice: fixed Bash invocation and POSIX-path expectation produce 2 failures when that test file is included;
+- Black and mypy executables are not installed in the current environment, so those checks were not claimed.

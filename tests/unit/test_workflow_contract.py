@@ -6,6 +6,7 @@ from super_dev.workflow_contract import (
     get_agent_team,
     get_gate_config,
     get_phase_chain,
+    get_phase_kinds,
     get_workflow_contract,
 )
 
@@ -32,6 +33,11 @@ def test_standard_workflow_contract_exposes_full_pipeline_contract():
         "preview_confirm": True,
         "quality": True,
     }
+    assert get_phase_kinds("standard")["docs_confirm"] == "gate"
+    assert get_phase_kinds("standard")["preview_confirm"] == "gate"
+    assert get_phase_kinds("standard")["backend"] == "work"
+    assert get_phase_kinds("standard")["quality"] == "work_gate"
+    assert get_phase_kinds("standard")["delivery"] == "work"
     assert [agent.key for agent in get_agent_team("standard")] == [
         "researcher",
         "pm",

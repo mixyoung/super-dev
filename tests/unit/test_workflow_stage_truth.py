@@ -1,4 +1,6 @@
+from super_dev.workflow_contract import CANONICAL_NINE_STAGE_IDS
 from super_dev.workflow_stage_truth import (
+    CANONICAL_WORKFLOW_STAGE_CHAIN,
     active_experts_for_stage,
     canonical_stage_for_engine_phase,
     normalize_stage_key,
@@ -6,6 +8,10 @@ from super_dev.workflow_stage_truth import (
     stages_require_docs_confirmation,
     stages_require_preview_confirmation,
 )
+
+
+def test_stage_truth_uses_the_canonical_nine_stage_roster() -> None:
+    assert CANONICAL_WORKFLOW_STAGE_CHAIN == ("baseline", *CANONICAL_NINE_STAGE_IDS)
 
 
 def test_normalize_stage_key_maps_legacy_aliases() -> None:

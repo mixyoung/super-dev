@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 WorkMode = Literal["new", "evolve", "variant", "patch", "resume"]
+GovernanceDepth = Literal["bounded", "architectural", "commercial"]
 
 WORK_MODE_LABELS: dict[str, str] = {
     "new": "从 0 到 1",
@@ -11,6 +12,12 @@ WORK_MODE_LABELS: dict[str, str] = {
     "variant": "版本派生 / 1-N+1",
     "patch": "缺陷修复",
     "resume": "恢复当前流程",
+}
+
+GOVERNANCE_DEPTH_LABELS: dict[str, str] = {
+    "bounded": "边界清楚的小改动",
+    "architectural": "架构或跨模块改动",
+    "commercial": "商业交付或高风险改动",
 }
 
 
@@ -49,3 +56,20 @@ def work_mode_requires_baseline(work_mode: str) -> bool:
 def work_mode_label(work_mode: str) -> str:
     normalized = normalize_work_mode(work_mode)
     return WORK_MODE_LABELS.get(normalized, normalized)
+
+
+def normalize_governance_depth(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in GOVERNANCE_DEPTH_LABELS:
+        return normalized
+    raise ValueError(f"Unsupported governance depth: {value!r}")
+
+
+def governance_depth_label(value: str) -> str:
+    normalized = normalize_governance_depth(value)
+    return GOVERNANCE_DEPTH_LABELS[normalized]
+
+
+def governance_depth_rank(value: str) -> int:
+    normalized = normalize_governance_depth(value)
+    return {"bounded": 0, "architectural": 1, "commercial": 2}[normalized]

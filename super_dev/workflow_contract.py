@@ -6,6 +6,7 @@ from typing import Any, Literal
 from .seeai_design_system import SEEAI_JUDGE_CHECKLIST, SEEAI_QUALITY_FLOOR
 
 FlowVariant = Literal["standard", "seeai"]
+StageKind = Literal["work", "gate", "work_gate"]
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,18 @@ STANDARD_PHASE_CHAIN: tuple[WorkflowPhase, ...] = (
         description="生成交付包、部署配置和审计产物。",
     ),
 )
+
+CANONICAL_NINE_STAGE_IDS: tuple[str, ...] = tuple(
+    phase.key for phase in STANDARD_PHASE_CHAIN
+)
+CANONICAL_STAGE_KINDS: dict[str, StageKind] = {
+    stage: (
+        "gate"
+        if stage in {"docs_confirm", "preview_confirm"}
+        else ("work_gate" if stage == "quality" else "work")
+    )
+    for stage in CANONICAL_NINE_STAGE_IDS
+}
 
 SEEAI_PHASE_CHAIN: tuple[WorkflowPhase, ...] = (
     WorkflowPhase(
@@ -323,6 +336,20 @@ def get_phase_chain(flow_variant: str = "standard") -> tuple[str, ...]:
     return tuple(phase.key for phase in get_workflow_contract(flow_variant).phase_chain)
 
 
+def get_phase_kinds(flow_variant: str = "standard") -> dict[str, StageKind]:
+    contract = get_workflow_contract(flow_variant)
+    if contract.flow_variant == "standard":
+        return dict(CANONICAL_STAGE_KINDS)
+    return {
+        phase.key: (
+            "gate"
+            if phase.key == "docs_confirm"
+            else ("work_gate" if phase.key == "quality" else "work")
+        )
+        for phase in contract.phase_chain
+    }
+
+
 def get_gate_config(flow_variant: str = "standard") -> dict[str, bool]:
     return {gate.key: gate.required for gate in get_workflow_contract(flow_variant).gates}
 
@@ -333,14 +360,18 @@ def get_agent_team(flow_variant: str = "standard") -> tuple[WorkflowAgent, ...]:
 
 __all__ = [
     "FlowVariant",
+    "StageKind",
     "WorkflowAgent",
     "WorkflowContractSpec",
     "WorkflowGate",
     "WorkflowPhase",
     "SEEAI_WORKFLOW_CONTRACT",
     "STANDARD_WORKFLOW_CONTRACT",
+    "CANONICAL_NINE_STAGE_IDS",
+    "CANONICAL_STAGE_KINDS",
     "get_agent_team",
     "get_gate_config",
     "get_phase_chain",
+    "get_phase_kinds",
     "get_workflow_contract",
 ]

@@ -5,8 +5,23 @@ from pathlib import Path
 
 import pytest
 
-from super_dev.work_mode import detect_work_mode, work_mode_requires_baseline
+from super_dev.work_mode import (
+    detect_work_mode,
+    governance_depth_label,
+    governance_depth_rank,
+    normalize_governance_depth,
+    work_mode_requires_baseline,
+)
 from super_dev.workflow_state import detect_pipeline_summary
+
+
+def test_governance_depth_is_strict_and_ordered() -> None:
+    assert normalize_governance_depth("bounded") == "bounded"
+    assert governance_depth_label("architectural") == "架构或跨模块改动"
+    assert governance_depth_rank("bounded") < governance_depth_rank("commercial")
+
+    with pytest.raises(ValueError, match="Unsupported governance depth"):
+        normalize_governance_depth("mystery")
 
 
 def test_detect_work_mode_defaults_to_new(temp_project_dir: Path):
