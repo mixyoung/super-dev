@@ -97,6 +97,19 @@ class ProjectConfig:
     # CLI 设置
     cli: dict[str, Any] = field(default_factory=dict)
 
+    # 自适应九阶段影子账本（默认关闭，不控制真实门禁）
+    adaptive_ledger: dict[str, Any] = field(
+        default_factory=lambda: {"enabled": False, "auto_create": False}
+    )
+
+    def __post_init__(self) -> None:
+        if isinstance(self.adaptive_ledger, dict):
+            self.adaptive_ledger = {
+                "enabled": False,
+                "auto_create": False,
+                **self.adaptive_ledger,
+            }
+
 
 class ConfigManager:
     """配置管理器"""
@@ -136,6 +149,7 @@ class ConfigManager:
         "overseer_halt_on_critical": True,
         "plan_failure_budget": 3,
         "output_dir": "output",
+        "adaptive_ledger": {"enabled": False, "auto_create": False},
         # 前端配置
         "ui_library": None,
         "style_solution": None,
@@ -383,6 +397,18 @@ class ConfigManager:
             errors.append("host_compatibility_min_score 必须在 0-100 之间")
         if config.host_compatibility_min_ready_hosts < 0:
             errors.append("host_compatibility_min_ready_hosts 不能小于 0")
+        adaptive_ledger = config.adaptive_ledger
+        if not isinstance(adaptive_ledger, dict):
+            errors.append("adaptive_ledger 必须是对象")
+        else:
+            for field_name in ("enabled", "auto_create"):
+                if not isinstance(adaptive_ledger.get(field_name), bool):
+                    errors.append(f"adaptive_ledger.{field_name} 必须是布尔值")
+            if (
+                adaptive_ledger.get("auto_create") is True
+                and adaptive_ledger.get("enabled") is not True
+            ):
+                errors.append("adaptive_ledger.auto_create 不能在 enabled 关闭时启用")
         if not isinstance(config.host_profile_enforce_selected, bool):
             errors.append("host_profile_enforce_selected 必须是布尔值")
         if not isinstance(config.host_profile_targets, list):

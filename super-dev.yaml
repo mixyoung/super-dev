@@ -1,4 +1,7 @@
 author: ''
+adaptive_ledger:
+  auto_create: true
+  enabled: true
 backend: node
 cli: {}
 database: postgresql

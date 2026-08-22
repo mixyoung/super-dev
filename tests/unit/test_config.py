@@ -29,6 +29,7 @@ class TestProjectConfig:
         assert config.language_preferences == []
         assert config.knowledge_allowed_domains == []
         assert config.knowledge_cache_ttl_seconds == 1800
+        assert config.adaptive_ledger == {"enabled": False, "auto_create": False}
 
     def test_config_with_custom_values(self):
         """测试自定义配置"""
@@ -122,6 +123,33 @@ class TestConfigManager:
         with open(config_path) as f:
             data = yaml.safe_load(f)
             assert data["name"] == "saved-project"
+
+    def test_adaptive_ledger_configuration_is_strict(self, temp_project_dir: Path):
+        manager = ConfigManager(temp_project_dir)
+
+        enabled = manager.create(
+            name="adaptive-ledger",
+            adaptive_ledger={"enabled": True, "auto_create": True},
+        )
+
+        assert enabled.adaptive_ledger == {"enabled": True, "auto_create": True}
+        with pytest.raises(ValueError, match="auto_create"):
+            manager.update(adaptive_ledger={"enabled": False, "auto_create": True})
+        with pytest.raises(ValueError, match="必须是布尔值"):
+            manager.update(adaptive_ledger={"enabled": "true", "auto_create": "true"})
+
+    def test_partial_adaptive_ledger_configuration_merges_safe_defaults(
+        self, temp_project_dir: Path
+    ):
+        config_path = temp_project_dir / "super-dev.yaml"
+        config_path.write_text(
+            "name: partial\nfrontend: next\nbackend: node\nadaptive_ledger:\n  enabled: true\n",
+            encoding="utf-8",
+        )
+
+        loaded = ConfigManager(temp_project_dir).load()
+
+        assert loaded.adaptive_ledger == {"enabled": True, "auto_create": False}
 
     def test_create_config(self, temp_project_dir: Path):
         """测试创建新配置"""

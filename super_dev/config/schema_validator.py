@@ -40,6 +40,7 @@ KNOWN_FIELDS = {
     "codex_review_phases",
     "overseer_halt_on_critical",
     "plan_failure_budget",
+    "adaptive_ledger",
 }
 
 
@@ -116,6 +117,26 @@ def validate_config(config: dict) -> list[str]:
     if design_inspiration_slug is not None and not isinstance(design_inspiration_slug, str):
         errors.append("'design_inspiration_slug' must be a string if present")
 
+    adaptive_ledger = config.get(
+        "adaptive_ledger", {"enabled": False, "auto_create": False}
+    )
+    if not isinstance(adaptive_ledger, dict):
+        errors.append("'adaptive_ledger' must be an object")
+    else:
+        adaptive_ledger = {
+            "enabled": False,
+            "auto_create": False,
+            **adaptive_ledger,
+        }
+        for field_name in ("enabled", "auto_create"):
+            if not isinstance(adaptive_ledger.get(field_name), bool):
+                errors.append(f"'adaptive_ledger.{field_name}' must be a boolean")
+        if (
+            adaptive_ledger.get("auto_create") is True
+            and adaptive_ledger.get("enabled") is not True
+        ):
+            errors.append("'adaptive_ledger.auto_create' requires 'adaptive_ledger.enabled'")
+
     return errors
 
 
@@ -160,4 +181,5 @@ class ConfigSchemaValidator:
             "experts": ["PM", "ARCHITECT", "CODE"],
             "host_compatibility_min_score": 70,
             "knowledge_cache_ttl_seconds": 3600,
+            "adaptive_ledger": {"enabled": False, "auto_create": False},
         }

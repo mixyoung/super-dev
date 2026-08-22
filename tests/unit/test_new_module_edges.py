@@ -59,6 +59,23 @@ class TestSchemaValidatorEdgeCases:
         defaults = v.get_defaults()
         assert validate_config(defaults) == []
 
+    def test_adaptive_ledger_schema_is_strict_and_backward_compatible(self):
+        valid = ConfigSchemaValidator().get_defaults()
+        valid["adaptive_ledger"] = {"enabled": True, "auto_create": True}
+        assert validate_config(valid) == []
+
+        legacy = dict(valid)
+        legacy.pop("adaptive_ledger")
+        assert validate_config(legacy) == []
+
+        invalid = dict(valid)
+        invalid["adaptive_ledger"] = {"enabled": False, "auto_create": True}
+        assert any("requires" in item for item in validate_config(invalid))
+
+        partial = dict(valid)
+        partial["adaptive_ledger"] = {"enabled": True}
+        assert validate_config(partial) == []
+
 
 class TestRateLimitEdgeCases:
     def test_zero_window_corrected(self):

@@ -162,3 +162,47 @@ After independent review, the final comparison contract was tightened further:
 - each evaluation produces one concise coaching summary instead of exposing raw stage reasons as user questions.
 
 Final affected regression: 110 passed and one existing Windows symbolic-link permission test skipped. Changed source and tests passed Ruff and diff whitespace checks. Independent Grok Build review returned `VERDICT=ACCEPT` with no mandatory fixes, and the follow-up review confirmed its three medium findings were resolved.
+
+## Fourth-Slice Automatic Shadow Creation
+
+The fourth slice creates a conservative shadow ledger automatically only after `SpecBuilder` has successfully created the stable change directory and tasks. It does not infer skips, waive gates, dispatch agents, or advance workflow state.
+
+### Creation contract
+
+- project configuration must explicitly set both `adaptive_ledger.enabled=true` and `adaptive_ledger.auto_create=true`;
+- defaults remain false for old and newly initialized projects;
+- `SpecBuilder` is the single production creation owner shared by the CLI pipeline and project creator;
+- the change directory must already exist and the change ID must use the safe identifier contract;
+- a first write uses a same-directory temporary file and an exclusive hard link, with an exclusive-create fallback for filesystems without hard-link support, so concurrent creators cannot overwrite each other;
+- a valid existing ledger is reused byte-for-byte;
+- an invalid existing ledger is reported and preserved rather than repaired or overwritten;
+- a failed shadow write never fails the primary Spec creation or changes a gate decision;
+- interrupted temporary files do not block a later retry;
+- the initial plan remains the conservative full nine-stage roster;
+- the newly created Spec stage is recorded as satisfied; docs and docs confirmation are recorded together only when the current document digest is confirmed; project-level historical research or document files never satisfy a new change by presence alone.
+
+All configuration, document-binding, path-inspection, and ledger-write work is isolated behind a broad shadow-only failure boundary in `SpecBuilder`. An unexpected shadow exception becomes a `write_failed` diagnostic after proposal/tasks creation and cannot fail the primary change creation.
+
+The repository itself opts into this path in `super-dev.yaml` as a local canary. Package defaults remain disabled.
+
+### Still outside this slice
+
+- no automatic changed-surface classification;
+- no automatic application of the comparison lab's skip or reuse decisions;
+- no ledger mutation after initial creation;
+- no stage-control, confirmation, quality, integration, merge, push, or release authority.
+
+### Fourth-slice evidence
+
+- affected configuration, SpecBuilder, lifecycle, comparison, workflow-state, and CLI regression: 218 passed;
+- one existing Windows symbolic-link permission test skipped;
+- changed source and tests passed Ruff and diff whitespace checks;
+- concurrent creation produced exactly one `created` and one `existing` result with one valid final ledger;
+- hard-link failure used the exclusive-create fallback without overwriting;
+- simulated failure of both write paths left no final ledger and did not fail Spec creation;
+- historical output files did not satisfy research or docs for a new change;
+- invalid JSON and mismatched change IDs were preserved byte-for-byte and reported;
+- independent Grok Build review first returned `VERDICT=REVISE` for historical-file status pollution and incomplete SpecBuilder failure isolation; both mandatory findings were fixed;
+- follow-up review returned `VERDICT=ACCEPT` with no remaining mandatory fixes.
+
+The exclusive-create fallback may leave an invalid final file if a non-hard-link filesystem crashes during the fallback write. Such a file is preserved and reported rather than overwritten. The primary NTFS canary path uses the completed temporary file plus exclusive hard link and does not expose this partial-write window.

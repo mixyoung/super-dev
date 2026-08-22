@@ -9,9 +9,16 @@ Spec 构建器 - 自动创建 Spec 规范
 
 from pathlib import Path
 
+from .. import __version__
+from ..config import ConfigManager
+from ..shadow_ledger_lifecycle import (
+    ShadowLedgerCreationResult,
+    adaptive_ledger_auto_create_enabled,
+    ensure_shadow_change_ledger,
+)
 from ..specs import ChangeManager, SpecGenerator, SpecManager
 from ..specs.models import DeltaType, Task, TaskStatus
-from ..workflow_guard import require_docs_confirmation
+from ..workflow_guard import docs_gate_status, require_docs_confirmation
 from .requirement_parser import RequirementParser
 
 
@@ -28,6 +35,7 @@ class SpecBuilder:
         self.change_manager = ChangeManager(self.project_dir)
         self.spec_manager = SpecManager(self.project_dir)
         self.requirement_parser = RequirementParser()
+        self.last_shadow_ledger_result: dict | None = None
 
     def create_change(
         self,
@@ -73,6 +81,31 @@ class SpecBuilder:
 
         # 3. 自动生成任务
         self._generate_tasks_for_change(change_id, tech_stack, scenario)
+
+        try:
+            config = ConfigManager(self.project_dir).config
+            satisfied_stages = {"spec"}
+            if docs_gate_status(self.project_dir).get("confirmed") is True:
+                satisfied_stages.update({"docs", "docs_confirm"})
+            shadow_result = ensure_shadow_change_ledger(
+                self.project_dir,
+                change_id=change_id,
+                harness_version=__version__,
+                intent="build",
+                governance_depth=(
+                    "commercial" if scenario == "0-1" else "architectural"
+                ),
+                work_mode="new" if scenario == "0-1" else "evolve",
+                enabled=adaptive_ledger_auto_create_enabled(config),
+                satisfied_stages=satisfied_stages,
+            )
+        except Exception as exc:
+            shadow_result = ShadowLedgerCreationResult(
+                status="write_failed",
+                change_id=change_id,
+                error=f"Shadow ledger isolation caught an unexpected error: {exc}",
+            )
+        self.last_shadow_ledger_result = shadow_result.to_dict()
 
         return change_id
 

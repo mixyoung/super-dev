@@ -74,3 +74,13 @@
 - [x] I4. Add one valid project-scoped evidence reuse and negative tests for stale or out-of-scope reuse.
 - [x] I5. Write the repeatable comparison results to `shadow-comparison-report.md` and keep production writes disabled.
 - [x] I6. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.
+
+## J. Automatic Shadow Ledger Creation
+
+- [x] J1. Add strict nested configuration with both feature and automatic-creation switches disabled by default.
+- [x] J2. Make `SpecBuilder` the single creation owner after a stable change ID, proposal, and tasks exist.
+- [x] J3. Add safe-path validation, atomic exclusive creation, idempotent reuse, and no-overwrite handling.
+- [x] J4. Preserve invalid existing evidence and keep shadow failures from blocking primary Spec creation.
+- [x] J5. Record the newly created Spec as satisfied, bind docs satisfaction to current digest confirmation, reject historical-file inference, and keep the initial plan conservative.
+- [x] J6. Add disabled, repeat, concurrent, interrupted, unsafe-path, invalid-existing, configuration, and SpecBuilder integration tests.
+- [x] J7. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.

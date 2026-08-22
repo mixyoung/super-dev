@@ -3154,9 +3154,30 @@ class SuperDevCLI(
 
                 self.console.print(f"  [green]✓[/green] 变更 ID: {change_id}")
                 self.console.print(f"  [green]✓[/green] Spec: .super-dev/changes/{change_id}/")
+                shadow_result = spec_builder.last_shadow_ledger_result or {}
+                if shadow_result.get("status") == "created":
+                    self.console.print(
+                        "  [green]✓[/green] 九阶段影子账本已建立（只读，不控制门禁）"
+                    )
+                elif shadow_result.get("status") in {
+                    "invalid_existing",
+                    "write_failed",
+                    "unsafe_path",
+                    "missing_change",
+                }:
+                    self.console.print(
+                        "  [yellow]⚠[/yellow] 影子账本未建立；主流程继续，"
+                        f"原因: {shadow_result.get('error', '-')}"
+                    )
                 self.console.print("")
-                _record_stage(True, details={"change_id": change_id})
-                _update_run_context(change_id=change_id)
+                _record_stage(
+                    True,
+                    details={
+                        "change_id": change_id,
+                        "shadow_ledger": shadow_result,
+                    },
+                )
+                _update_run_context(change_id=change_id, shadow_ledger=shadow_result)
 
             # ========== 第 3 阶段: 生成前端实施蓝图 ==========
             _start_stage("3", "前端实施蓝图与预览")
