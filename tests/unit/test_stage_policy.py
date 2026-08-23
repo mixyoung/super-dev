@@ -213,6 +213,65 @@ def test_ui_contract_change_requires_docs_confirmation() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "work_mode,governance_depth",
+    [("new", "bounded"), ("evolve", "commercial")],
+)
+def test_new_or_commercial_change_cannot_skip_research(
+    work_mode: str,
+    governance_depth: str,
+) -> None:
+    ledger = _ledger(governance_depth)
+    with pytest.raises(StagePolicyError, match="cannot skip the research"):
+        apply_stage_resolution(
+            ledger.get_stage("research"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=StagePolicyContext(
+                change_id=ledger.change_id,
+                work_mode=work_mode,
+                governance_depth=governance_depth,
+            ),
+            reason="No research needed",
+        )
+
+
+@pytest.mark.parametrize(
+    "work_mode,governance_depth",
+    [("new", "bounded"), ("evolve", "commercial")],
+)
+def test_new_or_commercial_change_cannot_skip_docs_or_confirmation(
+    work_mode: str,
+    governance_depth: str,
+) -> None:
+    ledger = _ledger(governance_depth)
+    context = StagePolicyContext(
+        change_id=ledger.change_id,
+        work_mode=work_mode,
+        governance_depth=governance_depth,
+    )
+
+    with pytest.raises(StagePolicyError, match="cannot skip the docs"):
+        apply_stage_resolution(
+            ledger.get_stage("docs"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=context,
+            reason="No docs needed",
+        )
+    with pytest.raises(StagePolicyError, match="require docs confirmation"):
+        apply_stage_resolution(
+            ledger.get_stage("docs_confirm"),
+            resolution=StageResolution.NOT_APPLICABLE,
+            depth=ArtifactDepth.NONE,
+            actor=_coordinator(),
+            context=context,
+            reason="No confirmation needed",
+        )
+
+
 def test_ui_change_cannot_skip_the_docs_that_user_must_confirm() -> None:
     ledger = _ledger()
     with pytest.raises(StagePolicyError, match="cannot skip the docs"):

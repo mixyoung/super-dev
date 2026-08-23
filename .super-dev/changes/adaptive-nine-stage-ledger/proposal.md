@@ -206,3 +206,30 @@ The repository itself opts into this path in `super-dev.yaml` as a local canary.
 - follow-up review returned `VERDICT=ACCEPT` with no remaining mandatory fixes.
 
 The exclusive-create fallback may leave an invalid final file if a non-hard-link filesystem crashes during the fallback write. Such a file is preserved and reported rather than overwritten. The primary NTFS canary path uses the completed temporary file plus exclusive hard link and does not expose this partial-write window.
+
+## Fifth-Slice Validation Responsibility Split
+
+The fifth slice removes the comparison laboratory from the published `super_dev` package and separates its responsibilities:
+
+- `super_dev/stage_scope.py` owns the production-grade pure rule that maps changed surfaces, work mode, and governance depth to required stages;
+- `super_dev/stage_policy.py` consumes that same rule when rejecting illegal skips, including the aligned rule that new or commercial changes cannot skip research, docs, or document confirmation;
+- representative scenarios and frozen expected answers live under `tests/fixtures/`;
+- in-memory plan assembly and evaluation live under `tests/support/`;
+- coaching summaries and report generation live under `tools/` and are excluded from the published package;
+- `super_dev/shadow_validation.py` is removed;
+- the production ledger lifecycle remains the only file writer and does not import the comparison fixtures, evaluator, or report tool.
+
+This split removes the second positive stage-rule source from the shipped package. The comparison remains useful as a development check without presenting an unused public governance API.
+
+### Fifth-slice evidence
+
+- affected scope, policy, comparison, package-boundary, lifecycle, configuration, workflow-state, and CLI regression: 250 passed;
+- one existing Windows symbolic-link permission test skipped;
+- changed source and tests passed Ruff and diff whitespace checks;
+- `python -m tools.shadow_comparison` completed and reproduced four passing representative scenarios;
+- package discovery includes only `super_dev*`; tests and tools are excluded;
+- syntax-tree import checks confirm production modules do not import `tests` or `tools`;
+- `super_dev.shadow_validation` is no longer importable;
+- production ledger lifecycle and SpecBuilder creation behavior are unchanged by this split;
+- Grok Build's architecture review recommended `SPLIT`; the implementation review returned `VERDICT=ACCEPT` with no mandatory fixes;
+- follow-up tests cover new or commercial changes retaining research, docs, and document confirmation even with no changed-surface hint.

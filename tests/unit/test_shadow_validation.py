@@ -7,14 +7,16 @@ import pytest
 
 from super_dev.agent_contract import AgentAssignment, AgentLevel
 from super_dev.change_ledger import EvidenceReference, StageResolution
-from super_dev.shadow_validation import (
-    build_representative_validation_report,
-    evaluate_shadow_scenario,
-    plan_shadow_scenario,
-    representative_shadow_scenarios,
-)
 from super_dev.stage_policy import StagePolicyError
 from super_dev.workflow_contract import CANONICAL_NINE_STAGE_IDS
+from tests.fixtures.shadow_scenarios import (
+    representative_shadow_scenarios,
+)
+from tests.support.shadow_plan_harness import (
+    evaluate_shadow_scenario,
+    plan_shadow_scenario,
+)
+from tools.shadow_comparison import build_representative_validation_report
 
 
 def _coordinator() -> AgentAssignment:

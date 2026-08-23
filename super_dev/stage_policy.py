@@ -14,6 +14,7 @@ from .change_ledger import (
     StageResolution,
     StageStatus,
 )
+from .stage_scope import required_stages_for
 from .work_mode import governance_depth_rank, normalize_governance_depth
 
 
@@ -46,6 +47,8 @@ SKIP_LIKE_RESOLUTIONS = {
 class StagePolicyContext:
     change_id: str
     changed_surfaces: frozenset[str] = field(default_factory=frozenset)
+    work_mode: str = "evolve"
+    governance_depth: str = "bounded"
     merge_or_release_candidate: bool = True
     executed_stages: frozenset[str] = field(default_factory=frozenset)
 
@@ -122,52 +125,36 @@ def validate_stage_resolution(
         raise StagePolicyError("This actor cannot approve reuse, skip, or gate waiver")
 
     surfaces = context.changed_surfaces
+    try:
+        required_stages = set(
+            required_stages_for(
+                changed_surfaces=surfaces,
+                work_mode=context.work_mode,
+                governance_depth=context.governance_depth,
+            )
+        )
+    except ValueError as exc:
+        raise StagePolicyError(str(exc)) from exc
+    if entry.stage == "research" and resolution == StageResolution.NOT_APPLICABLE:
+        if "research" in required_stages:
+            raise StagePolicyError("New or commercial changes cannot skip the research stage")
+    if entry.stage == "spec" and resolution == StageResolution.NOT_APPLICABLE:
+        raise StagePolicyError("A real change cannot skip the Spec stage")
     if entry.stage == "frontend" and resolution == StageResolution.NOT_APPLICABLE:
-        if surfaces & {"frontend", "ui", "route", "style", "component"}:
+        if "frontend" in required_stages:
             raise StagePolicyError("Frontend changes cannot skip the frontend stage")
     if entry.stage == "backend" and resolution == StageResolution.NOT_APPLICABLE:
-        if surfaces & {"backend", "api", "data", "authorization"}:
+        if "backend" in required_stages:
             raise StagePolicyError("Backend or contract changes cannot skip the backend stage")
     if entry.stage == "docs" and resolution == StageResolution.NOT_APPLICABLE:
-        if surfaces & {
-            "product",
-            "architecture",
-            "uiux",
-            "ui",
-            "frontend",
-            "route",
-            "style",
-            "component",
-            "api",
-            "data",
-            "authorization",
-        }:
+        if "docs" in required_stages:
             raise StagePolicyError("Contract changes cannot skip the docs stage")
-    if entry.stage == "docs_confirm" and surfaces & {
-        "product",
-        "architecture",
-        "uiux",
-        "ui",
-        "frontend",
-        "route",
-        "style",
-        "component",
-        "api",
-        "data",
-        "authorization",
-    }:
+    if entry.stage == "docs_confirm" and "docs_confirm" in required_stages:
         if resolution != StageResolution.REQUIRE:
             raise StagePolicyError("Contract changes require docs confirmation")
     if entry.stage == "preview_confirm" and (
         "frontend" in context.executed_stages
-        or surfaces
-        & {
-        "frontend",
-        "ui",
-        "route",
-        "style",
-        "component",
-        }
+        or "preview_confirm" in required_stages
     ):
         if resolution != StageResolution.REQUIRE:
             raise StagePolicyError("User-visible frontend changes require preview confirmation")

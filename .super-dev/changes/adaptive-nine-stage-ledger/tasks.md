@@ -84,3 +84,13 @@
 - [x] J5. Record the newly created Spec as satisfied, bind docs satisfaction to current digest confirmation, reject historical-file inference, and keep the initial plan conservative.
 - [x] J6. Add disabled, repeat, concurrent, interrupted, unsafe-path, invalid-existing, configuration, and SpecBuilder integration tests.
 - [x] J7. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.
+
+## K. Comparison Responsibility Split
+
+- [x] K1. Add production stage-range rules in `super_dev/stage_scope.py` with one shared surface vocabulary.
+- [x] K2. Make `stage_policy.py` consume the same required-stage rule and close the research-skip gap for new or commercial changes.
+- [x] K3. Move representative scenarios and frozen expectations to `tests/fixtures/`.
+- [x] K4. Move in-memory plan assembly and evaluation to `tests/support/`.
+- [x] K5. Move coaching summaries and report generation to `tools/`, outside the published package.
+- [x] K6. Remove `super_dev/shadow_validation.py` and verify that production lifecycle code has no test/tool dependency.
+- [x] K7. Run the affected regression suite, package-boundary check, independent read-only review, and prepare the local commit; do not push.
