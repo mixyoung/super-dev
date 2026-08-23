@@ -233,3 +233,44 @@ This split removes the second positive stage-rule source from the shipped packag
 - production ledger lifecycle and SpecBuilder creation behavior are unchanged by this split;
 - Grok Build's architecture review recommended `SPLIT`; the implementation review returned `VERDICT=ACCEPT` with no mandatory fixes;
 - follow-up tests cover new or commercial changes retaining research, docs, and document confirmation even with no changed-surface hint.
+
+## Sixth-Slice Read-Only Scope Advisory
+
+The sixth slice lets newly created shadow ledgers consume the production stage-range rule without changing any real stage resolution.
+
+- `scope_advisory` is an additive top-level ledger object; old ledgers omit it and remain byte-contract compatible;
+- the real `stages[*].resolution` roster remains the conservative seven `EXECUTE` work stages plus two `REQUIRE` confirmation gates;
+- `scope_advisory.recommendations[*].recommended_resolution` records only a proposal;
+- advisory control authority is fixed to `none`;
+- every recommendation for reuse, waiver, or not-applicable requires explicit approval;
+- incomplete scope can only recommend the conservative full nine-stage plan;
+- unsupported changed-surface values fail closed instead of producing skip advice;
+- new projects derive an explicit scope from product/architecture plus configured frontend/backend presence;
+- existing changes without explicit structured scope remain incomplete and receive no reduction advice;
+- callers may provide an explicit changed-surface set to `SpecBuilder.create_change` for a complete advisory;
+- existing ledger files are never rewritten to add or refresh advisory data.
+
+The project canary enables `adaptive_ledger.scope_advisory=true`. Package defaults remain disabled. The comparison fixtures and developer report remain outside the production package and are not used to create the advisory.
+
+### Still outside this slice
+
+- no automatic natural-language scope classifier;
+- no application of recommendations to real stage resolutions;
+- no automated skip, reuse, waiver, confirmation, quality, merge, push, or release decision;
+- no update of an existing advisory after initial ledger creation.
+
+### Sixth-slice evidence
+
+- affected ledger model, stage range, policy, automatic creation, configuration, store, CLI, package-boundary, and backward-compatibility regression: 266 passed;
+- one existing Windows symbolic-link permission test skipped;
+- changed source and tests passed Ruff and diff whitespace checks;
+- bounded backend scope produced five approval-required reduction recommendations while the real ledger remained seven `EXECUTE` stages plus two `REQUIRE` gates;
+- incomplete existing-project scope produced a full nine-stage advisory with zero reductions;
+- new-project scope was derived conservatively from product/architecture and configured frontend/backend presence;
+- unsupported surfaces failed the shadow write without failing primary Spec creation;
+- malformed advisory objects were normalized to `ChangeLedgerError`, reported as invalid by the store, and did not break CLI summaries;
+- an existing ledger without advisory data remained byte-for-byte unchanged after advisory enablement;
+- Grok Build review first returned `VERDICT=REVISE` for unwrapped advisory parse errors; the parser and lifecycle failure contract were fixed;
+- follow-up review returned `VERDICT=ACCEPT` with no remaining mandatory fixes.
+
+Ledger schema version remains `1` because the advisory is optional, omitted by default, and old ledgers round-trip without a new field. A present advisory must pass the stricter object contract.

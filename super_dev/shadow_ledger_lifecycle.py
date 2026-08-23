@@ -7,10 +7,12 @@ import os
 import re
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from .change_ledger import ChangeLedger, StageStatus
+from .change_ledger import ChangeLedger, ChangeLedgerError, StageStatus
+from .scope_advisory import build_scope_advisory
 from .shadow_ledger_store import ShadowLedgerReadError, load_shadow_ledger
 from .workflow_contract import CANONICAL_NINE_STAGE_IDS
 
@@ -34,6 +36,7 @@ class ShadowLedgerCreationResult:
     ledger_path: str = ""
     read_only: bool = True
     control_authority: str = "none"
+    scope_advisory_created: bool = False
     error: str = ""
 
     @property
@@ -47,6 +50,7 @@ class ShadowLedgerCreationResult:
             "ledger_path": self.ledger_path,
             "read_only": self.read_only,
             "control_authority": self.control_authority,
+            "scope_advisory_created": self.scope_advisory_created,
             "succeeded": self.succeeded,
             "error": self.error,
         }
@@ -58,6 +62,15 @@ def adaptive_ledger_auto_create_enabled(config: Any) -> bool:
         isinstance(payload, dict)
         and payload.get("enabled") is True
         and payload.get("auto_create") is True
+    )
+
+
+def adaptive_ledger_scope_advisory_enabled(config: Any) -> bool:
+    payload = getattr(config, "adaptive_ledger", {})
+    return (
+        adaptive_ledger_auto_create_enabled(config)
+        and isinstance(payload, dict)
+        and payload.get("scope_advisory") is True
     )
 
 
@@ -98,6 +111,7 @@ def _existing_result(project_dir: Path, change_id: str, ledger_path: Path) -> Sh
         status="existing",
         change_id=change_id,
         ledger_path=display_path,
+        scope_advisory_created=record.ledger.scope_advisory is not None,
     )
 
 
@@ -137,6 +151,9 @@ def ensure_shadow_change_ledger(
     work_mode: str,
     enabled: bool,
     satisfied_stages: set[str] | None = None,
+    scope_advisory_enabled: bool = False,
+    changed_surfaces: set[str] | None = None,
+    scope_complete: bool = False,
 ) -> ShadowLedgerCreationResult:
     """Create one shadow ledger without overwriting or controlling the workflow."""
 
@@ -225,8 +242,16 @@ def ensure_shadow_change_ledger(
         )
         for stage in satisfied:
             ledger.get_stage(stage).status = StageStatus.SATISFIED
+        if scope_advisory_enabled is True:
+            ledger.scope_advisory = build_scope_advisory(
+                changed_surfaces=changed_surfaces or set(),
+                work_mode=work_mode,
+                governance_depth=governance_depth,
+                scope_complete=scope_complete,
+                generated_at=datetime.now(timezone.utc).isoformat(),
+            )
         serialized = json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2) + "\n"
-    except (KeyError, TypeError, ValueError) as exc:
+    except (ChangeLedgerError, KeyError, TypeError, ValueError) as exc:
         return ShadowLedgerCreationResult(
             status="write_failed",
             change_id=change_id,
@@ -275,6 +300,7 @@ def ensure_shadow_change_ledger(
         status="created",
         change_id=change_id,
         ledger_path=_display_path(project_dir, ledger_path),
+        scope_advisory_created=ledger.scope_advisory is not None,
     )
 
 
@@ -282,5 +308,6 @@ __all__ = [
     "ShadowLedgerCreationResult",
     "ShadowLedgerCreationStatus",
     "adaptive_ledger_auto_create_enabled",
+    "adaptive_ledger_scope_advisory_enabled",
     "ensure_shadow_change_ledger",
 ]

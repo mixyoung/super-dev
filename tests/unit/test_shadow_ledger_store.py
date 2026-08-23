@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from super_dev.change_ledger import ChangeLedger
+from super_dev.scope_advisory import build_scope_advisory
 from super_dev.shadow_ledger_store import (
     ShadowLedgerReadError,
     build_shadow_ledger_summary,
@@ -149,3 +150,51 @@ def test_non_shadow_ledger_is_reported_as_invalid(temp_project_dir: Path) -> Non
     assert summary["valid_count"] == 0
     assert summary["invalid_count"] == 1
     assert "shadow-only" in summary["errors"][0]["error"]
+
+
+def test_summary_separates_scope_advice_from_real_stage_decisions(
+    temp_project_dir: Path,
+) -> None:
+    ledger_path = _write_ledger(temp_project_dir, "advisory-change")
+    payload = json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger = ChangeLedger.from_dict(payload)
+    ledger.scope_advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
+    ledger_path.write_text(json.dumps(ledger.to_dict()), encoding="utf-8")
+
+    summary = build_shadow_ledger_summary(temp_project_dir)
+
+    assert summary["resolution_counts"] == {"EXECUTE": 7, "REQUIRE": 2}
+    assert summary["scope_advisory_present"] is True
+    assert summary["scope_complete"] is True
+    assert summary["recommended_reduction_count"] == 5
+    assert summary["approval_required_count"] == 5
+    assert "建议保留4个阶段" in summary["scope_advisory_summary"]
+
+
+def test_malformed_scope_advisory_is_reported_without_breaking_summary(
+    temp_project_dir: Path,
+) -> None:
+    ledger_path = _write_ledger(temp_project_dir, "broken-advisory")
+    payload = json.loads(ledger_path.read_text(encoding="utf-8"))
+    advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    ).to_dict()
+    advisory["recommendations"][0].pop("stage")
+    payload["scope_advisory"] = advisory
+    ledger_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    summary = build_shadow_ledger_summary(temp_project_dir)
+
+    assert summary["valid_count"] == 0
+    assert summary["invalid_count"] == 1
+    assert "Invalid scope_advisory payload" in summary["errors"][0]["error"]

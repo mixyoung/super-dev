@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
+from super_dev.scope_advisory import build_scope_advisory
 
 
 def test_resume_stage_resolution_matrix() -> None:
@@ -282,6 +283,13 @@ def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
         governance_depth="bounded",
         work_mode="patch",
     )
+    ledger.scope_advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
     ledger_path = temp_project_dir / ".super-dev" / "changes" / "cli-ledger" / "ledger.json"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text(
@@ -296,6 +304,8 @@ def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
     assert payload["shadow_ledger"]["active_change_id"] == "cli-ledger"
     assert payload["shadow_ledger"]["read_only"] is True
     assert payload["shadow_ledger"]["control_authority"] == "none"
+    assert payload["shadow_ledger"]["recommended_reduction_count"] == 5
+    assert payload["shadow_ledger"]["approval_required_count"] == 5
 
 
 def test_finalized_next_step_payload_includes_shadow_ledger(

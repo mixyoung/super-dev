@@ -21,6 +21,9 @@ DOCUMENT_SURFACES = frozenset(
     }
 )
 ALWAYS_REQUIRED_STAGES = frozenset({"spec", "quality", "delivery"})
+KNOWN_CHANGE_SURFACES = frozenset(
+    {"product", "architecture", "uiux", *FRONTEND_SURFACES, *BACKEND_SURFACES}
+)
 
 
 def required_stages_for(
@@ -36,6 +39,9 @@ def required_stages_for(
     surfaces = frozenset(
         str(item).strip().lower() for item in changed_surfaces if str(item).strip()
     )
+    unknown_surfaces = surfaces - KNOWN_CHANGE_SURFACES
+    if unknown_surfaces:
+        raise ValueError(f"Unsupported changed surfaces: {sorted(unknown_surfaces)}")
     required = set(ALWAYS_REQUIRED_STAGES)
     if normalized_mode == "new" or normalized_depth == "commercial":
         required.update({"research", "docs", "docs_confirm"})
@@ -53,5 +59,6 @@ __all__ = [
     "BACKEND_SURFACES",
     "DOCUMENT_SURFACES",
     "FRONTEND_SURFACES",
+    "KNOWN_CHANGE_SURFACES",
     "required_stages_for",
 ]

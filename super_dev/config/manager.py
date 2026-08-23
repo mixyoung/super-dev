@@ -99,7 +99,11 @@ class ProjectConfig:
 
     # 自适应九阶段影子账本（默认关闭，不控制真实门禁）
     adaptive_ledger: dict[str, Any] = field(
-        default_factory=lambda: {"enabled": False, "auto_create": False}
+        default_factory=lambda: {
+            "enabled": False,
+            "auto_create": False,
+            "scope_advisory": False,
+        }
     )
 
     def __post_init__(self) -> None:
@@ -107,6 +111,7 @@ class ProjectConfig:
             self.adaptive_ledger = {
                 "enabled": False,
                 "auto_create": False,
+                "scope_advisory": False,
                 **self.adaptive_ledger,
             }
 
@@ -149,7 +154,11 @@ class ConfigManager:
         "overseer_halt_on_critical": True,
         "plan_failure_budget": 3,
         "output_dir": "output",
-        "adaptive_ledger": {"enabled": False, "auto_create": False},
+        "adaptive_ledger": {
+            "enabled": False,
+            "auto_create": False,
+            "scope_advisory": False,
+        },
         # 前端配置
         "ui_library": None,
         "style_solution": None,
@@ -401,7 +410,7 @@ class ConfigManager:
         if not isinstance(adaptive_ledger, dict):
             errors.append("adaptive_ledger 必须是对象")
         else:
-            for field_name in ("enabled", "auto_create"):
+            for field_name in ("enabled", "auto_create", "scope_advisory"):
                 if not isinstance(adaptive_ledger.get(field_name), bool):
                     errors.append(f"adaptive_ledger.{field_name} 必须是布尔值")
             if (
@@ -409,6 +418,13 @@ class ConfigManager:
                 and adaptive_ledger.get("enabled") is not True
             ):
                 errors.append("adaptive_ledger.auto_create 不能在 enabled 关闭时启用")
+            if adaptive_ledger.get("scope_advisory") is True and (
+                adaptive_ledger.get("enabled") is not True
+                or adaptive_ledger.get("auto_create") is not True
+            ):
+                errors.append(
+                    "adaptive_ledger.scope_advisory 只能在自动影子建账开启时启用"
+                )
         if not isinstance(config.host_profile_enforce_selected, bool):
             errors.append("host_profile_enforce_selected 必须是布尔值")
         if not isinstance(config.host_profile_targets, list):

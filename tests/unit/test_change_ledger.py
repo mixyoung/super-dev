@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 from super_dev.change_ledger import (
@@ -8,8 +10,11 @@ from super_dev.change_ledger import (
     ChangeLedger,
     ChangeLedgerError,
     EvidenceReference,
+    ScopeAdvisory,
     StageResolution,
+    StageScopeRecommendation,
 )
+from super_dev.scope_advisory import build_scope_advisory
 from super_dev.workflow_contract import CANONICAL_NINE_STAGE_IDS
 
 
@@ -147,3 +152,157 @@ def test_foreign_harness_identity_is_rejected() -> None:
 
     with pytest.raises(ChangeLedgerError, match="active Super Dev"):
         ChangeLedger.from_dict(payload)
+
+
+def test_old_ledger_without_scope_advisory_remains_unchanged() -> None:
+    ledger = ChangeLedger.create(
+        change_id="change-1",
+        harness_version="2.4.0",
+        intent="build",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+
+    payload = ledger.to_dict()
+
+    assert "scope_advisory" not in payload
+    assert ChangeLedger.from_dict(payload).scope_advisory is None
+
+
+def test_scope_advisory_round_trip_does_not_change_real_stage_resolutions() -> None:
+    ledger = ChangeLedger.create(
+        change_id="change-1",
+        harness_version="2.4.0",
+        intent="debug",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+    ledger.scope_advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode=ledger.work_mode,
+        governance_depth=ledger.governance_depth,
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
+
+    restored = ChangeLedger.from_dict(ledger.to_dict())
+
+    assert restored.to_dict() == ledger.to_dict()
+    assert restored.schema_version == 1
+    assert restored.scope_advisory is not None
+    assert restored.scope_advisory.control_authority == "none"
+    assert restored.get_stage("frontend").resolution == StageResolution.EXECUTE
+    frontend_recommendation = next(
+        item for item in restored.scope_advisory.recommendations if item.stage == "frontend"
+    )
+    assert frontend_recommendation.recommended_resolution == StageResolution.NOT_APPLICABLE
+    assert frontend_recommendation.approval_required is True
+
+
+def test_incomplete_scope_advisory_must_keep_conservative_full_plan() -> None:
+    advisory = build_scope_advisory(
+        changed_surfaces=set(),
+        work_mode="evolve",
+        governance_depth="bounded",
+        scope_complete=False,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
+
+    assert all(
+        item.recommended_resolution
+        == (StageResolution.REQUIRE if item.kind == "gate" else StageResolution.EXECUTE)
+        for item in advisory.recommendations
+    )
+
+
+def test_scope_advisory_rejects_control_authority_and_unapproved_reduction() -> None:
+    with pytest.raises(ChangeLedgerError, match="control authority"):
+        ScopeAdvisory(
+            generated_at="2026-08-23T00:00:00+00:00",
+            scope_complete=True,
+            changed_surfaces=[],
+            control_authority="gate",
+            recommendations=[],
+        )
+
+    with pytest.raises(ChangeLedgerError, match="require approval"):
+        StageScopeRecommendation(
+            stage="frontend",
+            kind="work",
+            recommended_resolution=StageResolution.NOT_APPLICABLE,
+            reason="Not involved",
+            approval_required=False,
+        )
+
+
+def test_scope_advisory_rejects_unknown_surface_even_when_scope_is_incomplete() -> None:
+    advisory = build_scope_advisory(
+        changed_surfaces=set(),
+        work_mode="evolve",
+        governance_depth="bounded",
+        scope_complete=False,
+        generated_at="2026-08-23T00:00:00+00:00",
+    ).to_dict()
+    advisory["changed_surfaces"] = ["unknown-surface"]
+
+    with pytest.raises(ChangeLedgerError, match="Invalid scope advisory object"):
+        ScopeAdvisory.from_dict(advisory)
+
+
+def test_malformed_scope_advisory_is_wrapped_as_change_ledger_error() -> None:
+    ledger = ChangeLedger.create(
+        change_id="change-1",
+        harness_version="2.4.0",
+        intent="debug",
+        governance_depth="bounded",
+        work_mode="patch",
+    )
+    ledger.scope_advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
+    base = ledger.to_dict()
+
+    malformed_payloads = []
+    missing_stage = copy.deepcopy(base)
+    missing_stage["scope_advisory"]["recommendations"][0].pop("stage")
+    malformed_payloads.append(missing_stage)
+    missing_approval = copy.deepcopy(base)
+    missing_approval["scope_advisory"]["recommendations"][0].pop(
+        "approval_required"
+    )
+    malformed_payloads.append(missing_approval)
+    invalid_resolution = copy.deepcopy(base)
+    invalid_resolution["scope_advisory"]["recommendations"][0][
+        "recommended_resolution"
+    ] = "INVALID"
+    malformed_payloads.append(invalid_resolution)
+    invalid_recommendations = copy.deepcopy(base)
+    invalid_recommendations["scope_advisory"]["recommendations"] = None
+    malformed_payloads.append(invalid_recommendations)
+    invalid_surfaces = copy.deepcopy(base)
+    invalid_surfaces["scope_advisory"]["changed_surfaces"] = None
+    malformed_payloads.append(invalid_surfaces)
+
+    for payload in malformed_payloads:
+        with pytest.raises(ChangeLedgerError, match="Invalid scope_advisory payload"):
+            ChangeLedger.from_dict(payload)
+
+
+def test_generated_advisory_uses_only_execute_require_or_not_applicable() -> None:
+    advisory = build_scope_advisory(
+        changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
+        scope_complete=True,
+        generated_at="2026-08-23T00:00:00+00:00",
+    )
+
+    assert {item.recommended_resolution for item in advisory.recommendations} <= {
+        StageResolution.EXECUTE,
+        StageResolution.REQUIRE,
+        StageResolution.NOT_APPLICABLE,
+    }

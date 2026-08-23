@@ -61,7 +61,11 @@ class TestSchemaValidatorEdgeCases:
 
     def test_adaptive_ledger_schema_is_strict_and_backward_compatible(self):
         valid = ConfigSchemaValidator().get_defaults()
-        valid["adaptive_ledger"] = {"enabled": True, "auto_create": True}
+        valid["adaptive_ledger"] = {
+            "enabled": True,
+            "auto_create": True,
+            "scope_advisory": True,
+        }
         assert validate_config(valid) == []
 
         legacy = dict(valid)
@@ -71,6 +75,14 @@ class TestSchemaValidatorEdgeCases:
         invalid = dict(valid)
         invalid["adaptive_ledger"] = {"enabled": False, "auto_create": True}
         assert any("requires" in item for item in validate_config(invalid))
+
+        invalid_advisory = dict(valid)
+        invalid_advisory["adaptive_ledger"] = {
+            "enabled": True,
+            "auto_create": False,
+            "scope_advisory": True,
+        }
+        assert any("scope_advisory" in item for item in validate_config(invalid_advisory))
 
         partial = dict(valid)
         partial["adaptive_ledger"] = {"enabled": True}

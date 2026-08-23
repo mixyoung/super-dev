@@ -14,6 +14,7 @@ from ..config import ConfigManager
 from ..shadow_ledger_lifecycle import (
     ShadowLedgerCreationResult,
     adaptive_ledger_auto_create_enabled,
+    adaptive_ledger_scope_advisory_enabled,
     ensure_shadow_change_ledger,
 )
 from ..specs import ChangeManager, SpecGenerator, SpecManager
@@ -42,6 +43,7 @@ class SpecBuilder:
         requirements: list,
         tech_stack: dict,
         scenario: str | None = None,
+        changed_surfaces: set[str] | None = None,
     ) -> str:
         """创建 Spec 变更提案"""
         require_docs_confirmation(
@@ -98,6 +100,13 @@ class SpecBuilder:
                 work_mode="new" if scenario == "0-1" else "evolve",
                 enabled=adaptive_ledger_auto_create_enabled(config),
                 satisfied_stages=satisfied_stages,
+                scope_advisory_enabled=adaptive_ledger_scope_advisory_enabled(config),
+                changed_surfaces=self._resolve_changed_surfaces(
+                    tech_stack=tech_stack,
+                    scenario=scenario,
+                    changed_surfaces=changed_surfaces,
+                ),
+                scope_complete=(changed_surfaces is not None or scenario == "0-1"),
             )
         except Exception as exc:
             shadow_result = ShadowLedgerCreationResult(
@@ -108,6 +117,24 @@ class SpecBuilder:
         self.last_shadow_ledger_result = shadow_result.to_dict()
 
         return change_id
+
+    @staticmethod
+    def _resolve_changed_surfaces(
+        *,
+        tech_stack: dict,
+        scenario: str | None,
+        changed_surfaces: set[str] | None,
+    ) -> set[str]:
+        if changed_surfaces is not None:
+            return {str(item).strip().lower() for item in changed_surfaces if str(item).strip()}
+        if scenario != "0-1":
+            return set()
+        inferred = {"product", "architecture"}
+        if str(tech_stack.get("frontend", "none")).strip().lower() != "none":
+            inferred.add("frontend")
+        if str(tech_stack.get("backend", "none")).strip().lower() != "none":
+            inferred.add("backend")
+        return inferred
 
     def _generate_tasks_for_change(self, change_id: str, tech_stack: dict, scenario: str):
         """为变更自动生成任务"""

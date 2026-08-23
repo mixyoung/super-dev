@@ -94,3 +94,14 @@
 - [x] K5. Move coaching summaries and report generation to `tools/`, outside the published package.
 - [x] K6. Remove `super_dev/shadow_validation.py` and verify that production lifecycle code has no test/tool dependency.
 - [x] K7. Run the affected regression suite, package-boundary check, independent read-only review, and prepare the local commit; do not push.
+
+## L. Read-Only Scope Advisory
+
+- [x] L1. Add an optional `scope_advisory` ledger object without changing old ledger serialization.
+- [x] L2. Keep advisory recommendations separate from real stage resolutions and force `control_authority=none`.
+- [x] L3. Require approval for every suggested reduction, reuse, or waiver; incomplete scope must retain the full plan.
+- [x] L4. Generate advisory data only during first automatic ledger creation and never overwrite an existing ledger.
+- [x] L5. Derive complete new-project scope conservatively and keep existing changes conservative unless explicit structured scope is provided.
+- [x] L6. Expose advisory counts and coaching text through the existing read-only CLI summary.
+- [x] L7. Add model, configuration, lifecycle, scope validation, store, CLI, and backward-compatibility tests.
+- [x] L8. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.

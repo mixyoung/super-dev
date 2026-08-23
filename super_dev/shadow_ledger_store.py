@@ -41,6 +41,12 @@ class ShadowLedgerSummary:
     ledger_path: str = ""
     resolution_counts: dict[str, int] = field(default_factory=dict)
     status_counts: dict[str, int] = field(default_factory=dict)
+    scope_advisory_present: bool = False
+    scope_complete: bool = False
+    recommended_resolution_counts: dict[str, int] = field(default_factory=dict)
+    recommended_reduction_count: int = 0
+    approval_required_count: int = 0
+    scope_advisory_summary: str = ""
     errors: list[dict[str, str]] = field(default_factory=list)
     summary: str = "未检测到影子九阶段账本"
 
@@ -58,6 +64,12 @@ class ShadowLedgerSummary:
             "ledger_path": self.ledger_path,
             "resolution_counts": dict(self.resolution_counts),
             "status_counts": dict(self.status_counts),
+            "scope_advisory_present": self.scope_advisory_present,
+            "scope_complete": self.scope_complete,
+            "recommended_resolution_counts": dict(self.recommended_resolution_counts),
+            "recommended_reduction_count": self.recommended_reduction_count,
+            "approval_required_count": self.approval_required_count,
+            "scope_advisory_summary": self.scope_advisory_summary,
             "errors": list(self.errors),
             "summary": self.summary,
         }
@@ -189,6 +201,35 @@ def build_shadow_ledger_summary(project_dir: Path) -> dict[str, Any]:
         f"门禁免除{resolution_counts[StageResolution.WAIVE.value]}、"
         f"失效{status_counts[StageStatus.INVALIDATED.value]}"
     )
+    advisory = active.ledger.scope_advisory
+    if advisory is not None:
+        recommended_counts = Counter(
+            item.recommended_resolution.value for item in advisory.recommendations
+        )
+        reduction_count = sum(
+            item.recommended_resolution
+            in {
+                StageResolution.REUSE,
+                StageResolution.NOT_APPLICABLE,
+                StageResolution.WAIVE,
+            }
+            for item in advisory.recommendations
+        )
+        approval_count = sum(item.approval_required for item in advisory.recommendations)
+        summary.scope_advisory_present = True
+        summary.scope_complete = advisory.scope_complete
+        summary.recommended_resolution_counts = dict(sorted(recommended_counts.items()))
+        summary.recommended_reduction_count = reduction_count
+        summary.approval_required_count = approval_count
+        if advisory.scope_complete:
+            summary.scope_advisory_summary = (
+                f"范围已明确：建议保留{len(advisory.recommendations) - reduction_count}个阶段，"
+                f"建议缩减{reduction_count}个阶段；缩减必须审批"
+            )
+        else:
+            summary.scope_advisory_summary = (
+                "范围信息不完整：暂时建议保留完整九阶段，不自动缩减"
+            )
     return summary.to_dict()
 
 

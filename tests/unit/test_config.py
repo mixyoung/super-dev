@@ -29,7 +29,11 @@ class TestProjectConfig:
         assert config.language_preferences == []
         assert config.knowledge_allowed_domains == []
         assert config.knowledge_cache_ttl_seconds == 1800
-        assert config.adaptive_ledger == {"enabled": False, "auto_create": False}
+        assert config.adaptive_ledger == {
+            "enabled": False,
+            "auto_create": False,
+            "scope_advisory": False,
+        }
 
     def test_config_with_custom_values(self):
         """测试自定义配置"""
@@ -129,14 +133,30 @@ class TestConfigManager:
 
         enabled = manager.create(
             name="adaptive-ledger",
-            adaptive_ledger={"enabled": True, "auto_create": True},
+            adaptive_ledger={
+                "enabled": True,
+                "auto_create": True,
+                "scope_advisory": True,
+            },
         )
 
-        assert enabled.adaptive_ledger == {"enabled": True, "auto_create": True}
+        assert enabled.adaptive_ledger == {
+            "enabled": True,
+            "auto_create": True,
+            "scope_advisory": True,
+        }
         with pytest.raises(ValueError, match="auto_create"):
             manager.update(adaptive_ledger={"enabled": False, "auto_create": True})
         with pytest.raises(ValueError, match="必须是布尔值"):
             manager.update(adaptive_ledger={"enabled": "true", "auto_create": "true"})
+        with pytest.raises(ValueError, match="scope_advisory"):
+            manager.update(
+                adaptive_ledger={
+                    "enabled": True,
+                    "auto_create": False,
+                    "scope_advisory": True,
+                }
+            )
 
     def test_partial_adaptive_ledger_configuration_merges_safe_defaults(
         self, temp_project_dir: Path
@@ -149,7 +169,11 @@ class TestConfigManager:
 
         loaded = ConfigManager(temp_project_dir).load()
 
-        assert loaded.adaptive_ledger == {"enabled": True, "auto_create": False}
+        assert loaded.adaptive_ledger == {
+            "enabled": True,
+            "auto_create": False,
+            "scope_advisory": False,
+        }
 
     def test_create_config(self, temp_project_dir: Path):
         """测试创建新配置"""

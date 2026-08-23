@@ -11,6 +11,7 @@ from super_dev.config import ConfigManager, ProjectConfig
 from super_dev.creators import SpecBuilder
 from super_dev.shadow_ledger_lifecycle import (
     adaptive_ledger_auto_create_enabled,
+    adaptive_ledger_scope_advisory_enabled,
     ensure_shadow_change_ledger,
 )
 from super_dev.shadow_ledger_store import load_shadow_ledger
@@ -64,6 +65,7 @@ def test_create_shadow_ledger_marks_only_observed_stages_satisfied(
     assert record.ledger.get_stage("research").status == StageStatus.SATISFIED
     assert record.ledger.get_stage("spec").status == StageStatus.SATISFIED
     assert record.ledger.get_stage("frontend").status == StageStatus.PENDING
+    assert record.ledger.scope_advisory is None
 
 
 def test_repeated_creation_is_idempotent_and_does_not_overwrite(temp_project_dir: Path) -> None:
@@ -81,6 +83,27 @@ def test_repeated_creation_is_idempotent_and_does_not_overwrite(temp_project_dir
         "delivery"
     ).status == StageStatus.PENDING
     assert b"\r\n" not in original
+
+
+def test_existing_ledger_without_advisory_is_not_rewritten_when_advisory_is_enabled(
+    temp_project_dir: Path,
+) -> None:
+    change_dir = _change_dir(temp_project_dir)
+    assert _ensure(temp_project_dir).status == "created"
+    ledger_path = change_dir / "ledger.json"
+    original = ledger_path.read_bytes()
+
+    second = _ensure(
+        temp_project_dir,
+        scope_advisory_enabled=True,
+        changed_surfaces={"backend"},
+        scope_complete=True,
+    )
+
+    assert second.status == "existing"
+    assert second.scope_advisory_created is False
+    assert ledger_path.read_bytes() == original
+    assert load_shadow_ledger(temp_project_dir, ledger_path).ledger.scope_advisory is None
 
 
 def test_invalid_existing_ledger_is_preserved_and_never_blocks_main_change(
@@ -207,6 +230,84 @@ def test_feature_switch_requires_two_strict_boolean_flags() -> None:
         )
         is False
     )
+    assert adaptive_ledger_scope_advisory_enabled(ProjectConfig(name="default")) is False
+    assert (
+        adaptive_ledger_scope_advisory_enabled(
+            ProjectConfig(
+                name="advisory-enabled",
+                adaptive_ledger={
+                    "enabled": True,
+                    "auto_create": True,
+                    "scope_advisory": True,
+                },
+            )
+        )
+        is True
+    )
+
+
+def test_complete_scope_creates_advisory_without_changing_real_resolutions(
+    temp_project_dir: Path,
+) -> None:
+    change_dir = _change_dir(temp_project_dir)
+
+    result = _ensure(
+        temp_project_dir,
+        scope_advisory_enabled=True,
+        changed_surfaces={"backend"},
+        scope_complete=True,
+        work_mode="patch",
+        governance_depth="bounded",
+    )
+
+    record = load_shadow_ledger(temp_project_dir, change_dir / "ledger.json")
+    assert result.scope_advisory_created is True
+    assert record.ledger.scope_advisory is not None
+    assert record.ledger.scope_advisory.scope_complete is True
+    assert record.ledger.get_stage("frontend").resolution.value == "EXECUTE"
+    recommendation = next(
+        item
+        for item in record.ledger.scope_advisory.recommendations
+        if item.stage == "frontend"
+    )
+    assert recommendation.recommended_resolution.value == "NOT_APPLICABLE"
+    assert recommendation.approval_required is True
+
+
+def test_incomplete_scope_creates_no_reduction_advice(temp_project_dir: Path) -> None:
+    change_dir = _change_dir(temp_project_dir)
+
+    _ensure(
+        temp_project_dir,
+        scope_advisory_enabled=True,
+        changed_surfaces=set(),
+        scope_complete=False,
+        work_mode="evolve",
+        governance_depth="bounded",
+    )
+
+    advisory = load_shadow_ledger(
+        temp_project_dir, change_dir / "ledger.json"
+    ).ledger.scope_advisory
+    assert advisory is not None
+    assert advisory.scope_complete is False
+    assert all(not item.approval_required for item in advisory.recommendations)
+
+
+def test_unknown_scope_surface_fails_shadow_write_without_blocking_main_contract(
+    temp_project_dir: Path,
+) -> None:
+    _change_dir(temp_project_dir)
+
+    result = _ensure(
+        temp_project_dir,
+        scope_advisory_enabled=True,
+        changed_surfaces={"unknown-surface"},
+        scope_complete=True,
+    )
+
+    assert result.status == "write_failed"
+    assert "Unsupported changed surfaces" in result.error
 
 
 def test_spec_builder_is_the_single_enabled_auto_creation_entry(
@@ -214,7 +315,11 @@ def test_spec_builder_is_the_single_enabled_auto_creation_entry(
 ) -> None:
     ConfigManager(temp_project_dir).create(
         name="auto-ledger-demo",
-        adaptive_ledger={"enabled": True, "auto_create": True},
+        adaptive_ledger={
+            "enabled": True,
+            "auto_create": True,
+            "scope_advisory": True,
+        },
     )
     builder = SpecBuilder(
         project_dir=temp_project_dir,
@@ -240,6 +345,82 @@ def test_spec_builder_is_the_single_enabled_auto_creation_entry(
     record = load_shadow_ledger(temp_project_dir, ledger_path)
     assert record.ledger.get_stage("spec").status == StageStatus.SATISFIED
     assert record.ledger.get_stage("quality").status == StageStatus.PENDING
+    assert builder.last_shadow_ledger_result["scope_advisory_created"] is True
+    assert record.ledger.scope_advisory is not None
+    assert record.ledger.scope_advisory.scope_complete is True
+    assert all(
+        not item.approval_required for item in record.ledger.scope_advisory.recommendations
+    )
+
+
+def test_existing_change_without_explicit_scope_keeps_full_advisory(
+    temp_project_dir: Path,
+) -> None:
+    ConfigManager(temp_project_dir).create(
+        name="unknown-scope-demo",
+        adaptive_ledger={
+            "enabled": True,
+            "auto_create": True,
+            "scope_advisory": True,
+        },
+    )
+    builder = SpecBuilder(
+        project_dir=temp_project_dir,
+        name="unknown-scope-demo",
+        description="existing change without structured scope",
+    )
+
+    change_id = builder.create_change(
+        requirements=[],
+        tech_stack={"platform": "web", "frontend": "react", "backend": "node"},
+        scenario="1-N+1",
+    )
+
+    advisory = load_shadow_ledger(
+        temp_project_dir,
+        temp_project_dir / ".super-dev" / "changes" / change_id / "ledger.json",
+    ).ledger.scope_advisory
+    assert advisory is not None
+    assert advisory.scope_complete is False
+    assert advisory.changed_surfaces == []
+    assert all(not item.approval_required for item in advisory.recommendations)
+
+
+def test_explicit_backend_scope_generates_reduction_advice_only(
+    temp_project_dir: Path,
+) -> None:
+    ConfigManager(temp_project_dir).create(
+        name="backend-scope-demo",
+        adaptive_ledger={
+            "enabled": True,
+            "auto_create": True,
+            "scope_advisory": True,
+        },
+    )
+    builder = SpecBuilder(
+        project_dir=temp_project_dir,
+        name="backend-scope-demo",
+        description="bounded backend patch",
+    )
+
+    change_id = builder.create_change(
+        requirements=[],
+        tech_stack={"platform": "web", "frontend": "react", "backend": "node"},
+        scenario="1-N+1",
+        changed_surfaces={"backend"},
+    )
+
+    ledger = load_shadow_ledger(
+        temp_project_dir,
+        temp_project_dir / ".super-dev" / "changes" / change_id / "ledger.json",
+    ).ledger
+    advisory = ledger.scope_advisory
+    assert advisory is not None
+    assert advisory.scope_complete is True
+    assert advisory.changed_surfaces == ["backend"]
+    reductions = [item.stage for item in advisory.recommendations if item.approval_required]
+    assert reductions == ["research", "docs", "docs_confirm", "frontend", "preview_confirm"]
+    assert ledger.get_stage("frontend").resolution.value == "EXECUTE"
 
 
 def test_historical_project_outputs_do_not_mark_new_change_satisfied(

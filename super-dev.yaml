@@ -2,6 +2,7 @@ author: ''
 adaptive_ledger:
   auto_create: true
   enabled: true
+  scope_advisory: true
 backend: node
 cli: {}
 database: postgresql

@@ -89,3 +89,12 @@ def test_unknown_governance_depth_is_rejected() -> None:
             work_mode="evolve",
             governance_depth="mystery",
         )
+
+
+def test_unknown_changed_surface_is_rejected_instead_of_skipped() -> None:
+    with pytest.raises(ValueError, match="Unsupported changed surfaces"):
+        required_stages_for(
+            changed_surfaces={"mystery-surface"},
+            work_mode="evolve",
+            governance_depth="bounded",
+        )

@@ -858,6 +858,11 @@ class SuperDevCLI(
             self.console.print(
                 f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
             )
+            if str(shadow_ledger.get("scope_advisory_summary", "")).strip():
+                self.console.print(
+                    "  阶段范围建议（只读，缩减必须审批）: "
+                    f"{shadow_ledger['scope_advisory_summary']}"
+                )
 
     def _workflow_mode_label(self, workflow_mode: str) -> str:
         return workflow_mode_label(workflow_mode)
@@ -1137,6 +1142,11 @@ class SuperDevCLI(
                     self.console.print(
                         f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
                     )
+                    if str(shadow_ledger.get("scope_advisory_summary", "")).strip():
+                        self.console.print(
+                            "  阶段范围建议（只读，缩减必须审批）: "
+                            f"{shadow_ledger['scope_advisory_summary']}"
+                        )
                 self.console.print("")
                 self.console.print("  下一步: 在宿主中输入 /super-dev <你的需求> 开始")
                 return 0
@@ -1263,6 +1273,11 @@ class SuperDevCLI(
             self.console.print(
                 f"  九阶段影子账本（只读观察，不改变门禁）: {shadow_ledger['summary']}"
             )
+            if str(shadow_ledger.get("scope_advisory_summary", "")).strip():
+                self.console.print(
+                    "  阶段范围建议（只读，缩减必须审批）: "
+                    f"{shadow_ledger['scope_advisory_summary']}"
+                )
         recent_snapshots = payload.get("recent_snapshots", [])
         if isinstance(recent_snapshots, list) and recent_snapshots:
             first = recent_snapshots[0] if isinstance(recent_snapshots[0], dict) else {}
@@ -3159,6 +3174,10 @@ class SuperDevCLI(
                     self.console.print(
                         "  [green]✓[/green] 九阶段影子账本已建立（只读，不控制门禁）"
                     )
+                    if shadow_result.get("scope_advisory_created") is True:
+                        self.console.print(
+                            "  [green]✓[/green] 阶段范围建议已生成（只读，缩减必须审批）"
+                        )
                 elif shadow_result.get("status") in {
                     "invalid_existing",
                     "write_failed",
