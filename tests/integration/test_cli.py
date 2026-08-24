@@ -1437,9 +1437,7 @@ class TestCLISkillAndIntegrate:
             os.chdir(original_cwd)
 
     def test_integrate_harden_json(self, temp_project_dir: Path, capsys, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
@@ -1539,9 +1537,7 @@ class TestCLISkillAndIntegrate:
     def test_integrate_harden_with_user_surfaces_writes_codex_global_agents(
         self, temp_project_dir: Path, capsys, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
@@ -1861,10 +1857,7 @@ class TestCLISkillAndIntegrate:
             os.chdir(original_cwd)
 
     def test_onboard_codex_cli_skips_slash_mapping(self, temp_project_dir: Path, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        (fake_home / ".codex").mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
@@ -1928,10 +1921,7 @@ class TestCLISkillAndIntegrate:
             os.chdir(original_cwd)
 
     def test_onboard_with_user_surfaces_writes_codex_global_agents(self, temp_project_dir: Path, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        (fake_home / ".codex").mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
