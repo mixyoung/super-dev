@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -29,6 +28,7 @@ from ..seeai_smoke_scenarios import (
     build_seeai_smoke_suite,
     get_seeai_acceptance_gates,
 )
+from ..user_directories import UserDirectoryContext
 from .manager_content_mixin import IntegrationManagerContentMixin
 
 
@@ -1390,9 +1390,14 @@ class IntegrationManager(IntegrationManagerContentMixin):
         "HOST_PARITY: required",
     )
 
-    def __init__(self, project_dir: Path):
+    def __init__(
+        self,
+        project_dir: Path,
+        user_directories: UserDirectoryContext | None = None,
+    ):
         self.project_dir = Path(project_dir).resolve()
         self.templates_dir = self.project_dir / "templates"
+        self.user_directories = user_directories or UserDirectoryContext.current()
 
     def _flow_contract_markdown_block(self) -> str:
         return (
@@ -1981,66 +1986,59 @@ class IntegrationManager(IntegrationManagerContentMixin):
             ],
         }
 
-    @classmethod
-    def _codex_home_dir(cls) -> Path:
-        raw = os.getenv("CODEX_HOME", "").strip()
-        if raw:
-            return Path(raw).expanduser()
-        return Path.home() / ".codex"
+    def _codex_home_dir(self) -> Path:
+        return self.user_directories.codex_home
 
-    @classmethod
-    def resolve_global_protocol_path(cls, target: str) -> Path | None:
+    def resolve_global_protocol_path(self, target: str) -> Path | None:
+        home = self.user_directories.home
         mapping = {
             "claude": None,
-            "claude-code": Path.home() / ".claude" / "CLAUDE.md",
-            "codebuddy-cli": Path.home() / ".codebuddy" / "CODEBUDDY.md",
-            "codebuddy": Path.home() / ".codebuddy" / "CODEBUDDY.md",
-            "codebuddy-cn": Path.home() / ".codebuddy" / "CODEBUDDY.md",
-            "droid-cli": Path.home() / ".factory" / "AGENTS.md",
-            "codex": cls._codex_home_dir() / "AGENTS.md",
-            "codex-cli": cls._codex_home_dir() / "AGENTS.md",
-            "copilot-cli": Path.home() / ".copilot" / "copilot-instructions.md",
-            "kiro-cli": Path.home() / ".kiro" / "steering" / "super-dev.md",
-            "kiro": Path.home() / ".kiro" / "steering" / "super-dev.md",
-            "gemini-cli": Path.home() / ".gemini" / "GEMINI.md",
-            "antigravity": Path.home() / ".gemini" / "GEMINI.md",
-            "opencode": Path.home() / ".config" / "opencode" / "AGENTS.md",
-            "qoder-cli": Path.home() / ".qoder" / "AGENTS.md",
-            "qoder": Path.home() / ".qoder" / "AGENTS.md",
-            "qwen-code": Path.home() / ".qwen" / "QWEN.md",
-            "trae": Path.home() / ".trae" / "user_rules.md",
-            "trae-cn": Path.home() / ".trae-cn" / "skills" / "super-dev" / "SKILL.md",
+            "claude-code": home / ".claude" / "CLAUDE.md",
+            "codebuddy-cli": home / ".codebuddy" / "CODEBUDDY.md",
+            "codebuddy": home / ".codebuddy" / "CODEBUDDY.md",
+            "codebuddy-cn": home / ".codebuddy" / "CODEBUDDY.md",
+            "droid-cli": home / ".factory" / "AGENTS.md",
+            "codex": self._codex_home_dir() / "AGENTS.md",
+            "codex-cli": self._codex_home_dir() / "AGENTS.md",
+            "copilot-cli": home / ".copilot" / "copilot-instructions.md",
+            "kiro-cli": home / ".kiro" / "steering" / "super-dev.md",
+            "kiro": home / ".kiro" / "steering" / "super-dev.md",
+            "gemini-cli": home / ".gemini" / "GEMINI.md",
+            "antigravity": home / ".gemini" / "GEMINI.md",
+            "opencode": home / ".config" / "opencode" / "AGENTS.md",
+            "qoder-cli": home / ".qoder" / "AGENTS.md",
+            "qoder": home / ".qoder" / "AGENTS.md",
+            "qwen-code": home / ".qwen" / "QWEN.md",
+            "trae": home / ".trae" / "user_rules.md",
+            "trae-cn": home / ".trae-cn" / "skills" / "super-dev" / "SKILL.md",
         }
         return mapping.get(target)
 
-    @classmethod
-    def resolve_compatibility_protocol_path(cls, target: str) -> Path | None:
+    def resolve_compatibility_protocol_path(self, target: str) -> Path | None:
         if target in {"trae", "trae-cn"}:
-            return Path.home() / ".trae" / "rules.md"
+            return self.user_directories.home / ".trae" / "rules.md"
         return None
 
-    @classmethod
     def expected_skill_path(
-        cls,
+        self,
         target: str,
         skill_name: str = "super-dev",
         project_dir: Path | None = None,
     ) -> Path | None:
-        paths = cls.expected_skill_paths(
+        paths = self.expected_skill_paths(
             target=target, skill_name=skill_name, project_dir=project_dir
         )
         return paths[0] if paths else None
 
-    @classmethod
     def expected_skill_paths(
-        cls,
+        self,
         target: str,
         skill_name: str = "super-dev",
         project_dir: Path | None = None,
     ) -> list[Path]:
         from ..skills import SkillManager
 
-        if not cls.requires_skill(target):
+        if not self.requires_skill(target):
             return []
         paths: list[Path] = []
         project_root = Path(project_dir).resolve() if project_dir is not None else None
@@ -2063,15 +2061,15 @@ class IntegrationManager(IntegrationManagerContentMixin):
                     paths.append(project_root / ".trae" / "skills" / name / "SKILL.md")
             if target not in SkillManager.TARGET_PATHS:
                 continue
-            target_root = Path(SkillManager.TARGET_PATHS[target]).expanduser()
+            target_root = self.user_directories.expanduser(SkillManager.TARGET_PATHS[target])
             if surface_kind == "observed-compatibility-surface" and not target_root.exists():
                 continue
             paths.append(target_root / name / "SKILL.md")
             for mirror in SkillManager.COMPATIBILITY_MIRROR_PATHS.get(target, []):
                 mirror_root = (
-                    cls._codex_home_dir() / "skills"
+                    self._codex_home_dir() / "skills"
                     if target in {"codex", "codex-cli"}
-                    else Path(mirror).expanduser()
+                    else self.user_directories.expanduser(mirror)
                 )
                 paths.append(mirror_root / name / "SKILL.md")
         deduped: list[Path] = []
@@ -2242,12 +2240,19 @@ class IntegrationManager(IntegrationManagerContentMixin):
 
         if self.supports_slash(target):
             project_slash = self.resolve_slash_command_path(
-                target=target, scope="project", project_dir=self.project_dir
+                target=target,
+                scope="project",
+                project_dir=self.project_dir,
+                user_directories=self.user_directories,
             )
             if project_slash is not None:
                 surfaces[f"project-slash:{project_slash}"] = project_slash
             if include_user_surfaces:
-                global_slash = self.resolve_slash_command_path(target=target, scope="global")
+                global_slash = self.resolve_slash_command_path(
+                    target=target,
+                    scope="global",
+                    user_directories=self.user_directories,
+                )
                 if global_slash is not None and global_slash != project_slash:
                     surfaces[f"global-slash:{global_slash}"] = global_slash
 
@@ -2265,9 +2270,11 @@ class IntegrationManager(IntegrationManagerContentMixin):
     def _resolve_surface_declaration(self, *, target: str, surface: str) -> Path:
         normalized = str(surface).strip()
         if normalized == "~/.codex/AGENTS.md":
-            return self.resolve_global_protocol_path("codex") or Path(normalized).expanduser()
+            return self.resolve_global_protocol_path("codex") or self.user_directories.expanduser(
+                normalized
+            )
         if normalized.startswith("~/"):
-            return Path(normalized).expanduser()
+            return self.user_directories.expanduser(normalized)
         return self.project_dir / normalized
 
     def surface_path_groups(
@@ -2361,8 +2368,13 @@ class IntegrationManager(IntegrationManagerContentMixin):
                 target=target,
                 scope="project",
                 project_dir=self.project_dir,
+                user_directories=self.user_directories,
             )
-            global_slash = self.resolve_slash_command_path(target=target, scope="global")
+            global_slash = self.resolve_slash_command_path(
+                target=target,
+                scope="global",
+                user_directories=self.user_directories,
+            )
         required_slash_paths: list[Path] = []
         optional_slash_paths: list[Path] = []
         compatibility_slash_paths: list[Path] = []
@@ -3536,17 +3548,16 @@ class IntegrationManager(IntegrationManagerContentMixin):
                 managed.append(derived)
         return managed
 
-    @classmethod
     def managed_user_agent_surfaces(
-        cls,
+        self,
         target: str,
         *,
         include_optional: bool = True,
     ) -> list[str]:
-        if target not in cls.TARGETS:
+        if target not in self.TARGETS:
             return []
 
-        declared = cls(Path.cwd())._install_surfaces(target=target)
+        declared = self._install_surfaces(target=target)
         surfaces: list[str] = []
         candidate_keys = ["official_user_surfaces"]
         if include_optional:

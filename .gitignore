@@ -54,6 +54,7 @@ htmlcov/
 
 # 输出文件
 output/
+.super-dev/baselines/windows-test-foundation/runs/
 .research/
 docs/plans/
 *.docx

@@ -4,7 +4,6 @@ Skill 安装管理器
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess  # nosec B404
 import tempfile
@@ -13,6 +12,7 @@ from pathlib import Path
 
 from ..catalogs import HOST_TOOL_IDS
 from ..host_registry import HostInstallMode, get_install_mode
+from ..user_directories import UserDirectoryContext
 from .skill_template import SkillTemplate
 
 
@@ -117,8 +117,13 @@ class SkillManager:
         **OFFICIAL_TARGET_PATHS,
     }
 
-    def __init__(self, project_dir: Path):
+    def __init__(
+        self,
+        project_dir: Path,
+        user_directories: UserDirectoryContext | None = None,
+    ):
         self.project_dir = Path(project_dir).resolve()
+        self.user_directories = user_directories or UserDirectoryContext.current()
 
     @classmethod
     def coverage_gaps(cls) -> dict[str, list[str]]:
@@ -144,10 +149,7 @@ class SkillManager:
 
     @classmethod
     def codex_home_dir(cls) -> Path:
-        raw = os.getenv("CODEX_HOME", "").strip()
-        if raw:
-            return Path(raw).expanduser()
-        return Path.home() / ".codex"
+        return UserDirectoryContext.current().codex_home
 
     @classmethod
     def compatibility_skill_names(cls, target: str, requested_name: str | None = None) -> list[str]:
@@ -224,7 +226,7 @@ class SkillManager:
         if self._is_git_source(source):
             return self._install_from_git(source=source, target=target, name=name, force=force)
 
-        source_path = Path(source).expanduser().resolve()
+        source_path = self.user_directories.expanduser(source).resolve()
         if source_path.is_dir():
             return self._install_from_directory(
                 source_dir=source_path,
@@ -305,7 +307,7 @@ class SkillManager:
             **self.OFFICIAL_TARGET_PATHS,
             **self.OBSERVED_TARGET_PATHS,
         }.items():
-            target_path = Path(target_path_str).expanduser()
+            target_path = self.user_directories.expanduser(target_path_str)
             # Check if super-dev skill exists for this target
             skill_dir = target_path / "super-dev"
             if skill_dir.exists() and (skill_dir / "SKILL.md").exists():
@@ -317,14 +319,18 @@ class SkillManager:
         return refreshed
 
     @classmethod
-    def cleanup_all_legacy(cls) -> list[str]:
+    def cleanup_all_legacy(
+        cls,
+        user_directories: UserDirectoryContext | None = None,
+    ) -> list[str]:
         """扫描所有已知和常见 skill 目录，删除旧版技能别名残留。"""
         cleaned: list[str] = []
         # 已知宿主路径
         all_paths = {**cls.OFFICIAL_TARGET_PATHS, **cls.OBSERVED_TARGET_PATHS}
-        search_dirs = [Path(p).expanduser() for p in all_paths.values()]
+        directories = user_directories or UserDirectoryContext.current()
+        search_dirs = [directories.expanduser(p) for p in all_paths.values()]
         # 常见但不在列表里的旧路径
-        home = Path.home()
+        home = directories.home
         for pattern in (
             ".*/skills",  # ~/.xxx/skills
             ".config/*/skills",  # ~/.config/xxx/skills
@@ -412,7 +418,7 @@ class SkillManager:
         relative = self.TARGET_PATHS.get(target)
         if relative is None:
             raise ValueError(f"Unsupported target: {target}")
-        raw_path = Path(relative).expanduser()
+        raw_path = self.user_directories.expanduser(relative)
         if raw_path.is_absolute():
             return raw_path
         return self.project_dir / relative
@@ -422,9 +428,9 @@ class SkillManager:
         resolved: list[Path] = []
         for item in paths:
             raw_path = (
-                self.codex_home_dir() / "skills"
-                if target == "codex-cli"
-                else Path(item).expanduser()
+                self.user_directories.codex_home / "skills"
+                if target in {"codex", "codex-cli"}
+                else self.user_directories.expanduser(item)
             )
             resolved.append(raw_path if raw_path.is_absolute() else self.project_dir / raw_path)
         return resolved

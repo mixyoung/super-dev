@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-24T17:36:00+08:00",
+  "historical_runs": [
+    {
+      "run_id": "windows-focused-legacy",
+      "baseline_kind": "historical",
+      "scope": "windows-focused",
+      "collected": 187,
+      "passed": 177,
+      "failed": 10,
+      "warnings": 12,
+      "failed_test_ids_available": false,
+      "note": "早期记录没有保存可逐项绑定的失败 ID；允许与较宽单元检查部分重叠，禁止与 55、35 相加。"
+    },
+    {
+      "run_id": "windows-unit-wide-legacy",
+      "baseline_kind": "historical",
+      "scope": "unit",
+      "passed": 2355,
+      "failed": 55,
+      "skipped": 3
+    },
+    {
+      "run_id": "windows-user-surfaces-pollution",
+      "baseline_kind": "historical",
+      "scope": "user-surfaces",
+      "passed": 204,
+      "failed": 35,
+      "created_real_user_files": 49,
+      "relationship": "35 ⊆ 55",
+      "classification": "test_defect",
+      "side_effect_risk": "confirmed"
+    }
+  ],
+  "scope_rules": [
+    {
+      "scope": "unit",
+      "match": "all historical_failure_ids",
+      "expected_count": 55
+    },
+    {
+      "scope": "user-surfaces",
+      "match_files": [
+        "tests/unit/test_skill_manager.py",
+        "tests/unit/test_integration_manager.py"
+      ],
+      "expected_count": 35,
+      "relationship": "subset of unit"
+    },
+    {
+      "scope": "windows-focused",
+      "failed_ids": null,
+      "expected_count": 10,
+      "relationship": "historical selector may overlap unit"
+    }
+  ],
+  "historical_failure_ids": [
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[kimi-code]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_codex_builtin_skill_no_duplicate_mirrors",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_codex_builtin_skill_installs_seeai_metadata",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_codex_no_compatibility_mirror_when_codex_home_set",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_cleanup_legacy_skill_aliases_removes_legacy_alias",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_codex_setup_global_protocol_writes_global_codex_agents",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_qwen_code_generates_project_agent_and_user_agent_surface",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_setup_global_slash_command",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_setup_global_slash_command_opencode_uses_config_dir",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_opencode_setup_uses_root_agents_and_global_agents",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_qoder_setup_uses_project_and_global_agents",
+    "tests/unit/test_integration_manager.py::TestIntegrationManager::test_collect_managed_surface_paths_includes_user_agent_surfaces_for_qoder",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[cursor-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[cursor]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[gemini-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[trae]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[trae-solo]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[vscode-copilot]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[antigravity]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[claude-code]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[codebuddy-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[codebuddy]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[codebuddy-cn]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[copilot-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[droid-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[kiro-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[kiro]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[qwen-code]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[trae-cn]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[trae-solocn]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[workbuddy]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[qoder-cli]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[qoder]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[roo-code]",
+    "tests/unit/test_skill_manager.py::TestSkillManager::test_install_builtin_skill[windsurf]",
+    "tests/unit/test_hook_manager.py::test_workflow_event_hook_dispatches_from_review_state",
+    "tests/unit/test_knowledge_gates.py::test_knowledge_gates_pass_with_required_assets",
+    "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_scans_project_knowledge_directory",
+    "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_prioritizes_knowledge_over_docs_when_scores_equal",
+    "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_scans_knowledge_yaml_and_txt",
+    "tests/unit/test_plan_executor.py::TestVerifyGates::test_successful_gate",
+    "tests/unit/test_plan_executor.py::TestUtilityFunctions::test_json_default_path",
+    "tests/unit/test_analyzer.py::TestDesignPattern::test_pattern_to_dict",
+    "tests/unit/test_analyzer.py::TestArchitectureReport::test_report_to_dict",
+    "tests/unit/test_delivery_enhanced.py::TestRelativePath::test_relative_path_inside_project",
+    "tests/unit/test_delivery_enhanced.py::TestRelativePath::test_outside_path_returns_full",
+    "tests/unit/test_delivery_packager.py::test_delivery_packager_ready",
+    "tests/unit/test_delivery_packager.py::test_delivery_packager_incomplete_without_frontend_runtime_report",
+    "tests/unit/test_delivery_packager.py::test_delivery_packager_incomplete_without_ui_contract_and_design_tokens",
+    "tests/unit/test_enforcement.py::TestHostHooksConfigurator::test_sensitive_read_guard_blocks_secret_paths_but_not_examples",
+    "tests/unit/test_enforcement.py::TestHostHooksConfigurator::test_bash_guard_blocks_secret_file_reads_and_env_prints",
+    "tests/unit/test_frontend_builder_enhanced.py::TestFrontendBuilderEdgeCases::test_special_chars_in_name",
+    "tests/unit/test_logger.py::TestLogger::test_get_logger_with_file",
+    "tests/unit/test_logger.py::TestLogger::test_log_with_extra",
+    "tests/unit/test_traceability.py::TestRequirementTracer::test_extract_from_spec"
+  ],
+  "current_baselines": {
+    "user_surfaces": {
+      "baseline_kind": "isolated-current",
+      "passed": 239,
+      "failed": 0,
+      "skipped": 2,
+      "safety_result": "safe",
+      "real_user_changes": 0
+    },
+    "windows_focused": {
+      "baseline_kind": "isolated-current",
+      "passed": 251,
+      "failed": 5,
+      "skipped": 2,
+      "safety_result": "safe",
+      "real_user_changes": 0
+    },
+    "unit_python_3_13": {
+      "baseline_kind": "isolated-current",
+      "passed": 2403,
+      "failed": 20,
+      "skipped": 3,
+      "warnings": 3,
+      "safety_result": "safe",
+      "real_user_changes": 0,
+      "note": "Python 3.13 本机诊断，不替代 Windows 3.10、3.11、3.12 持续检查证据。"
+    }
+  },
+  "current_classification": {
+    "test_defect": [
+      "tests/unit/test_frontend_builder_enhanced.py::TestFrontendBuilderEdgeCases::test_special_chars_in_name",
+      "tests/unit/test_hook_manager.py::test_workflow_event_hook_dispatches_from_review_state"
+    ],
+    "environment_gap": [
+      "tests/unit/test_enforcement.py::TestHostHooksConfigurator::test_sensitive_read_guard_blocks_secret_paths_but_not_examples",
+      "tests/unit/test_enforcement.py::TestHostHooksConfigurator::test_bash_guard_blocks_secret_file_reads_and_env_prints",
+      "tests/unit/test_plan_executor.py::TestVerifyGates::test_successful_gate"
+    ],
+    "product_defect": [
+      "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_scans_project_knowledge_directory",
+      "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_prioritizes_knowledge_over_docs_when_scores_equal",
+      "tests/unit/test_knowledge.py::TestKnowledgeAugmenter::test_augment_scans_knowledge_yaml_and_txt",
+      "tests/unit/test_logger.py::TestLogger::test_get_logger_with_file",
+      "tests/unit/test_logger.py::TestLogger::test_log_with_extra"
+    ],
+    "unclassified": [
+      "tests/unit/test_analyzer.py::TestDesignPattern::test_pattern_to_dict",
+      "tests/unit/test_analyzer.py::TestArchitectureReport::test_report_to_dict",
+      "tests/unit/test_delivery_enhanced.py::TestRelativePath::test_relative_path_inside_project",
+      "tests/unit/test_delivery_enhanced.py::TestRelativePath::test_outside_path_returns_full",
+      "tests/unit/test_delivery_packager.py::test_delivery_packager_ready",
+      "tests/unit/test_delivery_packager.py::test_delivery_packager_incomplete_without_frontend_runtime_report",
+      "tests/unit/test_delivery_packager.py::test_delivery_packager_incomplete_without_ui_contract_and_design_tokens",
+      "tests/unit/test_knowledge_gates.py::test_knowledge_gates_pass_with_required_assets",
+      "tests/unit/test_plan_executor.py::TestUtilityFunctions::test_json_default_path",
+      "tests/unit/test_traceability.py::TestRequirementTracer::test_extract_from_spec"
+    ]
+  }
+}

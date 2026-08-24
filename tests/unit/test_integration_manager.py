@@ -156,10 +156,6 @@ class TestIntegrationManager:
     def test_primary_hosts_write_all_managed_seeai_user_surfaces(
         self, temp_project_dir: Path, target: str, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
-
         manager = IntegrationManager(temp_project_dir)
         SkillManager(temp_project_dir).install(source="super-dev", target=target, force=True)
 
@@ -273,9 +269,7 @@ class TestIntegrationManager:
     def test_codex_setup_global_protocol_writes_global_codex_agents(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         global_file = manager.setup_global_protocol("codex-cli", force=True)
@@ -292,11 +286,8 @@ class TestIntegrationManager:
     def test_codex_global_protocol_and_skill_paths_follow_codex_home(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
         codex_home = temp_project_dir / "custom-codex-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
         codex_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
         monkeypatch.setenv("CODEX_HOME", str(codex_home))
 
         manager = IntegrationManager(temp_project_dir)
@@ -886,10 +877,7 @@ class TestIntegrationManager:
     def test_qwen_code_generates_project_agent_and_user_agent_surface(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
-
+        fake_home = Path.home()
         manager = IntegrationManager(temp_project_dir)
         files = manager.setup("qwen-code", force=True)
         global_protocol = manager.setup_global_protocol("qwen-code", force=True)
@@ -1055,10 +1043,6 @@ class TestIntegrationManager:
     def test_managed_surfaces_all_pass_contract_audit(
         self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
-
         manager = IntegrationManager(temp_project_dir)
         skill_manager = SkillManager(temp_project_dir)
 
@@ -1172,9 +1156,7 @@ class TestIntegrationManager:
     def test_setup_global_slash_command(
         self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         command_file = manager.setup_global_slash_command(target="claude-code", force=True)
@@ -1189,9 +1171,7 @@ class TestIntegrationManager:
         temp_project_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         command_file = manager.setup_global_slash_command(target="opencode", force=True)
@@ -1206,9 +1186,7 @@ class TestIntegrationManager:
         temp_project_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         written = manager.setup("opencode", force=True)
@@ -1243,9 +1221,7 @@ class TestIntegrationManager:
         temp_project_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         written = manager.setup("qoder-cli", force=True)
@@ -1270,9 +1246,7 @@ class TestIntegrationManager:
         temp_project_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
 
         manager = IntegrationManager(temp_project_dir)
         surfaces = manager.collect_managed_surface_paths(

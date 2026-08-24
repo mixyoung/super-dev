@@ -49,9 +49,6 @@ class TestSkillManager:
         assert SkillManager.TARGET_PATHS["trae-solocn"] == "~/.trae-cn/skills"
 
     def test_install_from_directory_and_uninstall(self, temp_project_dir: Path, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
         source_skill = temp_project_dir / "my-skill"
         source_skill.mkdir(parents=True, exist_ok=True)
         (source_skill / "SKILL.md").write_text("# My Skill", encoding="utf-8")
@@ -74,9 +71,6 @@ class TestSkillManager:
         list(SkillManager.TARGET_PATHS.keys()),
     )
     def test_install_builtin_skill(self, temp_project_dir: Path, target: str, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
         manager = SkillManager(temp_project_dir)
         result = manager.install(source="super-dev", target=target, name="super-dev")
 
@@ -104,9 +98,7 @@ class TestSkillManager:
     def test_codex_builtin_skill_no_duplicate_mirrors(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         manager = SkillManager(temp_project_dir)
 
         legacy_name = SkillManager.legacy_cleanup_skill_names()[0]
@@ -139,9 +131,7 @@ class TestSkillManager:
         assert not primary_skill.exists()
 
     def test_codex_builtin_skill_installs_seeai_metadata(self, temp_project_dir: Path, monkeypatch):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         manager = SkillManager(temp_project_dir)
 
         manager.install(source="super-dev", target="codex-cli", name="super-dev")
@@ -179,11 +169,8 @@ class TestSkillManager:
     def test_codex_no_compatibility_mirror_when_codex_home_set(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
         codex_home = temp_project_dir / "custom-codex-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
         codex_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
         monkeypatch.setenv("CODEX_HOME", str(codex_home))
         manager = SkillManager(temp_project_dir)
 
@@ -198,9 +185,7 @@ class TestSkillManager:
     def test_cleanup_legacy_skill_aliases_removes_legacy_alias(
         self, temp_project_dir: Path, monkeypatch
     ):
-        fake_home = temp_project_dir / "fake-home"
-        fake_home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        fake_home = Path.home()
         manager = SkillManager(temp_project_dir)
 
         legacy_name = SkillManager.legacy_cleanup_skill_names()[0]

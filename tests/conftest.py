@@ -11,6 +11,47 @@ import pytest
 
 from super_dev.config import ConfigManager, ProjectConfig
 from super_dev.orchestrator import WorkflowContext, WorkflowEngine
+from super_dev.user_directories import UserDirectoryContext
+from tests.support.user_surface_snapshot import (
+    capture_user_surfaces,
+    collect_user_surface_paths,
+    diff_surface_snapshots,
+    has_surface_changes,
+    unsafe_surface_states,
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def protect_real_user_surfaces(request: pytest.FixtureRequest):
+    """整次测试会话前后比较真实用户级接入面。"""
+
+    project_dir = Path(str(request.config.rootpath)).resolve()
+    real_directories = UserDirectoryContext.current()
+    protected_paths = collect_user_surface_paths(project_dir, real_directories)
+    before = capture_user_surfaces(protected_paths)
+    risks = unsafe_surface_states(before)
+    assert not risks, f"真实用户级接入面包含无法安全检查的连接点或路径: {risks}"
+    yield
+    after = capture_user_surfaces(protected_paths)
+    diff = diff_surface_snapshots(before, after)
+    assert not has_surface_changes(diff), f"真实用户级接入面发生变化: {diff}"
+
+
+@pytest.fixture(autouse=True)
+def isolated_user_directories(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> UserDirectoryContext:
+    """让每个测试默认运行在独立用户目录，避免接触真实宿主文件。"""
+
+    home = tmp_path / "isolated-user-home"
+    home.mkdir(parents=True, exist_ok=True)
+    context = UserDirectoryContext.from_home(home)
+    for name, value in context.environment({}).items():
+        monkeypatch.setenv(name, value)
+    assert Path.home().resolve() == context.home
+    assert Path("~").expanduser().resolve() == context.home
+    yield context
 
 
 @pytest.fixture(autouse=True)

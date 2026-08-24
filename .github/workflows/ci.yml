@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop]
   pull_request:
@@ -59,3 +60,67 @@ jobs:
 
       - name: Check for known vulnerabilities
         run: pip audit || true
+
+  windows-baseline:
+    name: Windows baseline evidence (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Verify isolated user directory
+        run: >-
+          python -m tests.support.run_safe_baseline isolation-smoke
+          --output-dir artifacts/windows-${{ matrix.python-version }}/isolation-smoke
+          --timeout-seconds 300
+          --fail-on-test-failure
+
+      - name: Verify user-level write surfaces
+        run: >-
+          python -m tests.support.run_safe_baseline user-surfaces
+          --output-dir artifacts/windows-${{ matrix.python-version }}/user-surfaces
+          --timeout-seconds 600
+          --fail-on-test-failure
+
+      - name: Capture safe Windows unit baseline
+        run: >-
+          python -m tests.support.run_safe_baseline unit
+          --output-dir artifacts/windows-${{ matrix.python-version }}/unit
+          --timeout-seconds 1200
+
+      - name: Publish readable summary
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          $root = "artifacts/windows-${{ matrix.python-version }}"
+          Get-ChildItem -LiteralPath $root -Filter summary.md -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object {
+              Get-Content -LiteralPath $_.FullName | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+            }
+          $unitResult = Join-Path $root "unit/result.json"
+          if (Test-Path -LiteralPath $unitResult) {
+            $result = Get-Content -LiteralPath $unitResult -Raw | ConvertFrom-Json
+            if ($result.test_result -ne "pass") {
+              Write-Warning "Windows unit tests are not all green; see uploaded baseline evidence."
+            }
+          }
+
+      - name: Upload Windows baseline evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-baseline-python-${{ matrix.python-version }}
+          path: artifacts/windows-${{ matrix.python-version }}
+          if-no-files-found: error

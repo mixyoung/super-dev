@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-24T17:36:00+08:00",
+  "branch": "feature/windows-test-foundation",
+  "commit_base": "6524dcf2c4db9f296549e89a8140b5abefdf7765",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "python": "3.13.12",
+  "safety_result": "safe",
+  "evidence_result": "complete",
+  "test_result": "fail",
+  "passed": 2403,
+  "failed": 20,
+  "skipped": 3,
+  "warnings": 3,
+  "repeatable": true,
+  "repeatability_runs": 2,
+  "real_user_changes": 0,
+  "high_risk_user_surface_failures_before": 35,
+  "high_risk_user_surface_failures_after": 0,
+  "verified_user_surface_run": {
+    "passed": 239,
+    "failed": 0,
+    "skipped": 2
+  },
+  "windows_matrix_status": "pending remote CI execution for Python 3.10, 3.11, 3.12"
+}

@@ -14,6 +14,7 @@ from ..seeai_design_system import (
     get_seeai_design_packs,
 )
 from ..skills.skill_template import SkillTemplate
+from ..user_directories import UserDirectoryContext
 
 
 class IntegrationManagerContentMixin:
@@ -161,6 +162,7 @@ class IntegrationManagerContentMixin:
             target=target,
             scope=scope,
             project_dir=self.project_dir,
+            user_directories=self.user_directories,
         )
         if command_file.exists() and not force:
             return None
@@ -189,6 +191,7 @@ class IntegrationManagerContentMixin:
             target=target,
             scope=scope,
             project_dir=self.project_dir,
+            user_directories=self.user_directories,
         )
         if command_file.exists() and not force:
             return None
@@ -212,6 +215,7 @@ class IntegrationManagerContentMixin:
         target: str,
         scope: str,
         project_dir: Path | None = None,
+        user_directories: UserDirectoryContext | None = None,
     ) -> Path:
         if not cls.supports_slash(target):
             raise ValueError(f"Unsupported target: {target}")
@@ -219,12 +223,15 @@ class IntegrationManagerContentMixin:
         if scope == "project":
             if project_dir is None:
                 raise ValueError("project_dir is required when scope='project'")
-            relative = cls.SLASH_COMMAND_FILES[target]
+            relative = str(cls.SLASH_COMMAND_FILES[target])
             return Path(project_dir).resolve() / relative
 
         if scope == "global":
-            relative = cls.GLOBAL_SLASH_COMMAND_FILES.get(target, cls.SLASH_COMMAND_FILES[target])
-            return Path.home() / relative
+            relative = str(
+                cls.GLOBAL_SLASH_COMMAND_FILES.get(target, cls.SLASH_COMMAND_FILES[target])
+            )
+            directories = user_directories or UserDirectoryContext.current()
+            return directories.home / relative
 
         raise ValueError(f"Unsupported slash scope: {scope}")
 
@@ -235,8 +242,14 @@ class IntegrationManagerContentMixin:
         target: str,
         scope: str,
         project_dir: Path | None = None,
+        user_directories: UserDirectoryContext | None = None,
     ) -> Path:
-        base = cls.resolve_slash_command_path(target=target, scope=scope, project_dir=project_dir)
+        base = cls.resolve_slash_command_path(
+            target=target,
+            scope=scope,
+            project_dir=project_dir,
+            user_directories=user_directories,
+        )
         return base.with_name(base.name.replace("super-dev", "super-dev-seeai"))
 
     @classmethod
