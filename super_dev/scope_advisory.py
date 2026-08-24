@@ -3,10 +3,66 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from .change_ledger import ScopeAdvisory, StageResolution, StageScopeRecommendation
-from .stage_scope import required_stages_for
+from .stage_scope import KNOWN_CHANGE_SURFACES, required_stages_for
+from .work_mode import normalize_governance_depth
 from .workflow_contract import CANONICAL_NINE_STAGE_IDS, get_phase_kinds
+
+
+@dataclass(frozen=True)
+class StructuredScopeDeclaration:
+    """Normalized scope data passed from a pipeline entry into Spec creation."""
+
+    changed_surfaces: tuple[str, ...]
+    scope_complete: bool
+    work_mode: str
+    governance_depth: str
+
+
+def resolve_pipeline_scope_declaration(
+    *,
+    changed_surfaces: Iterable[str] | None,
+    request_mode: str,
+    scenario: str,
+    governance_depth: str | None = None,
+) -> StructuredScopeDeclaration:
+    """Normalize one pipeline declaration without guessing omitted change surfaces."""
+
+    surfaces = tuple(
+        sorted(
+            {
+                str(item).strip().lower()
+                for item in (changed_surfaces or ())
+                if str(item).strip()
+            }
+        )
+    )
+    unknown_surfaces = set(surfaces) - KNOWN_CHANGE_SURFACES
+    if unknown_surfaces:
+        raise ValueError(f"Unsupported changed surfaces: {sorted(unknown_surfaces)}")
+
+    normalized_request_mode = str(request_mode).strip().lower()
+    if normalized_request_mode not in {"feature", "bugfix"}:
+        normalized_request_mode = "feature"
+    work_mode = (
+        "new"
+        if scenario == "0-1"
+        else ("patch" if normalized_request_mode == "bugfix" else "evolve")
+    )
+    default_depth = (
+        "commercial"
+        if scenario == "0-1"
+        else ("bounded" if normalized_request_mode == "bugfix" else "architectural")
+    )
+    effective_depth = normalize_governance_depth(governance_depth or default_depth)
+    return StructuredScopeDeclaration(
+        changed_surfaces=surfaces,
+        scope_complete=bool(surfaces),
+        work_mode=work_mode,
+        governance_depth=effective_depth,
+    )
 
 
 def build_scope_advisory(
@@ -66,4 +122,8 @@ def build_scope_advisory(
     )
 
 
-__all__ = ["build_scope_advisory"]
+__all__ = [
+    "StructuredScopeDeclaration",
+    "build_scope_advisory",
+    "resolve_pipeline_scope_declaration",
+]

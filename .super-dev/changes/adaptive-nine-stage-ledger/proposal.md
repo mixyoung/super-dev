@@ -274,3 +274,60 @@ The project canary enables `adaptive_ledger.scope_advisory=true`. Package defaul
 - follow-up review returned `VERDICT=ACCEPT` with no remaining mandatory fixes.
 
 Ledger schema version remains `1` because the advisory is optional, omitted by default, and old ledgers round-trip without a new field. A present advisory must pass the stricter object contract.
+
+## Seventh-Slice Structured Scope Declaration
+
+The seventh slice lets hosts provide confirmed changed surfaces at the existing Spec creation boundary instead of guessing from natural-language requirements.
+
+### Supported creation paths
+
+- `super-dev pipeline <需求> --changed-surfaces ... --governance-depth ...` passes structured surfaces into `SpecBuilder`;
+- `super-dev spec propose <id> ... --changed-surfaces ... --work-mode ... --governance-depth ...` creates the same first-write shadow ledger after the default Spec/task scaffold exists;
+- `spec propose --no-scaffold` does not create a ledger because the task contract is not ready;
+- both paths call `ensure_shadow_change_ledger`; the lifecycle remains the only file writer;
+- existing ledgers are not updated or overwritten.
+
+### Safety contract
+
+- the CLI accepts only the known production changed-surface vocabulary;
+- omitting `--changed-surfaces` means scope is incomplete and keeps the full nine-stage advisory;
+- an explicit surface list is treated as complete and may produce approval-required reduction advice;
+- existing-project scope is never inferred from the project's configured technology stack;
+- a new-project pipeline may still derive the conservative product/architecture/frontend/backend scope;
+- bugfix pipeline mode maps to patch work mode and bounded governance unless explicitly overridden;
+- pipeline resume persists and restores the declared surfaces and governance depth;
+- scope advice remains read-only and cannot change real resolutions or confirmation gates.
+
+The canonical Skill template now instructs hosts to declare surfaces only after documents are confirmed. It presents familiar Chinese labels followed by technical identifiers in parentheses and tells the host to omit the field when uncertain. All tracked Codex and Claude Code Skill copies are generated from that template and synchronized.
+
+The formal changed-surface vocabulary is:
+
+- product (`product`), architecture (`architecture`), UI/UX contract (`uiux`);
+- frontend (`frontend`), UI/interaction (`ui`), route (`route`), style (`style`), component (`component`);
+- backend (`backend`), API (`api`), data (`data`), authorization (`authorization`).
+
+### Still outside this slice
+
+- no natural-language scope classifier;
+- no post-creation scope update;
+- no automatic application of advisory reductions;
+- no automated gate, quality, merge, push, or release decision.
+
+### Seventh-slice validation status
+
+- the affected scope, ledger, stage-policy, workflow-contract, CLI resume, Skill contract, and Spec-manager regression completed with 211 passed and one existing Windows symbolic-link permission test skipped;
+- the exact `run --resume` integration test confirmed that bugfix mode, changed surfaces, and governance depth are restored together;
+- Ruff, Python bytecode compilation, Skill synchronization, and diff whitespace checks passed;
+- focused type checking passed for the new production scope declaration and `SpecBuilder`; two existing errors remain in unchanged sections of `cli_spec_mixin.py` and are not presented as part of this slice;
+- a wider Windows unit run completed with 2355 passed, 3 skipped, and 55 failures. The failures were outside the changed call chain and clustered around POSIX path expectations, Bash-only hook commands, Windows-invalid filenames, and tests that failed to isolate the real user home directory. This wider run is therefore recorded as diagnostic evidence, not as a green release gate;
+- the wider run rewrote user-level Super Dev Skill copies because of that home-directory isolation defect. The touched copies were backed up, restored to branch HEAD `a403db6`, and verified; no recent non-Skill global files were found in the affected tool directories;
+- the configured independent model channel initially failed to return content, then the direct Grok Build CLI was verified with a fixed-text health probe;
+- Grok Build reviewed a 46,795-character packet containing the full relevant diff and the new untracked test file, returned `VERDICT=ACCEPT`, and reported no mandatory fixes.
+
+The first independent review returned `VERDICT=REVISE`; its mandatory findings now have production fixes, regression evidence, and an accepted follow-up review. Grok Build's optional backlog is retained rather than treated as a release blocker:
+
+- add a stronger process-level pipeline/resume-to-ledger integration test;
+- make the Skill explicit that `run --resume` restores saved scope but cannot add a previously omitted scope;
+- normalize a programmatic empty surface list in the Spec proposal helper;
+- add explicit governance-depth override coverage;
+- separately evaluate direct-entry scope passthrough and document the `0-1` plus bugfix precedence rule.

@@ -5312,6 +5312,7 @@ class TestCLIRunControl:
                         "project_name": "resume-demo",
                         "pipeline_args": {
                             "description": "构建一个支持登录和看板的平台",
+                            "mode": "bugfix",
                             "platform": "web",
                             "frontend": "react",
                             "backend": "python",
@@ -5324,6 +5325,8 @@ class TestCLIRunControl:
                             "skip_rehearsal_verify": False,
                             "offline": True,
                             "quality_threshold": None,
+                            "changed_surfaces": ["api", "backend"],
+                            "governance_depth": "bounded",
                         },
                     },
                     ensure_ascii=False,
@@ -5346,6 +5349,9 @@ class TestCLIRunControl:
             assert getattr(pipeline_args, "resume") is True
             assert getattr(pipeline_args, "name") == "resume-demo"
             assert getattr(pipeline_args, "description") == "构建一个支持登录和看板的平台"
+            assert getattr(pipeline_args, "mode") == "bugfix"
+            assert getattr(pipeline_args, "changed_surfaces") == ["api", "backend"]
+            assert getattr(pipeline_args, "governance_depth") == "bounded"
         finally:
             os.chdir(original_cwd)
 

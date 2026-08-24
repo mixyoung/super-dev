@@ -105,3 +105,16 @@
 - [x] L6. Expose advisory counts and coaching text through the existing read-only CLI summary.
 - [x] L7. Add model, configuration, lifecycle, scope validation, store, CLI, and backward-compatibility tests.
 - [x] L8. Run the affected regression suite, lint, independent read-only review, and prepare the local commit; do not push.
+
+## M. Structured Scope Declaration
+
+- [x] M1. Add known-surface CLI choices to pipeline and Spec proposal creation.
+- [x] M2. Persist declared surfaces and governance depth in pipeline run state and restore them on resume.
+- [x] M3. Pass explicit surfaces, work mode, and governance depth through `SpecBuilder` into first ledger creation.
+- [x] M4. Add host-oriented `spec propose` registration that uses the same lifecycle writer and never overwrites an existing ledger.
+- [x] M5. Keep omitted scope conservative and prevent `--no-scaffold` proposal-only work from creating a ledger early.
+- [x] M6. Add the Chinese-label-plus-identifier scope contract to the canonical Skill template and synchronize tracked host copies.
+- [x] M7. Add parser, Spec command, advisory, no-scope, invalid-surface, and early-write prevention tests.
+- [x] M8. Run the affected regression suite, lint, type checks, Skill synchronization, bytecode compilation, and diff inspection.
+- [x] M9. Audit the wider Windows unit run, identify its global Skill pollution, restore touched user-level copies to branch HEAD, and verify no recent non-Skill global mutations.
+- [x] M10. Obtain the independent follow-up `VERDICT=ACCEPT`, then create the local commit; do not push.

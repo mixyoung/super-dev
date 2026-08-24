@@ -64,3 +64,5 @@ python -m tools.shadow_comparison
 正式账本创建模块（`super_dev/shadow_ledger_lifecycle.py`）不调用上述测试和报告工具，仍然是唯一文件写入入口。
 
 后续正式自动建账可以直接调用阶段范围判断（`super_dev/stage_scope.py`）生成只读范围建议（`scope_advisory`），但不会调用模拟案例、测试用装配工具或开发报告工具。范围建议与真正阶段决定（`resolution`）分开保存，不能自动改变门禁。
+
+宿主现在可以在创建规范时通过结构化改动范围（`--changed-surfaces`）提供输入。若宿主没有足够证据确认范围，就必须省略该参数，让系统保持完整九阶段建议；不能根据技术栈或模糊描述猜测缩减。

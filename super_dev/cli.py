@@ -92,6 +92,7 @@ from .review_state import (
     workflow_event_log_file,
     workflow_state_file,
 )
+from .scope_advisory import resolve_pipeline_scope_declaration
 from .shadow_ledger_store import build_shadow_ledger_summary
 from .terminal import (
     create_console,
@@ -1002,6 +1003,7 @@ class SuperDevCLI(
 
         pipeline_args = argparse.Namespace(
             description=str(raw_args.get("description", "")).strip(),
+            mode=str(raw_args.get("mode", "feature")),
             platform=str(raw_args.get("platform", "web")),
             frontend=str(raw_args.get("frontend", "react")),
             backend=str(raw_args.get("backend", "node")),
@@ -1014,6 +1016,8 @@ class SuperDevCLI(
             skip_rehearsal_verify=bool(raw_args.get("skip_rehearsal_verify", False)),
             offline=bool(raw_args.get("offline", False)),
             quality_threshold=raw_args.get("quality_threshold"),
+            changed_surfaces=raw_args.get("changed_surfaces"),
+            governance_depth=raw_args.get("governance_depth"),
             resume=True,
         )
 
@@ -2443,6 +2447,21 @@ class SuperDevCLI(
             "backend": args.backend,
             "domain": args.domain,
         }
+        declared_changed_surfaces = getattr(args, "changed_surfaces", None)
+        normalized_declared_surfaces = sorted(
+            {
+                str(item).strip().lower()
+                for item in (
+                    declared_changed_surfaces
+                    if isinstance(declared_changed_surfaces, (list, tuple, set, frozenset))
+                    else ()
+                )
+                if str(item).strip()
+            }
+        )
+        declared_governance_depth = str(
+            getattr(args, "governance_depth", "") or ""
+        ).strip()
 
         project_dir = Path.cwd()
         output_dir = project_dir / "output"
@@ -2478,6 +2497,8 @@ class SuperDevCLI(
             "skip_rehearsal_verify": bool(args.skip_rehearsal_verify),
             "offline": bool(args.offline),
             "quality_threshold": args.quality_threshold,
+            "changed_surfaces": normalized_declared_surfaces or None,
+            "governance_depth": declared_governance_depth or None,
         }
         pipeline_policy = policy_manager.load()
 
@@ -3165,7 +3186,44 @@ class SuperDevCLI(
                     project_dir=project_dir, name=project_name, description=args.description
                 )
 
-                change_id = spec_builder.create_change(requirements, tech_stack, scenario=scenario)
+                scope_input = normalized_declared_surfaces
+                if not scope_input and run_context.get("scope_complete") is True:
+                    stored_surfaces = run_context.get("changed_surfaces")
+                    if isinstance(stored_surfaces, list):
+                        scope_input = stored_surfaces
+                stored_depth = str(run_context.get("scope_governance_depth", "") or "").strip()
+                scope_declaration = resolve_pipeline_scope_declaration(
+                    changed_surfaces=scope_input,
+                    request_mode=request_mode_override,
+                    scenario=scenario,
+                    governance_depth=declared_governance_depth or stored_depth or None,
+                )
+                pipeline_args_snapshot["changed_surfaces"] = (
+                    list(scope_declaration.changed_surfaces)
+                    if scope_declaration.scope_complete
+                    else None
+                )
+                pipeline_args_snapshot["governance_depth"] = (
+                    scope_declaration.governance_depth
+                )
+                _update_run_context(
+                    changed_surfaces=list(scope_declaration.changed_surfaces),
+                    scope_complete=scope_declaration.scope_complete,
+                    scope_work_mode=scope_declaration.work_mode,
+                    scope_governance_depth=scope_declaration.governance_depth,
+                )
+                change_id = spec_builder.create_change(
+                    requirements,
+                    tech_stack,
+                    scenario=scenario,
+                    changed_surfaces=(
+                        set(scope_declaration.changed_surfaces)
+                        if scope_declaration.scope_complete
+                        else None
+                    ),
+                    work_mode=scope_declaration.work_mode,
+                    governance_depth=scope_declaration.governance_depth,
+                )
 
                 self.console.print(f"  [green]✓[/green] 变更 ID: {change_id}")
                 self.console.print(f"  [green]✓[/green] Spec: .super-dev/changes/{change_id}/")
@@ -6223,6 +6281,8 @@ class SuperDevCLI(
             skip_rehearsal_verify=bool(direct_overrides.get("skip_rehearsal_verify", False)),
             offline=bool(direct_overrides.get("offline", False)),
             quality_threshold=direct_overrides.get("quality_threshold"),
+            changed_surfaces=None,
+            governance_depth=None,
             resume=False,
         )
 

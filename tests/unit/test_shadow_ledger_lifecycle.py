@@ -408,6 +408,8 @@ def test_explicit_backend_scope_generates_reduction_advice_only(
         tech_stack={"platform": "web", "frontend": "react", "backend": "node"},
         scenario="1-N+1",
         changed_surfaces={"backend"},
+        work_mode="patch",
+        governance_depth="bounded",
     )
 
     ledger = load_shadow_ledger(
@@ -416,6 +418,7 @@ def test_explicit_backend_scope_generates_reduction_advice_only(
     ).ledger
     advisory = ledger.scope_advisory
     assert advisory is not None
+    assert ledger.intent.value == "debug"
     assert advisory.scope_complete is True
     assert advisory.changed_surfaces == ["backend"]
     reductions = [item.stage for item in advisory.recommendations if item.approval_required]

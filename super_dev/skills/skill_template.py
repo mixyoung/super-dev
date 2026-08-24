@@ -169,6 +169,7 @@ class SuperDevSkillContent:
             self._section_runtime_contract_codex(),
             self._section_cli_command_guide(),
             self._section_first_response_contract(),
+            self._section_changed_surface_contract(),
             self._section_knowledge_contract(),
             self._section_pre_code_gate(),
             self._section_session_continuity(),
@@ -366,6 +367,7 @@ class SuperDevSkillContent:
             self._section_runtime_contract_generic(),
             self._section_cli_command_guide(),
             self._section_first_response_contract(),
+            self._section_changed_surface_contract(),
             self._section_knowledge_contract(),
             self._section_pre_code_gate(),
             self._section_session_continuity(),
@@ -663,6 +665,35 @@ class SuperDevSkillContent:
             "竞品和官方文档，写入 `output/*-research.md`。\n"
             "\n"
             "两个引擎的结果都必须在 PRD/架构/UIUX 文档中被继承。"
+        )
+
+    def _section_changed_surface_contract(self) -> str:
+        return (
+            "## 改动范围登记（文档确认后、创建 Spec 时执行）\n"
+            "\n"
+            "- 只登记已经由文档和用户确认的改动范围，不根据项目技术栈猜测已有项目的范围。\n"
+            "- 普通流程在三份核心文档确认前启动完整流水线时，不填写改动范围参数"
+            "（`--changed-surfaces`）；文档已经确认后的恢复或定向执行才可以填写。\n"
+            "- 可用范围包括：产品（`product`）、架构（`architecture`）、界面规范（`uiux`）、"
+            "前端（`frontend`）、界面与交互（`ui`）、路由（`route`）、样式（`style`）、"
+            "组件（`component`）、后端（`backend`）、接口（`api`）、数据（`data`）、"
+            "权限（`authorization`）。\n"
+            "- 范围明确时，优先通过本地治理命令创建 Spec，例如："
+            "`super-dev spec propose <id> --title <标题> --description <描述> "
+            "--changed-surfaces backend api --work-mode evolve "
+            "--governance-depth architectural`。这里的已有项目增量迭代（`evolve`）和"
+            "架构级治理（`architectural`）分别说明改动方式与检查强度。\n"
+            "- 修复明确缺陷时可使用："
+            "`super-dev spec propose <id> --title <标题> --description <描述> "
+            "--changed-surfaces backend api --work-mode patch --governance-depth bounded`。"
+            "缺陷修复（`patch`）和边界清楚（`bounded`）不会自动跳过阶段，只生成只读建议。\n"
+            "- 文档已经确认后，运行完整流水线的恢复或定向执行可使用："
+            "`super-dev pipeline <需求> --changed-surfaces backend api "
+            "--governance-depth architectural`。\n"
+            "- 范围不确定时不要填写（`--changed-surfaces`）；系统必须保留完整九阶段建议，"
+            "不能为了省步骤而猜测。\n"
+            "- 阶段范围建议（`scope_advisory`）只用于说明，缩减建议必须审批，"
+            "不能自动修改真正阶段决定（`resolution`）或跳过确认步骤。"
         )
 
     def _section_knowledge_contract(self) -> str:

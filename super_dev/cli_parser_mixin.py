@@ -15,6 +15,7 @@ from .catalogs import (
     PLATFORM_IDS,
     normalize_host_tool_id,
 )
+from .stage_scope import KNOWN_CHANGE_SURFACES
 
 SUPPORTED_PLATFORMS = list(PLATFORM_IDS)
 SUPPORTED_PIPELINE_FRONTENDS = list(PIPELINE_FRONTEND_TEMPLATE_IDS)
@@ -757,6 +758,24 @@ class CliParserMixin:
         spec_propose_parser.add_argument("--motivation", help="变更动机/背景")
         spec_propose_parser.add_argument("--impact", help="影响范围")
         spec_propose_parser.add_argument(
+            "--changed-surfaces",
+            nargs="+",
+            choices=sorted(KNOWN_CHANGE_SURFACES),
+            help="明确的改动范围，可多选；不填写则保留完整九阶段建议",
+        )
+        spec_propose_parser.add_argument(
+            "--work-mode",
+            choices=["new", "evolve", "variant", "patch", "resume"],
+            default="evolve",
+            help="工作类型（默认：已有项目增量修改）",
+        )
+        spec_propose_parser.add_argument(
+            "--governance-depth",
+            choices=["bounded", "architectural", "commercial"],
+            default="architectural",
+            help="治理强度（默认：架构级）",
+        )
+        spec_propose_parser.add_argument(
             "--no-scaffold",
             action="store_true",
             help="仅创建 proposal，不生成 spec/plan/tasks/checklist 模板",
@@ -956,6 +975,18 @@ class CliParserMixin:
             "-d", "--domain", choices=SUPPORTED_DOMAINS, default="", help="业务领域"
         )
         pipeline_parser.add_argument("--name", help="项目名称 (默认根据描述生成)")
+        pipeline_parser.add_argument(
+            "--changed-surfaces",
+            nargs="+",
+            choices=sorted(KNOWN_CHANGE_SURFACES),
+            help="明确的改动范围，可多选；不填写则使用保守完整建议",
+        )
+        pipeline_parser.add_argument(
+            "--governance-depth",
+            choices=["bounded", "architectural", "commercial"],
+            default=None,
+            help="显式治理强度；不填写则按新建、缺陷修复或增量修改选择保守值",
+        )
         pipeline_parser.add_argument(
             "--cicd", choices=SUPPORTED_CICD, default="all", help="CI/CD 平台"
         )

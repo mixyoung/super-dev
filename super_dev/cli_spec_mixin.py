@@ -5,12 +5,60 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
+from . import __version__
 from .config import get_config_manager
+from .shadow_ledger_lifecycle import (
+    ShadowLedgerCreationResult,
+    adaptive_ledger_auto_create_enabled,
+    adaptive_ledger_scope_advisory_enabled,
+    ensure_shadow_change_ledger,
+)
 from .terminal import create_console
+from .workflow_guard import docs_gate_status
 
 
 class CliSpecMixin:
+    def _create_spec_shadow_ledger(
+        self,
+        *,
+        project_dir: Path,
+        change_id: str,
+        changed_surfaces: list[str] | None,
+        work_mode: str,
+        governance_depth: str,
+    ) -> dict[str, Any]:
+        try:
+            config = get_config_manager(project_dir).config
+            satisfied_stages = {"spec"}
+            if docs_gate_status(project_dir).get("confirmed") is True:
+                satisfied_stages.update({"docs", "docs_confirm"})
+            result = ensure_shadow_change_ledger(
+                project_dir,
+                change_id=change_id,
+                harness_version=__version__,
+                intent="debug" if work_mode == "patch" else "build",
+                governance_depth=governance_depth,
+                work_mode=work_mode,
+                enabled=adaptive_ledger_auto_create_enabled(config),
+                satisfied_stages=satisfied_stages,
+                scope_advisory_enabled=adaptive_ledger_scope_advisory_enabled(config),
+                changed_surfaces=(
+                    {str(item).strip().lower() for item in changed_surfaces}
+                    if changed_surfaces is not None
+                    else set()
+                ),
+                scope_complete=changed_surfaces is not None,
+            )
+        except Exception as exc:
+            result = ShadowLedgerCreationResult(
+                status="write_failed",
+                change_id=change_id,
+                error=f"Shadow ledger isolation caught an unexpected error: {exc}",
+            )
+        return result.to_dict()
+
     def _cmd_spec(self, args) -> int:
         """Spec-Driven Development 命令"""
         from .specs import ChangeManager, SpecGenerator, SpecManager
@@ -120,10 +168,36 @@ class CliSpecMixin:
             if not bool(getattr(args, "no_scaffold", False)):
                 scaffolded_files = generator.scaffold_change_artifacts(change.id, force=False)
 
+            shadow_result: dict[str, Any] = {}
+            if scaffolded_files:
+                shadow_result = self._create_spec_shadow_ledger(
+                    project_dir=project_dir,
+                    change_id=change.id,
+                    changed_surfaces=getattr(args, "changed_surfaces", None),
+                    work_mode=str(getattr(args, "work_mode", "evolve")),
+                    governance_depth=str(
+                        getattr(args, "governance_depth", "architectural")
+                    ),
+                )
+
             self.console.print(f"[green]✓[/green] 变更提案已创建: {change.id}")
             self.console.print(f"  [dim].super-dev/changes/{change.id}/[/dim]")
             if scaffolded_files:
                 self.console.print("  [dim]已生成 spec/plan/tasks/checklist 四件套[/dim]")
+            if shadow_result.get("status") == "created":
+                self.console.print("  [dim]已建立只读九阶段影子账本[/dim]")
+                if shadow_result.get("scope_advisory_created") is True:
+                    self.console.print("  [dim]已生成只读阶段范围建议；缩减必须审批[/dim]")
+            elif shadow_result.get("status") in {
+                "invalid_existing",
+                "write_failed",
+                "unsafe_path",
+                "missing_change",
+            }:
+                self.console.print(
+                    "  [yellow]影子账本未建立，变更提案继续有效：[/yellow]"
+                    f"{shadow_result.get('error', '-')}"
+                )
             self.console.print("")
             self.console.print("[cyan]下一步:[/cyan]")
             self.console.print(

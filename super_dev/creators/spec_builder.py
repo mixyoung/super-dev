@@ -44,6 +44,8 @@ class SpecBuilder:
         tech_stack: dict,
         scenario: str | None = None,
         changed_surfaces: set[str] | None = None,
+        work_mode: str | None = None,
+        governance_depth: str | None = None,
     ) -> str:
         """创建 Spec 变更提案"""
         require_docs_confirmation(
@@ -89,15 +91,19 @@ class SpecBuilder:
             satisfied_stages = {"spec"}
             if docs_gate_status(self.project_dir).get("confirmed") is True:
                 satisfied_stages.update({"docs", "docs_confirm"})
+            effective_work_mode = work_mode or (
+                "new" if scenario == "0-1" else "evolve"
+            )
+            effective_governance_depth = governance_depth or (
+                "commercial" if scenario == "0-1" else "architectural"
+            )
             shadow_result = ensure_shadow_change_ledger(
                 self.project_dir,
                 change_id=change_id,
                 harness_version=__version__,
-                intent="build",
-                governance_depth=(
-                    "commercial" if scenario == "0-1" else "architectural"
-                ),
-                work_mode="new" if scenario == "0-1" else "evolve",
+                intent="debug" if effective_work_mode == "patch" else "build",
+                governance_depth=effective_governance_depth,
+                work_mode=effective_work_mode,
                 enabled=adaptive_ledger_auto_create_enabled(config),
                 satisfied_stages=satisfied_stages,
                 scope_advisory_enabled=adaptive_ledger_scope_advisory_enabled(config),
