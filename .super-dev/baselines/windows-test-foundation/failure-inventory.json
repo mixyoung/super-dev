@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-24T17:36:00+08:00",
+  "updated_at": "2026-08-24T23:39:43+08:00",
   "historical_runs": [
     {
       "run_id": "windows-focused-legacy",
@@ -138,6 +138,35 @@
       "safety_result": "safe",
       "real_user_changes": 0,
       "note": "Python 3.13 本机诊断，不替代 Windows 3.10、3.11、3.12 持续检查证据。"
+    },
+    "remote_windows_matrix": {
+      "baseline_kind": "isolated-current-ci",
+      "run_id": 32745564644,
+      "head_sha": "da7b3f71efb357986cde7d3aa1342b7fb23e5198",
+      "versions": {
+        "3.10": {
+          "passed": 2400,
+          "failed": 30,
+          "errors": 0,
+          "skipped": 2
+        },
+        "3.11": {
+          "passed": 2400,
+          "failed": 30,
+          "errors": 0,
+          "skipped": 2
+        },
+        "3.12": {
+          "passed": 2400,
+          "failed": 30,
+          "errors": 0,
+          "skipped": 2
+        }
+      },
+      "failure_sets_identical": true,
+      "safety_result": "safe",
+      "evidence_result": "complete",
+      "artifacts_uploaded": true
     }
   },
   "current_classification": {

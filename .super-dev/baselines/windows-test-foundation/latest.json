@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
-  "recorded_at": "2026-08-24T17:36:00+08:00",
+  "recorded_at": "2026-08-24T23:39:43+08:00",
   "branch": "feature/windows-test-foundation",
   "commit_base": "6524dcf2c4db9f296549e89a8140b5abefdf7765",
+  "validated_head": "da7b3f71efb357986cde7d3aa1342b7fb23e5198",
   "platform": "Windows-10-10.0.19045-SP0",
   "python": "3.13.12",
   "safety_result": "safe",
@@ -22,5 +23,50 @@
     "failed": 0,
     "skipped": 2
   },
-  "windows_matrix_status": "pending remote CI execution for Python 3.10, 3.11, 3.12"
+  "windows_matrix_status": "passed",
+  "remote_windows_matrix": {
+    "run_id": 32745564644,
+    "url": "https://github.com/mixyoung/super-dev/actions/runs/32745564644",
+    "head_sha": "da7b3f71efb357986cde7d3aa1342b7fb23e5198",
+    "quality_jobs": {
+      "3.10": "passed",
+      "3.11": "passed",
+      "3.12": "passed"
+    },
+    "baseline_jobs": {
+      "3.10": {
+        "safety_result": "safe",
+        "evidence_result": "complete",
+        "test_result": "fail",
+        "passed": 2400,
+        "failed": 30,
+        "errors": 0,
+        "skipped": 2,
+        "artifact": "windows-baseline-python-3.10"
+      },
+      "3.11": {
+        "safety_result": "safe",
+        "evidence_result": "complete",
+        "test_result": "fail",
+        "passed": 2400,
+        "failed": 30,
+        "errors": 0,
+        "skipped": 2,
+        "artifact": "windows-baseline-python-3.11"
+      },
+      "3.12": {
+        "safety_result": "safe",
+        "evidence_result": "complete",
+        "test_result": "fail",
+        "passed": 2400,
+        "failed": 30,
+        "errors": 0,
+        "skipped": 2,
+        "artifact": "windows-baseline-python-3.12"
+      }
+    },
+    "failure_sets_identical": true,
+    "security_scan": "passed",
+    "note": "普通单元测试仍有已登记的 Windows 失败；这不等于目录隔离或证据任务失败。"
+  }
 }
