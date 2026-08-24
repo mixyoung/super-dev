@@ -106,6 +106,14 @@ class ProjectConfig:
         }
     )
 
+    # 最小扩展平台（默认关闭，不控制主工作流状态）
+    extensions: dict[str, Any] = field(
+        default_factory=lambda: {
+            "enabled": False,
+            "allowed_builtin_methods": [],
+        }
+    )
+
     def __post_init__(self) -> None:
         if isinstance(self.adaptive_ledger, dict):
             self.adaptive_ledger = {
@@ -113,6 +121,12 @@ class ProjectConfig:
                 "auto_create": False,
                 "scope_advisory": False,
                 **self.adaptive_ledger,
+            }
+        if isinstance(self.extensions, dict):
+            self.extensions = {
+                "enabled": False,
+                "allowed_builtin_methods": [],
+                **self.extensions,
             }
 
 
@@ -158,6 +172,10 @@ class ConfigManager:
             "enabled": False,
             "auto_create": False,
             "scope_advisory": False,
+        },
+        "extensions": {
+            "enabled": False,
+            "allowed_builtin_methods": [],
         },
         # 前端配置
         "ui_library": None,
@@ -425,6 +443,29 @@ class ConfigManager:
                 errors.append(
                     "adaptive_ledger.scope_advisory 只能在自动影子建账开启时启用"
                 )
+        extensions = config.extensions
+        if not isinstance(extensions, dict):
+            errors.append("extensions 必须是对象")
+        else:
+            unknown_extension_fields = set(extensions) - {
+                "enabled",
+                "allowed_builtin_methods",
+            }
+            if unknown_extension_fields:
+                errors.append(
+                    f"extensions 包含未知字段: {sorted(unknown_extension_fields)}"
+                )
+            if not isinstance(extensions.get("enabled"), bool):
+                errors.append("extensions.enabled 必须是布尔值")
+            allowed_methods = extensions.get("allowed_builtin_methods")
+            if not isinstance(allowed_methods, list) or any(
+                not isinstance(item, str) or not item.strip() for item in allowed_methods or []
+            ):
+                errors.append("extensions.allowed_builtin_methods 必须是非空字符串数组")
+            elif len(set(allowed_methods)) != len(allowed_methods):
+                errors.append("extensions.allowed_builtin_methods 不能重复")
+            elif any(item != "contract-probe" for item in allowed_methods):
+                errors.append("阶段 1 只支持内置方法 contract-probe")
         if not isinstance(config.host_profile_enforce_selected, bool):
             errors.append("host_profile_enforce_selected 必须是布尔值")
         if not isinstance(config.host_profile_targets, list):

@@ -41,6 +41,7 @@ KNOWN_FIELDS = {
     "overseer_halt_on_critical",
     "plan_failure_budget",
     "adaptive_ledger",
+    "extensions",
 }
 
 
@@ -146,6 +147,38 @@ def validate_config(config: dict) -> list[str]:
                 "'adaptive_ledger.scope_advisory' requires enabled automatic creation"
             )
 
+    extensions = config.get(
+        "extensions",
+        {"enabled": False, "allowed_builtin_methods": []},
+    )
+    if not isinstance(extensions, dict):
+        errors.append("'extensions' must be an object")
+    else:
+        extensions = {
+            "enabled": False,
+            "allowed_builtin_methods": [],
+            **extensions,
+        }
+        unknown_extension_fields = set(extensions) - {
+            "enabled",
+            "allowed_builtin_methods",
+        }
+        if unknown_extension_fields:
+            errors.append(
+                f"'extensions' contains unknown fields: {sorted(unknown_extension_fields)}"
+            )
+        if not isinstance(extensions.get("enabled"), bool):
+            errors.append("'extensions.enabled' must be a boolean")
+        allowed_methods = extensions.get("allowed_builtin_methods")
+        if not isinstance(allowed_methods, list) or any(
+            not isinstance(item, str) or not item.strip() for item in allowed_methods or []
+        ):
+            errors.append("'extensions.allowed_builtin_methods' must be a string list")
+        elif len(set(allowed_methods)) != len(allowed_methods):
+            errors.append("'extensions.allowed_builtin_methods' must not contain duplicates")
+        elif any(item != "contract-probe" for item in allowed_methods):
+            errors.append("only 'contract-probe' is supported in phase 1")
+
     return errors
 
 
@@ -194,5 +227,9 @@ class ConfigSchemaValidator:
                 "enabled": False,
                 "auto_create": False,
                 "scope_advisory": False,
+            },
+            "extensions": {
+                "enabled": False,
+                "allowed_builtin_methods": [],
             },
         }

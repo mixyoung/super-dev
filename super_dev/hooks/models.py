@@ -21,7 +21,10 @@ class HookDefinition:
     """单个 hook 定义"""
 
     type: HookType = HookType.COMMAND
-    command: str = ""  # Shell 命令或 Python 模块路径
+    command: str = ""  # 旧命令字符串，仅用于识别并给出迁移提示
+    executable: str = ""  # 新结构化命令的程序
+    args: tuple[str, ...] = ()  # 新结构化命令的参数列表
+    validation_error: str = ""
     timeout: int = 30  # 超时秒数
     matcher: str = "*"  # 事件匹配模式 (阶段名 或 * 通配符)
     description: str = ""
@@ -74,12 +77,16 @@ class HookConfig:
       PrePhase:
         - matcher: "drafting"
           type: command
-          command: "python scripts/pre-draft.py"
+          command:
+            executable: python
+            args: [scripts/pre-draft.py]
           timeout: 30
       PostPhase:
         - matcher: "*"
           type: command
-          command: "echo 'Phase completed'"
+          command:
+            executable: python
+            args: [-c, "print('Phase completed')"]
       PostQualityGate:
         - matcher: "*"
           type: log
@@ -103,18 +110,71 @@ class HookConfig:
         for item in raw_list:
             if not isinstance(item, dict):
                 continue
+            validation_errors: list[str] = []
+            unknown_item_fields = set(item) - {
+                "type",
+                "command",
+                "timeout",
+                "matcher",
+                "description",
+                "blocking",
+            }
+            if unknown_item_fields:
+                validation_errors.append(
+                    f"Hook 包含未知字段: {sorted(unknown_item_fields)}"
+                )
             try:
                 hook_type = HookType(item.get("type", "command"))
             except ValueError:
                 hook_type = HookType.COMMAND
+                validation_errors.append(f"未知 Hook 类型: {item.get('type')}")
+            raw_command = item.get("command", "")
+            legacy_command = raw_command if isinstance(raw_command, str) else ""
+            structured_command = raw_command if isinstance(raw_command, dict) else {}
+            executable = str(structured_command.get("executable", "")).strip()
+            raw_args = structured_command.get("args", [])
+            if isinstance(raw_command, dict):
+                unknown_command_fields = set(structured_command) - {"executable", "args"}
+                if unknown_command_fields:
+                    validation_errors.append(
+                        f"command 包含未知字段: {sorted(unknown_command_fields)}"
+                    )
+                if not isinstance(raw_args, list):
+                    validation_errors.append("command.args 必须是数组")
+            elif not isinstance(raw_command, str):
+                validation_errors.append("command 必须是旧字符串或结构化对象")
+            args = (
+                tuple(str(value) for value in raw_args)
+                if isinstance(raw_args, list)
+                else ()
+            )
+            raw_timeout = item.get("timeout", 30)
+            if (
+                not isinstance(raw_timeout, int)
+                or isinstance(raw_timeout, bool)
+                or not (1 <= raw_timeout <= 3600)
+            ):
+                validation_errors.append("timeout 必须是 1-3600 的整数")
+                timeout = 30
+            else:
+                timeout = raw_timeout
+            raw_blocking = item.get("blocking", True)
+            if not isinstance(raw_blocking, bool):
+                validation_errors.append("blocking 必须是布尔值")
+                blocking = True
+            else:
+                blocking = raw_blocking
             definitions.append(
                 HookDefinition(
                     type=hook_type,
-                    command=str(item.get("command", "")),
-                    timeout=int(item.get("timeout", 30)),
+                    command=legacy_command,
+                    executable=executable,
+                    args=args,
+                    validation_error="; ".join(validation_errors),
+                    timeout=timeout,
                     matcher=str(item.get("matcher", "*")),
                     description=str(item.get("description", "")),
-                    blocking=bool(item.get("blocking", True)),
+                    blocking=blocking,
                 )
             )
         return definitions

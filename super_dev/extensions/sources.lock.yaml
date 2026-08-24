@@ -1,0 +1,8 @@
+schema_version: 1
+sources:
+  contract-probe:
+    kind: builtin
+    path: builtins/contract_probe.py
+    content_digest: sha256:c1408e25069a56a9a96900c5da85dacadac4a2957522562cdbe3b29273a160d9
+    manifest_digest: sha256:1d52b9c83dcf8f0e049eb1dfec894b71dc6722b50f3eec5de36a5dec850d989d
+    reviewed_at: 2026-08-25

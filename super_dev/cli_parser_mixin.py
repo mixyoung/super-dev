@@ -849,6 +849,48 @@ class CliParserMixin:
             help="保存验收清单到 .super-dev/changes/<id>/acceptance.md",
         )
 
+        # extension 命令 - 最小扩展平台维护入口
+        extension_parser = subparsers.add_parser(
+            "extension",
+            help="检查最小扩展合同（内部维护入口）",
+            description="校验来源与权限边界，或运行仓库内置合同探针",
+        )
+        extension_subparsers = extension_parser.add_subparsers(
+            dest="extension_action",
+            required=True,
+        )
+        for action, help_text in (
+            ("validate", "只校验扩展清单格式和边界"),
+            ("inspect", "查看扩展能力、所有权和写入申请"),
+            ("verify-source", "核对来源锁和本地内容摘要"),
+        ):
+            action_parser = extension_subparsers.add_parser(action, help=help_text)
+            action_parser.add_argument("manifest", help="扩展清单路径")
+            action_parser.add_argument("--json", action="store_true", help="输出 JSON")
+        probe_parser = extension_subparsers.add_parser(
+            "probe-contract", help="运行仓库内置合同探针"
+        )
+        probe_parser.add_argument(
+            "--stage",
+            choices=[
+                "research",
+                "docs",
+                "docs_confirm",
+                "spec",
+                "frontend",
+                "preview_confirm",
+                "backend",
+                "quality",
+                "delivery",
+            ],
+            default="quality",
+            help="用于合同检查的标准阶段",
+        )
+        probe_parser.add_argument("--json", action="store_true", help="输出 JSON")
+        history_parser = extension_subparsers.add_parser("history", help="查看扩展运行历史")
+        history_parser.add_argument("--limit", type=int, default=20, help="最多返回记录数")
+        history_parser.add_argument("--json", action="store_true", help="输出 JSON")
+
         # task 命令 - 独立执行/查看 Spec 任务闭环
         task_parser = subparsers.add_parser(
             "task",

@@ -86,6 +86,9 @@ super-dev = "super_dev.cli:main"
 where = ["."]
 include = ["super_dev*"]
 
+[tool.setuptools.package-data]
+"super_dev.extensions" = ["*.yaml", "builtins/*.yaml"]
+
 [tool.black]
 line-length = 100
 target-version = ["py310", "py311", "py312"]

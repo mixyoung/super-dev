@@ -1,0 +1,42 @@
+schema_version: 1
+id: contract-probe
+version: 0.1.0
+kind: builtin-test-adapter
+source:
+  kind: builtin
+  path: builtins/contract_probe.py
+  content_digest: sha256:c1408e25069a56a9a96900c5da85dacadac4a2957522562cdbe3b29273a160d9
+trigger:
+  mode: explicit
+  allowed_stages:
+    - quality
+capabilities:
+  required:
+    - write_evidence
+ownership:
+  lifecycle: false
+  orchestration: false
+  production_writer: false
+  placement: false
+  may_spawn_subworkers: false
+writes:
+  allowed:
+    - .super-dev/extensions/runs/**
+  forbidden:
+    - .git/**
+    - .super-dev/workflow-state.json
+    - $USER_SURFACES/**
+authority:
+  commit: false
+  merge: false
+  push: false
+  pull_request: false
+  deploy: false
+  external_write: false
+  global_install: false
+execution:
+  executor: builtin-python
+  entrypoint: super_dev.extensions.builtins.contract_probe:run
+  timeout_seconds: 30
+result:
+  schema: extension-result-v1

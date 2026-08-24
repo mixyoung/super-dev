@@ -51,6 +51,7 @@ from .catalogs import (
 from .cli_analysis_mixin import CliAnalysisMixin
 from .cli_deploy_runtime_mixin import CliDeployRuntimeMixin
 from .cli_design_mixin import CliDesignMixin
+from .cli_extension_mixin import CliExtensionMixin
 from .cli_governance_mixin import CliGovernanceMixin
 from .cli_host_ops_mixin import CliHostOpsMixin
 from .cli_parser_mixin import CliParserMixin
@@ -135,6 +136,7 @@ class SuperDevCLI(
     CliParserMixin,
     CliAnalysisMixin,
     CliDesignMixin,
+    CliExtensionMixin,
     CliReleaseQualityMixin,
     CliDeployRuntimeMixin,
     CliHostOpsMixin,
@@ -5276,6 +5278,7 @@ class SuperDevCLI(
         "clean",
         "generate",
         "enforce",
+        "extension",
         "completion",
         "feedback",
         "migrate",

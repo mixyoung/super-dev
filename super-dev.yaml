@@ -3,6 +3,9 @@ adaptive_ledger:
   auto_create: true
   enabled: true
   scope_advisory: true
+extensions:
+  allowed_builtin_methods: []
+  enabled: false
 backend: node
 cli: {}
 database: postgresql

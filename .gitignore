@@ -88,6 +88,7 @@ dist_2_0_9/
 .super-dev/knowledge-stats.db
 .super-dev/install-manifest.json
 .super-dev/checkpoints/
+.super-dev/extensions/
 .super-dev/pipeline-state.json
 .super-dev/SESSION_BRIEF.md
 .super-dev/workflow-state.json

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import subprocess  # nosec B404
+import shutil
 import time
 from enum import Enum
 from pathlib import Path
@@ -23,6 +23,8 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from ..extensions.executor import StructuredExecutor
+from ..extensions.models import CommandSpec, ExtensionStatus
 from ..utils import get_logger
 from .models import HookConfig, HookDefinition, HookResult, HookType
 
@@ -237,10 +239,16 @@ class HookManager:
         if defn.type == HookType.COMMAND:
             return self._execute_command_hook(defn, event_name, context)
         return HookResult(
-            hook_name=defn.command or defn.description,
+            hook_name=defn.command or defn.executable or defn.description,
             event=event_name,
             success=False,
-            error=f"不支持的 hook 类型: {defn.type}",
+            error=(
+                "YAML type: python 从未提供安全配置执行；请改为结构化 command，"
+                "或在受信代码中注册 Python callback"
+                if defn.type == HookType.PYTHON
+                else f"不支持的 hook 类型: {defn.type}"
+            ),
+            blocked=defn.blocking,
         )
 
     def _execute_command_hook(
@@ -249,13 +257,47 @@ class HookManager:
         event_name: str,
         context: dict[str, Any],
     ) -> HookResult:
-        """执行 shell 命令 hook"""
-        if not defn.command:
+        """执行结构化命令 hook；旧字符串命令只返回迁移提示。"""
+        if defn.validation_error:
+            return HookResult(
+                hook_name=defn.executable or "(invalid)",
+                event=event_name,
+                success=False,
+                error=defn.validation_error,
+                blocked=defn.blocking,
+            )
+        if defn.command:
+            return HookResult(
+                hook_name=defn.command,
+                event=event_name,
+                success=False,
+                error=(
+                    "旧 Hook 命令字符串已停止执行。请改为 command.executable 和 "
+                    "command.args，例如 command: {executable: python, args: [-m, pytest, -q]}"
+                ),
+                blocked=defn.blocking,
+            )
+        if not defn.executable:
             return HookResult(
                 hook_name="(empty)",
                 event=event_name,
                 success=False,
-                error="Hook command 为空",
+                error="Hook command.executable 为空",
+                blocked=defn.blocking,
+            )
+
+        executable_path = shutil.which(defn.executable)
+        if not executable_path:
+            candidate = Path(defn.executable)
+            if candidate.is_absolute() and candidate.exists():
+                executable_path = str(candidate)
+        if not executable_path:
+            return HookResult(
+                hook_name=defn.executable,
+                event=event_name,
+                success=False,
+                error=f"找不到 Hook 可执行程序: {defn.executable}",
+                blocked=defn.blocking,
             )
 
         env = {
@@ -268,48 +310,28 @@ class HookManager:
             if isinstance(val, str):
                 env[f"SUPER_DEV_{key.upper()}"] = val
 
-        start = time.monotonic()
-        try:
-            result = subprocess.run(
-                defn.command,
-                shell=True,  # nosec B602
-                capture_output=True,
-                text=True,
-                timeout=defn.timeout,
-                cwd=str(self.project_dir),
-                env={**dict(__import__("os").environ), **env},
+        execution = StructuredExecutor(project_dir=self.project_dir).run(
+            CommandSpec(
+                executable=Path(executable_path),
+                args=defn.args,
+                cwd=self.project_dir,
+                timeout_seconds=defn.timeout,
+                env=env,
+                output_limit_bytes=64 * 1024,
             )
-            duration_ms = (time.monotonic() - start) * 1000
-
-            blocked = defn.blocking and result.returncode == 2
-            return HookResult(
-                hook_name=defn.command,
-                event=event_name,
-                success=result.returncode == 0,
-                output=result.stdout[:2000] if result.stdout else "",
-                error=result.stderr[:1000] if result.stderr else "",
-                duration_ms=duration_ms,
-                blocked=blocked,
-            )
-        except subprocess.TimeoutExpired:
-            duration_ms = (time.monotonic() - start) * 1000
-            return HookResult(
-                hook_name=defn.command,
-                event=event_name,
-                success=False,
-                error=f"Hook 执行超时 ({defn.timeout}s)",
-                duration_ms=duration_ms,
-                blocked=defn.blocking,
-            )
-        except Exception as e:
-            duration_ms = (time.monotonic() - start) * 1000
-            return HookResult(
-                hook_name=defn.command,
-                event=event_name,
-                success=False,
-                error=str(e),
-                duration_ms=duration_ms,
-            )
+        )
+        blocked = defn.blocking and (
+            execution.status == ExtensionStatus.BLOCKED or execution.exit_code == 2
+        )
+        return HookResult(
+            hook_name=" ".join((defn.executable, *defn.args)),
+            event=event_name,
+            success=execution.status == ExtensionStatus.PASS,
+            output=execution.stdout[:2000],
+            error=(execution.error or execution.stderr)[:1000],
+            duration_ms=execution.duration_ms,
+            blocked=blocked,
+        )
 
     def _execute_log_hook(
         self,
