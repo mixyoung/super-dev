@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib import error as urllib_error
 from urllib import request as urllib_request
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from ..catalogs import HOST_TOOL_CATEGORY_MAP, HOST_TOOL_IDS
 from ..host_adapters import (
@@ -1814,6 +1814,7 @@ class IntegrationManager(IntegrationManagerContentMixin):
         timeout_seconds: float,
         read_content: bool = False,
         max_bytes: int = 120000,
+        redirects_remaining: int = 3,
     ) -> dict[str, object]:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"}:
@@ -1861,6 +1862,24 @@ class IntegrationManager(IntegrationManagerContentMixin):
                 status = int(getattr(exc, "code", 0) or 0)
                 last_status = status
                 last_error = str(exc)
+                if status in {301, 302, 303, 307, 308} and redirects_remaining > 0:
+                    location = str(exc.headers.get("Location", "")).strip()
+                    redirected_url = urljoin(url, location) if location else ""
+                    redirected = urlparse(redirected_url) if redirected_url else None
+                    if (
+                        redirected is not None
+                        and redirected.scheme in {"http", "https"}
+                        and redirected_url != url
+                    ):
+                        result = self._probe_official_url(
+                            url=redirected_url,
+                            timeout_seconds=timeout_seconds,
+                            read_content=read_content,
+                            max_bytes=max_bytes,
+                            redirects_remaining=redirects_remaining - 1,
+                        )
+                        result["redirected_from"] = url
+                        return result
                 if method == "HEAD" and status in {401, 403, 405, 406, 429}:
                     continue
                 if 200 <= status < 400:

@@ -14,6 +14,53 @@ from super_dev.skills import SkillManager
 
 
 class TestIntegrationManager:
+    def test_official_doc_probe_follows_http_308_redirect(
+        self,
+        temp_project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _max_bytes: int) -> bytes:
+                return b"Codex skills agents.md commands"
+
+        def fake_urlopen(request, timeout):
+            assert timeout == 1.0
+            if request.full_url == "https://example.test/old":
+                raise urllib_error.HTTPError(
+                    request.full_url,
+                    308,
+                    "Permanent Redirect",
+                    {"Location": "https://example.test/new"},
+                    None,
+                )
+            assert request.full_url == "https://example.test/new"
+            return FakeResponse()
+
+        monkeypatch.setattr(
+            "super_dev.integrations.manager.urllib_request.urlopen",
+            fake_urlopen,
+        )
+        manager = IntegrationManager(temp_project_dir)
+
+        result = manager._probe_official_url(
+            url="https://example.test/old",
+            timeout_seconds=1.0,
+            read_content=True,
+        )
+
+        assert result["reachable"] is True
+        assert result["status_code"] == 200
+        assert result["content"] == "Codex skills agents.md commands"
+        assert result["redirected_from"] == "https://example.test/old"
+
     def test_coverage_gaps_are_empty(self):
         gaps = IntegrationManager.coverage_gaps()
         assert gaps["missing_in_targets"] == []
