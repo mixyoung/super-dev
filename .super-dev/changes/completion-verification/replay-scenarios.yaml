@@ -1,0 +1,45 @@
+schema_version: 1
+scenarios:
+  - id: current-pass-clean
+    category: current-pass
+    expected_status: PASS
+    legacy_risk: release readiness could pass without current test evidence
+  - id: current-pass-partial-skip
+    category: current-pass
+    expected_status: PASS
+    legacy_risk: skip counts were not shown or bound to a machine-readable report
+  - id: current-pass-non-strict-xpass
+    category: current-pass
+    expected_status: PASS
+    expected_advisory: NON_STRICT_XPASS
+    legacy_risk: an unexpected pass had no structured reminder
+  - id: old-pass-current-fail
+    category: old-evidence
+    expected_status: FAIL
+    expected_new_run: true
+    legacy_risk: an earlier green result could be mistaken for current evidence
+  - id: old-pass-current-candidate
+    category: old-evidence
+    expected_status: PASS
+    expected_new_run: true
+    legacy_risk: the previous run could be reused instead of executing again
+  - id: current-fail-assertion
+    category: current-fail
+    expected_status: FAIL
+    legacy_risk: release readiness without --verify-tests could omit the failure
+  - id: current-fail-strict-xpass
+    category: current-fail
+    expected_status: FAIL
+    legacy_risk: JUnit may encode strict xpass differently from the process exit code
+  - id: no-tests-collected
+    category: incomplete
+    expected_status: BLOCKED
+    legacy_risk: no current machine-readable evidence
+  - id: timeout-or-cancel
+    category: incomplete
+    expected_status: BLOCKED
+    legacy_risk: incomplete process-tree evidence
+  - id: candidate-changed-during-run
+    category: candidate-drift
+    expected_status: BLOCKED
+    legacy_risk: a green test result could refer to a changed candidate

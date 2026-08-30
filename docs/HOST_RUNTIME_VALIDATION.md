@@ -27,7 +27,7 @@
 2. 回到宿主里触发 `/super-dev ...`
 3. 让宿主真实进入 `research -> 三文档 -> 等待确认`
 
-只有维护者在排障或补正式验收证据时，才需要进入 `doctor / integrate / review` 这条维护链。
+只有维护者在排障或补正式验收证据时，才需要进入 `doctor / integrate / review` 这条维护链；其中，文档确认门的验收状态可通过 `super-dev review docs` 查看和记录。
 
 ## 产物
 

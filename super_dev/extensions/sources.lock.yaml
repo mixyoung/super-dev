@@ -6,3 +6,9 @@ sources:
     content_digest: sha256:c1408e25069a56a9a96900c5da85dacadac4a2957522562cdbe3b29273a160d9
     manifest_digest: sha256:1d52b9c83dcf8f0e049eb1dfec894b71dc6722b50f3eec5de36a5dec850d989d
     reviewed_at: 2026-08-25
+  fresh-verification:
+    kind: builtin
+    path: builtins/fresh_verification.py
+    content_digest: sha256:6058bc1ff206776b0dbcea2eacbc1ab15868aa8896e2c767d668d0cd9c4c7e28
+    manifest_digest: sha256:e93c7d9a8fbe2f46faa7c8a2163f04a3b111a746d86bfe800a87346f23ba5969
+    reviewed_at: 2026-08-25

@@ -24,6 +24,7 @@ from super_dev.reviewers.validation_rules import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_rule(**overrides) -> ValidationRule:
     """快捷构造合法的 ValidationRule。"""
     defaults = dict(
@@ -61,6 +62,7 @@ def _minimal_rule_dict(**overrides) -> dict:
 # ---------------------------------------------------------------------------
 # ValidationRule dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestValidationRule:
     def test_valid_construction(self):
@@ -110,6 +112,7 @@ class TestValidationRule:
 # _parse_rule_dict / _load_rules_from_yaml
 # ---------------------------------------------------------------------------
 
+
 class TestParseHelpers:
     def test_parse_rule_dict_minimal(self):
         rule = _parse_rule_dict(_minimal_rule_dict())
@@ -119,7 +122,9 @@ class TestParseHelpers:
 
     def test_parse_rule_dict_with_all_fields(self):
         d = _minimal_rule_dict(
-            description="desc", enabled=False, tags=["a", "b"],
+            description="desc",
+            enabled=False,
+            tags=["a", "b"],
             check_config={"file_pattern": "*.py"},
         )
         rule = _parse_rule_dict(d)
@@ -161,6 +166,7 @@ class TestParseHelpers:
 # ValidationRuleEngine — 规则加载
 # ---------------------------------------------------------------------------
 
+
 class TestEngineLoading:
     def test_engine_loads_default_rules(self, tmp_path: Path):
         engine = ValidationRuleEngine(tmp_path)
@@ -180,14 +186,16 @@ class TestEngineLoading:
         custom_dir = tmp_path / ".super-dev" / "rules"
         _write_rules_yaml(
             custom_dir / "custom_rules.yaml",
-            [_minimal_rule_dict(
-                id=first_default.id,
-                name=custom_name,
-                category=first_default.category,
-                severity=first_default.severity,
-                phase=first_default.phase,
-                check_type=first_default.check_type,
-            )],
+            [
+                _minimal_rule_dict(
+                    id=first_default.id,
+                    name=custom_name,
+                    category=first_default.category,
+                    severity=first_default.severity,
+                    phase=first_default.phase,
+                    check_type=first_default.check_type,
+                )
+            ],
         )
 
         engine.reload_rules()
@@ -205,6 +213,7 @@ class TestEngineLoading:
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — 规则管理
 # ---------------------------------------------------------------------------
+
 
 class TestEngineManagement:
     def test_add_rule_new(self, tmp_path: Path):
@@ -287,6 +296,7 @@ class TestEngineManagement:
 # ValidationRuleEngine — check_type: file_exists
 # ---------------------------------------------------------------------------
 
+
 class TestCheckFileExists:
     def test_file_exists_pass(self, tmp_path: Path):
         (tmp_path / "output").mkdir()
@@ -321,6 +331,7 @@ class TestCheckFileExists:
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — check_type: content_contains
 # ---------------------------------------------------------------------------
+
 
 class TestCheckContentContains:
     def test_content_contains_pass(self, tmp_path: Path):
@@ -377,6 +388,7 @@ class TestCheckContentContains:
 # ValidationRuleEngine — check_type: content_not_contains
 # ---------------------------------------------------------------------------
 
+
 class TestCheckContentNotContains:
     def test_no_violation(self, tmp_path: Path):
         (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
@@ -412,10 +424,193 @@ class TestCheckContentNotContains:
         report = engine.validate("all")
         assert report.results[0].passed is False
 
+    def test_generated_build_tree_is_ignored_but_root_source_still_fails(
+        self,
+        tmp_path: Path,
+    ):
+        (tmp_path / "build" / "lib").mkdir(parents=True)
+        (tmp_path / "build" / "lib" / "generated.py").write_text(
+            'password = "generated"\n',
+            encoding="utf-8",
+        )
+        (tmp_path / "demo.egg-info").mkdir()
+        (tmp_path / "demo.egg-info" / "generated.py").write_text(
+            'password = "egg-generated"\n',
+            encoding="utf-8",
+        )
+        (tmp_path / "source.py").write_text(
+            'password = "real-source"\n',
+            encoding="utf-8",
+        )
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [
+            _make_rule(
+                id="CNC-SCOPE",
+                check_type="content_not_contains",
+                check_config={
+                    "file_pattern": "**/*.py",
+                    "patterns": [r"password\s*=\s*['\"]"],
+                },
+            )
+        ]
+
+        report = engine.validate("quality")
+
+        assert report.results[0].passed is False
+        assert "source.py" in report.results[0].message
+        assert "build" not in report.results[0].message
+        assert "demo.egg-info" not in report.results[0].message
+
+    def test_frontend_tagged_rule_is_skipped_when_frontend_is_not_required(
+        self,
+        tmp_path: Path,
+    ):
+        (tmp_path / "page.tsx").write_text("forbidden-ui-pattern\n", encoding="utf-8")
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [
+            _make_rule(
+                id="CNC-FRONTEND",
+                phase="quality",
+                tags=["frontend"],
+                check_type="content_not_contains",
+                check_config={
+                    "file_pattern": "**/*.tsx",
+                    "patterns": ["forbidden-ui-pattern"],
+                },
+            )
+        ]
+
+        not_applicable = engine.validate("quality", {"frontend_required": False})
+        applicable = engine.validate("quality", {"frontend_required": True})
+
+        assert not_applicable.results == []
+        assert not_applicable.passed is True
+        assert applicable.results[0].passed is False
+
+    def test_relative_project_context_reports_violation(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        (tmp_path / "sample.py").write_text('password = "secret"\n', encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [
+            _make_rule(
+                id="CNC-RELATIVE",
+                check_type="content_not_contains",
+                check_config={
+                    "file_pattern": "*.py",
+                    "patterns": [r"password\s*=\s*['\"]"],
+                },
+            )
+        ]
+
+        report = engine.validate("all", {"project_dir": "."})
+
+        assert report.results[0].passed is False
+        assert "sample.py" in report.results[0].message
+        assert "规则执行异常" not in report.results[0].message
+
+
+# ---------------------------------------------------------------------------
+# ValidationRuleEngine — check_type: python_sensitive_logging
+# ---------------------------------------------------------------------------
+
+
+class TestPythonSensitiveLogging:
+    def _rule(self):
+        return _make_rule(
+            id="CQ-BE-001",
+            severity="critical",
+            check_type="python_sensitive_logging",
+            check_config={
+                "file_pattern": "**/*.py",
+                "sensitive_names": ["password", "secret", "token", "api_key"],
+            },
+        )
+
+    def test_detects_sensitive_values_passed_to_output_calls(self, tmp_path: Path):
+        (tmp_path / "bad.py").write_text(
+            "import logging\n"
+            "logger = logging.getLogger(__name__)\n"
+            "password = 'value'\n"
+            "logger.info('password=%s', password)\n"
+            "print(settings.api_key)\n",
+            encoding="utf-8",
+        )
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [self._rule()]
+
+        report = engine.validate("quality")
+
+        assert report.results[0].passed is False
+        assert "bad.py:4" in report.results[0].message
+        assert "bad.py:5" in report.results[0].message
+
+    def test_detects_sensitive_mapping_access(self, tmp_path: Path):
+        (tmp_path / "bad.py").write_text(
+            "import logging\n"
+            "logger = logging.getLogger(__name__)\n"
+            "logger.error('request failed: %s', config['token'])\n",
+            encoding="utf-8",
+        )
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [self._rule()]
+
+        report = engine.validate("quality")
+
+        assert report.results[0].passed is False
+        assert "bad.py:3" in report.results[0].message
+
+    def test_metric_exemption_does_not_hide_access_tokens(self, tmp_path: Path):
+        (tmp_path / "bad.py").write_text(
+            "import logging\n"
+            "logger = logging.getLogger(__name__)\n"
+            "logger.info('access token=%s', access_token_used)\n",
+            encoding="utf-8",
+        )
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [self._rule()]
+
+        report = engine.validate("quality")
+
+        assert report.results[0].passed is False
+        assert "bad.py:3" in report.results[0].message
+
+    def test_ignores_static_labels_and_generated_source_strings(self, tmp_path: Path):
+        (tmp_path / "clean.py").write_text(
+            "import logging\n"
+            "logger = logging.getLogger(__name__)\n"
+            "logger.debug('Could not extract tokens; using defaults.')\n"
+            "logger.info('usage=%s/%s', tokens_used, total_token_budget)\n"
+            "logger.info('limit=%s', _DEFAULT_TOKEN_BUDGET)\n"
+            "generated = \"print(f'secret={secret}')\"\n"
+            "print('Configure secrets before release')\n",
+            encoding="utf-8",
+        )
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [self._rule()]
+
+        report = engine.validate("quality")
+
+        assert report.results[0].passed is True
+
+    def test_validate_file_uses_the_same_ast_check(self, tmp_path: Path):
+        source = tmp_path / "single.py"
+        source.write_text("print(getattr(settings, 'token'))\n", encoding="utf-8")
+        engine = ValidationRuleEngine(tmp_path)
+
+        result = engine.validate_file(source, [self._rule()])
+
+        assert result[0].passed is False
+        assert "lines 1" in result[0].message
+
 
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — check_type: regex_match
 # ---------------------------------------------------------------------------
+
 
 class TestCheckRegexMatch:
     def test_regex_match_found(self, tmp_path: Path):
@@ -469,10 +664,35 @@ class TestCheckRegexMatch:
         report = engine.validate("backend")
         assert report.results[0].passed is True  # 无文件时跳过
 
+    def test_relative_project_context_finds_regex(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        (tmp_path / "sample.py").write_text('app.get("/api/v2/users")\n', encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        engine = ValidationRuleEngine(tmp_path)
+        engine.rules = [
+            _make_rule(
+                id="RX-RELATIVE",
+                check_type="regex_match",
+                check_config={
+                    "file_pattern": "*.py",
+                    "pattern": r"/api/v[0-9]+",
+                },
+            )
+        ]
+
+        report = engine.validate("all", {"project_dir": "."})
+
+        assert report.results[0].passed is True
+        assert "规则执行异常" not in report.results[0].message
+
 
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — check_type: metric_threshold
 # ---------------------------------------------------------------------------
+
 
 class TestCheckMetricThreshold:
     def test_metric_within_range(self, tmp_path: Path):
@@ -528,13 +748,17 @@ class TestCheckMetricThreshold:
 # ValidationRuleEngine — custom checker
 # ---------------------------------------------------------------------------
 
+
 class TestCustomChecker:
     def test_registered_custom_checker_invoked(self, tmp_path: Path):
         engine = ValidationRuleEngine(tmp_path)
 
         def my_checker(rule, context):
             return ValidationResult(
-                rule_id=rule.id, passed=True, message="custom ok", severity=rule.severity,
+                rule_id=rule.id,
+                passed=True,
+                message="custom ok",
+                severity=rule.severity,
             )
 
         engine.register_custom_checker("custom", my_checker)
@@ -559,7 +783,10 @@ class TestCustomChecker:
 
         def special(rule, context):
             return ValidationResult(
-                rule_id=rule.id, passed=False, message="special fail", severity=rule.severity,
+                rule_id=rule.id,
+                passed=False,
+                message="special fail",
+                severity=rule.severity,
             )
 
         engine.register_custom_checker("file_exists", special)
@@ -572,6 +799,7 @@ class TestCustomChecker:
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — critical 规则导致整体不通过
 # ---------------------------------------------------------------------------
+
 
 class TestCriticalFailure:
     def test_critical_fail_makes_report_fail(self, tmp_path: Path):
@@ -629,6 +857,7 @@ class TestCriticalFailure:
 # ---------------------------------------------------------------------------
 # ValidationRuleEngine — validate_file
 # ---------------------------------------------------------------------------
+
 
 class TestValidateFile:
     def test_validate_file_content_contains(self, tmp_path: Path):
@@ -698,8 +927,11 @@ class TestValidateFile:
 # ValidationReport
 # ---------------------------------------------------------------------------
 
+
 class TestValidationReport:
-    def _build_report(self, results: list[ValidationResult], passed: bool = True) -> ValidationReport:
+    def _build_report(
+        self, results: list[ValidationResult], passed: bool = True
+    ) -> ValidationReport:
         return ValidationReport(
             phase="docs",
             timestamp="2026-01-01T00:00:00",
@@ -778,6 +1010,7 @@ class TestValidationReport:
 # Score calculation
 # ---------------------------------------------------------------------------
 
+
 class TestScoreCalculation:
     def test_all_pass_score_100(self, tmp_path: Path):
         results = [
@@ -812,6 +1045,7 @@ class TestScoreCalculation:
 # Disabled rules
 # ---------------------------------------------------------------------------
 
+
 class TestDisabledRules:
     def test_disabled_rule_not_executed(self, tmp_path: Path):
         engine = ValidationRuleEngine(tmp_path)
@@ -830,6 +1064,7 @@ class TestDisabledRules:
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
+
 
 class TestErrorHandling:
     def test_rule_execution_exception_returns_failed_result(self, tmp_path: Path):

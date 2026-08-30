@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 from threading import Event
-from typing import Any
+from typing import Any, Literal
 
 
 class ExtensionStatus(str, Enum):
@@ -110,9 +110,7 @@ class ExtensionManifest:
                 "mode": self.trigger.mode,
                 "allowed_stages": list(self.trigger.allowed_stages),
             },
-            "capabilities": {
-                "required": [item.value for item in self.required_capabilities]
-            },
+            "capabilities": {"required": [item.value for item in self.required_capabilities]},
             "ownership": asdict(self.ownership),
             "writes": {
                 "allowed": list(self.writes.allowed),
@@ -181,6 +179,44 @@ class CommandExecution:
 
 
 @dataclass(frozen=True)
+class PytestVerificationPlan:
+    profile: Literal["pytest-current-python"]
+    plan_id: str
+    args: tuple[str, ...]
+    timeout_seconds: int
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["args"] = list(self.args)
+        return payload
+
+
+@dataclass(frozen=True)
+class PytestSummary:
+    tests: int
+    failures: int
+    errors: int
+    skipped: int
+    executed: int
+    duration_seconds: float
+    junit_digest: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class VerificationAdvisory:
+    run_id: str
+    code: Literal["NON_STRICT_XPASS"]
+    occurrences: int
+    output_digest: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ExtensionEvent:
     schema_version: int
     event: ExtensionEventType
@@ -213,7 +249,7 @@ class ExtensionResult:
     commands: list[CommandExecution] = field(default_factory=list)
     writes: list[str] = field(default_factory=list)
     blocking_findings: list[str] = field(default_factory=list)
-    advisory_findings: list[str] = field(default_factory=list)
+    advisory_findings: list[str | VerificationAdvisory] = field(default_factory=list)
     started_at: str = ""
     finished_at: str = ""
     duration_ms: float = 0.0
@@ -233,7 +269,10 @@ class ExtensionResult:
             "commands": [item.to_dict() for item in self.commands],
             "writes": list(self.writes),
             "blocking_findings": list(self.blocking_findings),
-            "advisory_findings": list(self.advisory_findings),
+            "advisory_findings": [
+                item.to_dict() if isinstance(item, VerificationAdvisory) else str(item)
+                for item in self.advisory_findings
+            ],
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "duration_ms": self.duration_ms,

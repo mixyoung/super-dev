@@ -10,7 +10,11 @@ from .models import (
     ExtensionManifest,
     ExtensionResult,
     ExtensionStatus,
+    PytestSummary,
+    PytestVerificationPlan,
+    VerificationAdvisory,
 )
+from .verification_metrics import VerificationMetricsSummary, summarize_verification_metrics
 
 __all__ = [
     "Capability",
@@ -22,4 +26,9 @@ __all__ = [
     "ExtensionManifest",
     "ExtensionResult",
     "ExtensionStatus",
+    "PytestSummary",
+    "PytestVerificationPlan",
+    "VerificationAdvisory",
+    "VerificationMetricsSummary",
+    "summarize_verification_metrics",
 ]

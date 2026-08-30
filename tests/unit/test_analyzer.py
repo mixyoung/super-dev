@@ -10,6 +10,7 @@ import pytest
 from super_dev.analyzer import (
     ArchitectureReport,
     Dependency,
+    DependencyGraphBuilder,
     DesignPattern,
     FeatureChecklistBuilder,
     ImpactAnalyzer,
@@ -219,13 +220,17 @@ class TestDetectProjectType:
         """测试检测 React 项目"""
         # 创建 package.json
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test-react-app",
-            "dependencies": {
-                "react": "^18.0.0",
-                "react-dom": "^18.0.0",
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "test-react-app",
+                    "dependencies": {
+                        "react": "^18.0.0",
+                        "react-dom": "^18.0.0",
+                    },
+                }
+            )
+        )
 
         category = detect_project_type(temp_project_dir)
         assert category == ProjectCategory.FRONTEND
@@ -233,13 +238,17 @@ class TestDetectProjectType:
     def test_detect_fullstack_project(self, temp_project_dir: Path):
         """测试检测全栈项目"""
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test-fullstack",
-            "dependencies": {
-                "react": "^18.0.0",
-                "express": "^4.18.0",
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "test-fullstack",
+                    "dependencies": {
+                        "react": "^18.0.0",
+                        "express": "^4.18.0",
+                    },
+                }
+            )
+        )
 
         category = detect_project_type(temp_project_dir)
         assert category == ProjectCategory.FULLSTACK
@@ -264,19 +273,23 @@ class TestDetectTechStack:
     def test_detect_react_stack(self, temp_project_dir: Path):
         """测试检测 React 技术栈"""
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test",
-            "dependencies": {
-                "react": "^18.0.0",
-                "react-dom": "^18.0.0",
-                "antd": "^5.0.0",
-                "zustand": "^4.0.0",
-            },
-            "devDependencies": {
-                "vite": "^4.0.0",
-                "jest": "^29.0.0",
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "test",
+                    "dependencies": {
+                        "react": "^18.0.0",
+                        "react-dom": "^18.0.0",
+                        "antd": "^5.0.0",
+                        "zustand": "^4.0.0",
+                    },
+                    "devDependencies": {
+                        "vite": "^4.0.0",
+                        "jest": "^29.0.0",
+                    },
+                }
+            )
+        )
 
         stack = detect_tech_stack(temp_project_dir)
 
@@ -290,11 +303,7 @@ class TestDetectTechStack:
     def test_detect_python_stack(self, temp_project_dir: Path):
         """测试检测 Python 技术栈"""
         requirements_txt = temp_project_dir / "requirements.txt"
-        requirements_txt.write_text(
-            "fastapi==0.100.0\n"
-            "uvicorn==0.23.0\n"
-            "pytest==7.4.0\n"
-        )
+        requirements_txt.write_text("fastapi==0.100.0\n" "uvicorn==0.23.0\n" "pytest==7.4.0\n")
 
         stack = detect_tech_stack(temp_project_dir)
 
@@ -321,12 +330,16 @@ class TestProjectAnalyzer:
         """测试分析简单项目"""
         # 创建 package.json
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test-app",
-            "dependencies": {
-                "react": "^18.0.0",
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "test-app",
+                    "dependencies": {
+                        "react": "^18.0.0",
+                    },
+                }
+            )
+        )
 
         # 创建一些源文件
         src_dir = temp_project_dir / "src"
@@ -378,10 +391,7 @@ def read_root():
     def test_analyzer_get_summary(self, temp_project_dir: Path):
         """测试获取项目摘要"""
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test",
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        package_json.write_text(json.dumps({"name": "test", "dependencies": {"react": "^18.0.0"}}))
 
         src_dir = temp_project_dir / "src"
         src_dir.mkdir()
@@ -398,16 +408,20 @@ def read_root():
     def test_analyzer_get_dependencies(self, temp_project_dir: Path):
         """测试获取依赖列表"""
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test",
-            "dependencies": {
-                "react": "^18.0.0",
-                "antd": "^5.0.0",
-            },
-            "devDependencies": {
-                "jest": "^29.0.0",
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "test",
+                    "dependencies": {
+                        "react": "^18.0.0",
+                        "antd": "^5.0.0",
+                    },
+                    "devDependencies": {
+                        "jest": "^29.0.0",
+                    },
+                }
+            )
+        )
 
         analyzer = ProjectAnalyzer(temp_project_dir)
         analyzer.analyze()
@@ -422,10 +436,7 @@ def read_root():
     def test_analyzer_get_language_distribution(self, temp_project_dir: Path):
         """测试获取语言分布"""
         package_json = temp_project_dir / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test",
-            "dependencies": {"react": "^18.0.0"}
-        }))
+        package_json.write_text(json.dumps({"name": "test", "dependencies": {"react": "^18.0.0"}}))
 
         src_dir = temp_project_dir / "src"
         src_dir.mkdir()
@@ -455,7 +466,9 @@ def read_root():
 
         # 创建代码文件（只有包含代码文件的目录才会被分析）
         (temp_project_dir / "src" / "App.tsx").write_text("export default function App() {}")
-        (temp_project_dir / "src" / "components" / "Button.tsx").write_text("export default function Button() {}")
+        (temp_project_dir / "src" / "components" / "Button.tsx").write_text(
+            "export default function Button() {}"
+        )
         (temp_project_dir / "src" / "utils" / "helper.ts").write_text("export function helper() {}")
         (temp_project_dir / "public" / "index.html").write_text("<html></html>")
 
@@ -498,17 +511,25 @@ class TestRepoMapBuilder:
         (temp_project_dir / "app").mkdir(parents=True, exist_ok=True)
         (temp_project_dir / "services").mkdir(parents=True, exist_ok=True)
         (temp_project_dir / "tests").mkdir(parents=True, exist_ok=True)
-        (temp_project_dir / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+        (temp_project_dir / "pyproject.toml").write_text(
+            "[project]\nname='demo'\n", encoding="utf-8"
+        )
         (temp_project_dir / "main.py").write_text("print('hello')\n", encoding="utf-8")
-        (temp_project_dir / "app" / "server.py").write_text("def run():\n    return True\n", encoding="utf-8")
-        (temp_project_dir / "services" / "billing.py").write_text("class BillingService:\n    pass\n", encoding="utf-8")
-        (temp_project_dir / "tests" / "test_main.py").write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+        (temp_project_dir / "app" / "server.py").write_text(
+            "def run():\n    return True\n", encoding="utf-8"
+        )
+        (temp_project_dir / "services" / "billing.py").write_text(
+            "class BillingService:\n    pass\n", encoding="utf-8"
+        )
+        (temp_project_dir / "tests" / "test_main.py").write_text(
+            "def test_ok():\n    assert True\n", encoding="utf-8"
+        )
 
         builder = RepoMapBuilder(temp_project_dir)
         report = builder.build()
         files = builder.write(report)
 
-        assert report.project_name == temp_project_dir.name
+        assert report.project_name == temp_project_dir.name.lower().replace("_", "-")
         assert any(item.path == "main.py" for item in report.entry_points)
         assert any(item.path == "app" for item in report.top_modules)
         assert files["markdown"].exists()
@@ -516,6 +537,50 @@ class TestRepoMapBuilder:
         markdown = files["markdown"].read_text(encoding="utf-8")
         assert "# Repo Map" in markdown
         assert "Likely Entry Points" in markdown
+
+    def test_codebase_intelligence_artifacts_use_active_change_prefix(
+        self,
+        temp_project_dir: Path,
+    ) -> None:
+        state_dir = temp_project_dir / ".super-dev"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        change_dir = state_dir / "changes" / "Current_Change"
+        change_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "workflow-state.json").write_text(
+            json.dumps({"active_change_id": "Current_Change"}),
+            encoding="utf-8",
+        )
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "current-change-prd.md").write_text("# PRD\n", encoding="utf-8")
+        (temp_project_dir / "pyproject.toml").write_text(
+            "[project]\nname='demo'\n",
+            encoding="utf-8",
+        )
+        (temp_project_dir / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        repo_map = RepoMapBuilder(temp_project_dir)
+        dependency_graph = DependencyGraphBuilder(temp_project_dir)
+        impact = ImpactAnalyzer(temp_project_dir)
+        regression = RegressionGuardBuilder(temp_project_dir)
+
+        assert {
+            repo_map.project_name,
+            dependency_graph.project_name,
+            impact.project_name,
+            regression.project_name,
+        } == {"current-change"}
+        written = [
+            repo_map.write(repo_map.build()),
+            dependency_graph.write(dependency_graph.build()),
+            impact.write(impact.build(description="current change", files=["main.py"])),
+            regression.write(regression.build(description="current change", files=["main.py"])),
+        ]
+        assert all(
+            path.name.startswith("current-change-")
+            for artifact_files in written
+            for path in artifact_files.values()
+        )
 
 
 class TestFeatureChecklistBuilder:
@@ -588,7 +653,9 @@ class TestFeatureChecklistBuilder:
         )
         change_dir = temp_project_dir / ".super-dev" / "changes" / "demo-change"
         change_dir.mkdir(parents=True, exist_ok=True)
-        (change_dir / "tasks.md").write_text("# Tasks\n\n- [x] 支持邮箱密码登录\n", encoding="utf-8")
+        (change_dir / "tasks.md").write_text(
+            "# Tasks\n\n- [x] 支持邮箱密码登录\n", encoding="utf-8"
+        )
         (output_dir / f"{temp_project_dir.name}-host-runtime-validation.md").write_text(
             "# Host Runtime Validation Matrix\n\n## Current Blockers\n\n- **trae** (validation) 宿主尚未完成真人运行时验收\n",
             encoding="utf-8",
@@ -601,10 +668,56 @@ class TestFeatureChecklistBuilder:
         assert report.high_priority_gap_count == 0
         assert not any("真人运行时验收" in item.title for item in report.items)
 
+    def test_feature_checklist_uses_only_active_change_inputs(self, temp_project_dir: Path) -> None:
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True)
+        changes_dir = temp_project_dir / ".super-dev" / "changes"
+        current_dir = changes_dir / "current-change"
+        historical_dir = changes_dir / "historical"
+        current_dir.mkdir(parents=True)
+        historical_dir.mkdir(parents=True)
+        (temp_project_dir / ".super-dev" / "workflow-state.json").write_text(
+            json.dumps({"active_change_id": "current-change"}),
+            encoding="utf-8",
+        )
+        (output_dir / "current-change-prd.md").write_text(
+            "# PRD\n\n## 2. 功能需求\n\n### Current capability\n- Current behavior\n",
+            encoding="utf-8",
+        )
+        (output_dir / "historical-prd.md").write_text(
+            "# PRD\n\n## 2. 功能需求\n\n### Historical capability\n- Legacy behavior\n",
+            encoding="utf-8",
+        )
+        (current_dir / "tasks.md").write_text(
+            "# Tasks\n\n- [x] Current behavior\n",
+            encoding="utf-8",
+        )
+        (historical_dir / "tasks.md").write_text(
+            "# Tasks\n\n- [ ] Historical capability\n",
+            encoding="utf-8",
+        )
+        (output_dir / "historical-research.md").write_text(
+            "| Priority | Item | Status |\n|:--:|:--|:--|\n| P1 | Historical capability | missing |\n",
+            encoding="utf-8",
+        )
+
+        builder = FeatureChecklistBuilder(temp_project_dir)
+        report = builder.build()
+        files = builder.write(report)
+
+        assert report.project_name == "current-change"
+        assert report.status == "ready"
+        assert report.total_features == 1
+        assert report.high_priority_gap_count == 0
+        assert files["json"].name == "current-change-feature-checklist.json"
+        assert all("Historical" not in item.title for item in report.items)
+
 
 class TestImpactAnalyzer:
     def test_build_impact_analysis_from_description_and_files(self, temp_project_dir: Path):
-        (temp_project_dir / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+        (temp_project_dir / "pyproject.toml").write_text(
+            "[project]\nname='demo'\n", encoding="utf-8"
+        )
         (temp_project_dir / "main.py").write_text("print('hello')\n", encoding="utf-8")
         (temp_project_dir / "services").mkdir(parents=True, exist_ok=True)
         (temp_project_dir / "services" / "auth.py").write_text(
@@ -623,7 +736,10 @@ class TestImpactAnalyzer:
 
         assert report.risk_level in {"medium", "high"}
         assert report.affected_modules
-        assert any(item.path.lower() in {"services", "services/auth.py"} or "auth" in item.path.lower() for item in report.affected_modules)
+        assert any(
+            item.path.lower() in {"services", "services/auth.py"} or "auth" in item.path.lower()
+            for item in report.affected_modules
+        )
         assert any("Authentication" in item for item in report.regression_focus)
         assert files["markdown"].exists()
         assert files["json"].exists()
@@ -631,7 +747,9 @@ class TestImpactAnalyzer:
 
 class TestRegressionGuardBuilder:
     def test_build_regression_guard_from_description_and_files(self, temp_project_dir: Path):
-        (temp_project_dir / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
+        (temp_project_dir / "pyproject.toml").write_text(
+            "[project]\nname='demo'\n", encoding="utf-8"
+        )
         (temp_project_dir / "services").mkdir(parents=True, exist_ok=True)
         (temp_project_dir / "services" / "auth.py").write_text(
             "class AuthService:\n    def login(self):\n        return True\n",
@@ -648,7 +766,9 @@ class TestRegressionGuardBuilder:
         files = builder.write(report)
 
         assert report.risk_level in {"medium", "high"}
-        assert report.high_priority_checks or report.medium_priority_checks or report.supporting_checks
+        assert (
+            report.high_priority_checks or report.medium_priority_checks or report.supporting_checks
+        )
         assert report.recommended_commands
         assert files["markdown"].exists()
         assert files["json"].exists()

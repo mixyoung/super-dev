@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..artifact_utils import (
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+)
 from ..baseline_governance import inspect_baseline_governance
 from ..compliance_governance import collect_compliance_governance_signal
 from ..host_runtime_governance import collect_layered_runtime_governance_gap
@@ -59,9 +64,7 @@ class ProductAuditReport:
             return "revision_required"
         if self.score >= 85:
             return "ready"
-        if self.score >= 70:
-            return "attention"
-        return "revision_required"
+        return "attention"
 
     @property
     def summary(self) -> str:
@@ -142,7 +145,7 @@ class ProductAuditReport:
 
 class ProductAuditBuilder:
     DOC_MARKERS = {
-        "docs/QUICKSTART.md": ["super-dev update", "/super-dev 你的需求", "继续当前流程"],
+        "docs/QUICKSTART.md": ["super-dev update", "/super-dev ", "继续当前流程"],
         "docs/HOST_USAGE_GUIDE.md": ["/super-dev 你的需求", "继续当前流程", "现在下一步是什么"],
         "docs/WORKFLOW_GUIDE.md": [
             "super-dev update",
@@ -156,7 +159,11 @@ class ProductAuditBuilder:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = self.project_dir.name
+        self.active_change_id = resolve_active_change_id(self.project_dir)
+        self.project_name = resolve_current_artifact_prefix(
+            self.project_dir,
+            fallback_name=self.project_dir.name,
+        )
         self.is_super_dev_repo = (self.project_dir / "super_dev" / "cli.py").exists()
 
     def build(self) -> ProductAuditReport:
@@ -180,17 +187,28 @@ class ProductAuditBuilder:
         )
         return {"markdown": md_path, "json": json_path}
 
+    def _has_current_artifact(self, pattern: str) -> bool:
+        return (
+            latest_artifact(
+                self.output_dir,
+                pattern,
+                preferred_prefix=self.project_name,
+                strict_prefix=bool(self.active_change_id),
+            )
+            is not None
+        )
+
     def _collect_strengths(self) -> list[str]:
         strengths: list[str] = []
         if (self.project_dir / "docs" / "QUICKSTART.md").exists():
             strengths.append("已提供 Quickstart 入口，具备最短路径引导基础。")
         if (self.project_dir / "docs" / "WORKFLOW_GUIDE.md").exists():
             strengths.append("已有显式 review/confirm/resume 机制，说明流程门禁已成形。")
-        if any(self.output_dir.glob("*-proof-pack.json")):
+        if self._has_current_artifact("*-proof-pack.json"):
             strengths.append("已有 proof-pack 交付证据包，说明项目具备交付审计基础。")
-        if any(self.output_dir.glob("*-release-readiness.json")):
+        if self._has_current_artifact("*-release-readiness.json"):
             strengths.append("已有 release readiness 报告，说明项目具备发布评分基础。")
-        if any(self.output_dir.glob("*-feature-checklist.json")):
+        if self._has_current_artifact("*-feature-checklist.json"):
             strengths.append("已有 feature checklist，说明项目具备范围覆盖审计基础。")
         return strengths
 
@@ -258,13 +276,15 @@ class ProductAuditBuilder:
         findings: list[ProductAuditFinding] = []
         baseline = inspect_baseline_governance(self.project_dir, output_dir=self.output_dir)
         runtime_payload = load_host_runtime_validation(self.project_dir) or {}
-        runtime_hosts = runtime_payload.get("hosts", {}) if isinstance(runtime_payload, dict) else {}
+        runtime_hosts = (
+            runtime_payload.get("hosts", {}) if isinstance(runtime_payload, dict) else {}
+        )
         has_runtime_state = isinstance(runtime_hosts, dict) and bool(runtime_hosts)
         expected = {
-            "feature coverage": any(self.output_dir.glob("*-feature-checklist.json")),
-            "quality gate": any(self.output_dir.glob("*-quality-gate.md")),
-            "proof pack": any(self.output_dir.glob("*-proof-pack.json")),
-            "release readiness": any(self.output_dir.glob("*-release-readiness.json")),
+            "feature coverage": self._has_current_artifact("*-feature-checklist.json"),
+            "quality gate": self._has_current_artifact("*-quality-gate.md"),
+            "proof pack": self._has_current_artifact("*-proof-pack.json"),
+            "release readiness": self._has_current_artifact("*-release-readiness.json"),
         }
         missing = [name for name, present in expected.items() if not present]
         if missing:
@@ -310,7 +330,9 @@ class ProductAuditBuilder:
                     ],
                 )
             )
-        compliance_signal = collect_compliance_governance_signal(self.project_dir, output_dir=self.output_dir)
+        compliance_signal = collect_compliance_governance_signal(
+            self.project_dir, output_dir=self.output_dir
+        )
         source_issues = compliance_signal.get("source_issues", [])
         if isinstance(source_issues, list) and source_issues:
             findings.append(
@@ -345,7 +367,10 @@ class ProductAuditBuilder:
                     file_refs=["output/"],
                 )
             )
-        if not any(self.output_dir.glob("*-host-runtime-validation.json")) and not has_runtime_state:
+        if (
+            not any(self.output_dir.glob("*-host-runtime-validation.json"))
+            and not has_runtime_state
+        ):
             findings.append(
                 ProductAuditFinding(
                     owner="QA",

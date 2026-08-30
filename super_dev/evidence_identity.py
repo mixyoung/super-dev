@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from .artifact_utils import resolve_project_artifact_prefix
+from .artifact_utils import resolve_current_artifact_prefix
 from .workflow_guard import load_stage_ledger
 
 
@@ -67,7 +67,10 @@ def build_evidence_identity(
     digest, labels = _digest_files(project_dir, dependencies)
     return {
         "artifact_name": artifact_name,
-        "project_name": resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name),
+        "project_name": resolve_current_artifact_prefix(
+            project_dir,
+            fallback_name=project_dir.name,
+        ),
         "run_id": run_id.strip() or current_evidence_run_id(project_dir),
         "inputs_digest": digest,
         "dependency_count": len(labels),

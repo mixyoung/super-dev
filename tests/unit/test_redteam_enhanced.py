@@ -20,10 +20,10 @@ from super_dev.reviewers.redteam import (
     load_redteam_evidence,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def empty_project(tmp_path):
@@ -109,12 +109,17 @@ def _make_reviewer(project_dir, name="test", **overrides):
 # SecurityIssue / PerformanceIssue / ArchitectureIssue 数据类
 # ---------------------------------------------------------------------------
 
+
 class TestSecurityIssueDataclass:
     def test_to_dict_and_from_dict_roundtrip(self):
         issue = SecurityIssue(
-            severity="high", category="injection", description="SQL injection detected",
-            recommendation="Use parameterized queries", cwe="CWE-89",
-            file_path="/app/src/db.py", line=42,
+            severity="high",
+            category="injection",
+            description="SQL injection detected",
+            recommendation="Use parameterized queries",
+            cwe="CWE-89",
+            file_path="/app/src/db.py",
+            line=42,
         )
         d = issue.to_dict()
         restored = SecurityIssue.from_dict(d)
@@ -129,10 +134,17 @@ class TestSecurityIssueDataclass:
         assert issue.line is None
 
     def test_from_dict_handles_none_values(self):
-        issue = SecurityIssue.from_dict({
-            "severity": "medium", "category": "auth", "description": "weak auth",
-            "recommendation": "fix", "cwe": None, "file_path": None, "line": None,
-        })
+        issue = SecurityIssue.from_dict(
+            {
+                "severity": "medium",
+                "category": "auth",
+                "description": "weak auth",
+                "recommendation": "fix",
+                "cwe": None,
+                "file_path": None,
+                "line": None,
+            }
+        )
         assert issue.cwe is None
         assert issue.file_path is None
 
@@ -140,9 +152,13 @@ class TestSecurityIssueDataclass:
 class TestPerformanceIssueDataclass:
     def test_roundtrip(self):
         issue = PerformanceIssue(
-            severity="high", category="database", description="N+1 query",
-            recommendation="Use eager loading", impact="Slow response",
-            file_path="/app/models.py", line=10,
+            severity="high",
+            category="database",
+            description="N+1 query",
+            recommendation="Use eager loading",
+            impact="Slow response",
+            file_path="/app/models.py",
+            line=10,
         )
         d = issue.to_dict()
         restored = PerformanceIssue.from_dict(d)
@@ -150,16 +166,22 @@ class TestPerformanceIssueDataclass:
         assert restored.line == 10
 
     def test_default_impact_is_empty_string(self):
-        issue = PerformanceIssue(severity="low", category="api", description="d", recommendation="r")
+        issue = PerformanceIssue(
+            severity="low", category="api", description="d", recommendation="r"
+        )
         assert issue.impact == ""
 
 
 class TestArchitectureIssueDataclass:
     def test_roundtrip(self):
         issue = ArchitectureIssue(
-            severity="critical", category="scalability", description="Monolith",
-            recommendation="Split services", adr_needed=True,
-            file_path="/app/main.py", line=1,
+            severity="critical",
+            category="scalability",
+            description="Monolith",
+            recommendation="Split services",
+            adr_needed=True,
+            file_path="/app/main.py",
+            line=1,
         )
         d = issue.to_dict()
         restored = ArchitectureIssue.from_dict(d)
@@ -169,6 +191,7 @@ class TestArchitectureIssueDataclass:
 # ---------------------------------------------------------------------------
 # RedTeamReport 属性和方法
 # ---------------------------------------------------------------------------
+
 
 class TestRedTeamReport:
     def test_empty_report_scores_100(self):
@@ -207,6 +230,21 @@ class TestRedTeamReport:
         )
         assert report.total_score == 98
 
+    def test_repeated_low_heuristics_have_bounded_score_impact(self):
+        report = RedTeamReport(
+            project_name="test",
+            security_issues=[
+                SecurityIssue("low", "version-range", f"desc-{index}", "rec") for index in range(20)
+            ],
+            performance_issues=[
+                PerformanceIssue("low", "n-plus-one", f"desc-{index}", "rec") for index in range(20)
+            ],
+        )
+
+        assert len(report.security_issues) == 20
+        assert len(report.performance_issues) == 20
+        assert report.total_score == 91
+
     def test_performance_deduction_scales(self):
         report = RedTeamReport(
             project_name="test",
@@ -238,15 +276,20 @@ class TestRedTeamReport:
 
     def test_passed_requires_no_critical_and_threshold(self):
         report = RedTeamReport(
-            project_name="test", pass_threshold=90,
-            security_issues=[SecurityIssue("high", "xss", "d", "r"), SecurityIssue("high", "csrf", "d", "r")],
+            project_name="test",
+            pass_threshold=90,
+            security_issues=[
+                SecurityIssue("high", "xss", "d", "r"),
+                SecurityIssue("high", "csrf", "d", "r"),
+            ],
         )
         assert report.total_score == 80
         assert report.passed is False
 
     def test_blocking_reasons_lists_critical_and_score(self):
         report = RedTeamReport(
-            project_name="test", pass_threshold=90,
+            project_name="test",
+            pass_threshold=90,
             security_issues=[SecurityIssue("critical", "cat", "d", "r")],
         )
         reasons = report.blocking_reasons
@@ -255,9 +298,15 @@ class TestRedTeamReport:
     def test_to_markdown_contains_key_sections(self):
         report = RedTeamReport(
             project_name="test-project",
-            security_issues=[SecurityIssue("high", "injection", "SQL injection found", "Fix it", cwe="CWE-89")],
-            performance_issues=[PerformanceIssue("medium", "db", "Slow query", "Add index", "500ms p99")],
-            architecture_issues=[ArchitectureIssue("low", "style", "Code smells", "Refactor", adr_needed=True)],
+            security_issues=[
+                SecurityIssue("high", "injection", "SQL injection found", "Fix it", cwe="CWE-89")
+            ],
+            performance_issues=[
+                PerformanceIssue("medium", "db", "Slow query", "Add index", "500ms p99")
+            ],
+            architecture_issues=[
+                ArchitectureIssue("low", "style", "Code smells", "Refactor", adr_needed=True)
+            ],
         )
         md = report.to_markdown()
         assert "test-project" in md
@@ -274,10 +323,15 @@ class TestRedTeamReport:
     def test_to_markdown_declarative_rules_section(self):
         report = RedTeamReport(
             project_name="test",
-            security_issues=[SecurityIssue(
-                "high", "hardcoded", "[RT-SEC-001] Hardcoded secret found: app.py:5",
-                "Use env vars", cwe="CWE-798",
-            )],
+            security_issues=[
+                SecurityIssue(
+                    "high",
+                    "hardcoded",
+                    "[RT-SEC-001] Hardcoded secret found: app.py:5",
+                    "Use env vars",
+                    cwe="CWE-798",
+                )
+            ],
         )
         md = report.to_markdown()
         assert "声明式规则检测结果" in md
@@ -285,7 +339,9 @@ class TestRedTeamReport:
 
     def test_to_dict_and_from_dict_roundtrip(self):
         report = RedTeamReport(
-            project_name="roundtrip", pass_threshold=80, scanned_files_count=42,
+            project_name="roundtrip",
+            pass_threshold=80,
+            scanned_files_count=42,
             security_issues=[SecurityIssue("high", "cat", "d", "r")],
             performance_issues=[PerformanceIssue("medium", "db", "d", "r")],
             architecture_issues=[ArchitectureIssue("low", "m", "d", "r")],
@@ -300,7 +356,10 @@ class TestRedTeamReport:
     def test_from_dict_skips_non_dict_issues(self):
         payload = {
             "project_name": "test",
-            "security_issues": [{"severity": "low", "category": "a", "description": "b", "recommendation": "c"}, "invalid"],
+            "security_issues": [
+                {"severity": "low", "category": "a", "description": "b", "recommendation": "c"},
+                "invalid",
+            ],
             "performance_issues": [],
             "architecture_issues": [],
         }
@@ -347,6 +406,7 @@ class TestRedTeamReport:
 # 密钥泄漏深度扫描
 # ---------------------------------------------------------------------------
 
+
 class TestSecretLeakDetection:
     def test_detects_hardcoded_api_key(self, insecure_project):
         reviewer = _make_reviewer(insecure_project, name="insecure")
@@ -362,6 +422,29 @@ class TestSecretLeakDetection:
         issues = reviewer._review_security()
         secret_issues = [i for i in issues if "硬编码" in i.category]
         assert len(secret_issues) == 0
+
+    def test_color_parser_token_is_not_reported_as_credential(self, tmp_path):
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "colors.py").write_text(textwrap.dedent("""\
+                def dart_color(hex_color):
+                    token = str(hex_color).lstrip("#")
+                    if len(token) != 6:
+                        token = "0F7CFA"
+                    return f"0xFF{token.upper()}"
+                """))
+        (src / "config.py").write_text('token = "A1B2C3"\n')
+        reviewer = _make_reviewer(tmp_path)
+
+        issues = reviewer._review_security()
+        credential_paths = {
+            Path(issue.file_path).name
+            for issue in issues
+            if issue.category == "硬编码凭据" and issue.file_path
+        }
+
+        assert "colors.py" not in credential_paths
+        assert "config.py" in credential_paths
 
     def test_detects_eval_usage(self, insecure_project):
         reviewer = _make_reviewer(insecure_project, name="insecure")
@@ -385,6 +468,7 @@ class TestSecretLeakDetection:
 # ---------------------------------------------------------------------------
 # API 安全扫描
 # ---------------------------------------------------------------------------
+
 
 class TestAPISecurityScan:
     def test_backend_gets_auth_baseline(self, basic_project):
@@ -428,6 +512,7 @@ class TestAPISecurityScan:
 # 声明式规则
 # ---------------------------------------------------------------------------
 
+
 class TestDeclarativeRules:
     def test_scan_returns_empty_when_no_rules(self, basic_project):
         reviewer = _make_reviewer(basic_project)
@@ -440,11 +525,18 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "app.py").write_text("password = 'hardcoded123'\n")
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-SEC-TEST", "name": "Test Secret Rule", "severity": "high",
-            "category": "security", "description": "Test hardcoded password",
-            "recommendation": "Use env vars", "patterns": [r"password\s*=\s*['\"]"], "cwe": "CWE-798",
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-SEC-TEST",
+                "name": "Test Secret Rule",
+                "severity": "high",
+                "category": "security",
+                "description": "Test hardcoded password",
+                "recommendation": "Use env vars",
+                "patterns": [r"password\s*=\s*['\"]"],
+                "cwe": "CWE-798",
+            }
+        ]
         sec, perf, arch = reviewer._scan_declarative_rules()
         assert len(sec) >= 1
         assert "RT-SEC-TEST" in sec[0].description
@@ -454,11 +546,17 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "worker.py").write_text("import time\ntime.sleep(60)\n")
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-PERF-001", "name": "Long sleep", "severity": "medium",
-            "category": "performance", "description": "Long sleep detected",
-            "recommendation": "Use async timers", "patterns": [r"time\.sleep\(\d{2,}\)"],
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-PERF-001",
+                "name": "Long sleep",
+                "severity": "medium",
+                "category": "performance",
+                "description": "Long sleep detected",
+                "recommendation": "Use async timers",
+                "patterns": [r"time\.sleep\(\d{2,}\)"],
+            }
+        ]
         sec, perf, arch = reviewer._scan_declarative_rules()
         assert len(perf) >= 1
 
@@ -467,11 +565,17 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "god_class.py").write_text("class GodObject:\n    pass\n")
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-ARCH-001", "name": "God class", "severity": "medium",
-            "category": "architecture", "description": "God class detected",
-            "recommendation": "Split class", "patterns": [r"class GodObject"],
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-ARCH-001",
+                "name": "God class",
+                "severity": "medium",
+                "category": "architecture",
+                "description": "God class detected",
+                "recommendation": "Split class",
+                "patterns": [r"class GodObject"],
+            }
+        ]
         sec, perf, arch = reviewer._scan_declarative_rules()
         assert len(arch) >= 1
 
@@ -480,12 +584,18 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "big.py").write_text("\n".join([f"line_{i} = {i}" for i in range(600)]))
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-ARCH-SIZE", "name": "File too large", "severity": "medium",
-            "category": "architecture", "description": "File exceeds max lines",
-            "recommendation": "Split file", "check_type": "file_line_count",
-            "check_config": {"max_lines": 500},
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-ARCH-SIZE",
+                "name": "File too large",
+                "severity": "medium",
+                "category": "architecture",
+                "description": "File exceeds max lines",
+                "recommendation": "Split file",
+                "check_type": "file_line_count",
+                "check_config": {"max_lines": 500},
+            }
+        ]
         sec, perf, arch = reviewer._scan_declarative_rules()
         assert len(arch) >= 1
 
@@ -495,10 +605,24 @@ class TestDeclarativeRules:
         (src / "app.py").write_text("eval('code')\n")
         reviewer = _make_reviewer(tmp_path)
         reviewer._redteam_rules = [
-            {"id": "RT-SEC-ACTIVE", "name": "Active", "severity": "high", "category": "security",
-             "description": "Active", "recommendation": "Fix", "patterns": [r"eval\("]},
-            {"id": "RT-SEC-INACTIVE", "name": "Inactive", "severity": "high", "category": "security",
-             "description": "Inactive", "recommendation": "Fix", "patterns": [r"eval\("]},
+            {
+                "id": "RT-SEC-ACTIVE",
+                "name": "Active",
+                "severity": "high",
+                "category": "security",
+                "description": "Active",
+                "recommendation": "Fix",
+                "patterns": [r"eval\("],
+            },
+            {
+                "id": "RT-SEC-INACTIVE",
+                "name": "Inactive",
+                "severity": "high",
+                "category": "security",
+                "description": "Inactive",
+                "recommendation": "Fix",
+                "patterns": [r"eval\("],
+            },
         ]
         reviewer._expert_rules = ["RT-SEC-ACTIVE"]
         sec, perf, arch = reviewer._scan_declarative_rules()
@@ -509,10 +633,17 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "app.py").write_text("some code\n")
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-BAD", "name": "Bad regex", "severity": "low", "category": "security",
-            "description": "Bad", "recommendation": "Fix", "patterns": ["[invalid(regex"],
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-BAD",
+                "name": "Bad regex",
+                "severity": "low",
+                "category": "security",
+                "description": "Bad",
+                "recommendation": "Fix",
+                "patterns": ["[invalid(regex"],
+            }
+        ]
         sec, perf, arch = reviewer._scan_declarative_rules()
         assert sec == []
 
@@ -521,10 +652,17 @@ class TestDeclarativeRules:
         src.mkdir()
         (src / "app.py").write_text("eval('a')\neval('b')\neval('c')\n")
         reviewer = _make_reviewer(tmp_path)
-        reviewer._redteam_rules = [{
-            "id": "RT-DEDUP", "name": "Dedup test", "severity": "high", "category": "security",
-            "description": "Dedup", "recommendation": "Fix", "patterns": [r"eval\("],
-        }]
+        reviewer._redteam_rules = [
+            {
+                "id": "RT-DEDUP",
+                "name": "Dedup test",
+                "severity": "high",
+                "category": "security",
+                "description": "Dedup",
+                "recommendation": "Fix",
+                "patterns": [r"eval\("],
+            }
+        ]
         sec, _, _ = reviewer._scan_declarative_rules()
         assert len(sec) == 1
 
@@ -532,6 +670,7 @@ class TestDeclarativeRules:
 # ---------------------------------------------------------------------------
 # 0 文件场景
 # ---------------------------------------------------------------------------
+
 
 class TestZeroFilesScenario:
     def test_empty_project_produces_report(self, empty_project):
@@ -556,6 +695,7 @@ class TestZeroFilesScenario:
 # 完整审查流程
 # ---------------------------------------------------------------------------
 
+
 class TestFullReview:
     def test_review_returns_all_issue_categories(self, basic_project):
         reviewer = _make_reviewer(basic_project, name="basic")
@@ -570,7 +710,11 @@ class TestFullReview:
         (src / "main.py").write_text("print('hello')\n")
         reviewer = _make_reviewer(tmp_path)
         report = reviewer.review()
-        test_issues = [i for i in report.architecture_issues if "tests" in i.description.lower() or "测试" in i.description]
+        test_issues = [
+            i
+            for i in report.architecture_issues
+            if "tests" in i.description.lower() or "测试" in i.description
+        ]
         assert len(test_issues) >= 1
 
     def test_review_detects_missing_ci(self, tmp_path):
@@ -600,13 +744,18 @@ class TestFullReview:
         (src / "huge.py").write_text("\n".join([f"x_{i} = {i}" for i in range(2500)]))
         reviewer = _make_reviewer(tmp_path)
         report = reviewer.review()
-        large_issues = [i for i in report.architecture_issues if "超大" in i.description or "大文件" in i.description]
+        large_issues = [
+            i
+            for i in report.architecture_issues
+            if "超大" in i.description or "大文件" in i.description
+        ]
         assert len(large_issues) >= 1
 
 
 # ---------------------------------------------------------------------------
 # 持久化加载
 # ---------------------------------------------------------------------------
+
 
 class TestPersistedRedteamReport:
     def test_load_from_json(self, tmp_path):
@@ -667,6 +816,7 @@ class TestRedTeamEvidence:
 # Performance review
 # ---------------------------------------------------------------------------
 
+
 class TestPerformanceReview:
     def test_detects_sync_http_in_async(self, tmp_path):
         src = tmp_path / "src"
@@ -679,7 +829,11 @@ class TestPerformanceReview:
         """))
         reviewer = _make_reviewer(tmp_path)
         report = reviewer.review()
-        async_issues = [i for i in report.performance_issues if "同步 HTTP" in i.description or "异步" in i.description]
+        async_issues = [
+            i
+            for i in report.performance_issues
+            if "同步 HTTP" in i.description or "异步" in i.description
+        ]
         assert len(async_issues) >= 1
 
     def test_baseline_db_recommendation(self, basic_project):
@@ -704,6 +858,7 @@ class TestPerformanceReview:
 # ---------------------------------------------------------------------------
 # 文件扫描辅助方法
 # ---------------------------------------------------------------------------
+
 
 class TestFileScanningHelpers:
     def test_should_skip_git_dir(self, tmp_path):
@@ -783,6 +938,7 @@ class TestFileScanningHelpers:
 # Architecture review edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestArchitectureReviewEdgeCases:
     def test_detect_no_health_endpoint(self, tmp_path):
         src = tmp_path / "src"
@@ -813,9 +969,15 @@ class TestArchitectureReviewEdgeCases:
 
     def test_tool_scans_env_var(self, basic_project, monkeypatch):
         monkeypatch.setenv("SUPER_DEV_ENABLE_TOOL_SCANS", "0")
-        reviewer = RedTeamReviewer(basic_project, "test", {
-            "platform": "web", "frontend": "react", "backend": "node",
-        })
+        reviewer = RedTeamReviewer(
+            basic_project,
+            "test",
+            {
+                "platform": "web",
+                "frontend": "react",
+                "backend": "node",
+            },
+        )
         assert reviewer.enable_tool_scans is False
 
     def test_review_with_multiple_source_files(self, tmp_path):

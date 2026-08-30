@@ -14,7 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..artifact_utils import resolve_project_artifact_prefix
+from ..artifact_utils import (
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+    sanitize_artifact_name,
+)
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
@@ -46,7 +51,9 @@ _IGNORE_DIRS: frozenset[str] = frozenset(
 class DriftItem:
     """A single architecture drift finding."""
 
-    drift_type: str  # missing_module | extra_module | missing_dependency | extra_dependency | tech_mismatch
+    drift_type: (
+        str  # missing_module | extra_module | missing_dependency | extra_dependency | tech_mismatch
+    )
     declared: str = ""
     actual: str = ""
     severity: str = "medium"  # critical | high | medium | low
@@ -159,7 +166,10 @@ def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
                 result["tech_stack"].append(cleaned)
 
     # Extract module/section names from headings
-    heading_pattern = re.compile(r"^#{1,4}\s+(?:Module|模块|Component|组件|Service|服务|Layer|层)\s*[:\-]?\s*(.+)", re.MULTILINE | re.IGNORECASE)
+    heading_pattern = re.compile(
+        r"^#{1,4}\s+(?:Module|模块|Component|组件|Service|服务|Layer|层)\s*[:\-]?\s*(.+)",
+        re.MULTILINE | re.IGNORECASE,
+    )
     for m in heading_pattern.finditer(content):
         mod_name = m.group(1).strip()
         if mod_name and len(mod_name) < 50:
@@ -197,7 +207,7 @@ def _scan_imports(project_dir: Path) -> dict[str, list[str]]:
                 continue
 
             parts = path.relative_to(project_dir).parts
-            if any(p in _IGNORE_DIRS for p in parts):
+            if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
                 continue
 
             if path.suffix == ".py":
@@ -316,23 +326,45 @@ def _scan_source_file_paths(project_dir: Path) -> list[Path]:
         if not path.is_file():
             continue
         parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS for p in parts):
+        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
             continue
         if path.suffix in {".py", ".ts", ".tsx", ".js", ".jsx"}:
             paths.append(path.resolve())
     return sorted(paths)
 
 
-def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, Path]:
-    project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    return (
-        output_dir / f"{project_name}-architecture-drift.json",
-        output_dir / "architecture-drift.json",
+def _artifact_context(project_dir: Path) -> tuple[str, str]:
+    active_change_id = resolve_active_change_id(project_dir)
+    resolved_prefix = resolve_current_artifact_prefix(
+        project_dir,
+        fallback_name=project_dir.name,
     )
+    return active_change_id, sanitize_artifact_name(active_change_id) or resolved_prefix
+
+
+def _architecture_files(project_dir: Path, output_dir: Path) -> list[Path]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    if active_change_id:
+        current = latest_artifact(
+            output_dir,
+            f"{project_name}-architecture.md",
+            preferred_prefix=project_name,
+            strict_prefix=True,
+        )
+        return [current] if current is not None else []
+    return list(output_dir.glob("*-architecture.md")) + list(output_dir.glob("*architecture*.md"))
+
+
+def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, ...]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    prefixed = output_dir / f"{project_name}-architecture-drift.json"
+    if active_change_id:
+        return (prefixed,)
+    return (prefixed, output_dir / "architecture-drift.json")
 
 
 def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
-    arch_files = sorted(list(output_dir.glob("*-architecture.md")) + list(output_dir.glob("*architecture*.md")))
+    arch_files = sorted(_architecture_files(project_dir, output_dir))
     dependency_files = [
         project_dir / "package.json",
         project_dir / "pyproject.toml",
@@ -346,16 +378,29 @@ def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
     ]
 
 
+def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
+    _active_change_id, project_name = _artifact_context(project_dir)
+    identity: dict[str, Any] = build_evidence_identity(
+        project_dir,
+        artifact_name="architecture-drift",
+        dependencies=_report_dependencies(project_dir, output_dir),
+    )
+    identity["project_name"] = project_name
+    return identity
+
+
 def _load_existing_report(
     project_dir: Path,
     output_dir: Path,
     *,
     expected_identity: dict[str, Any],
 ) -> DriftReport | None:
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    active_change_id, project_name = _artifact_context(project_dir)
+    for path in _report_paths(project_dir, output_dir):
         payload = load_json_payload(path)
         if not payload:
+            continue
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
             continue
         identity_ok, _ = evidence_identity_matches(payload, expected=expected_identity)
         if not identity_ok:
@@ -372,9 +417,11 @@ def _load_existing_report(
             actual_tech_stack=list(payload.get("actual_tech_stack", []) or []),
             drifts=drifts,
             score=int(payload.get("score", 0) or 0),
-            evidence_identity=dict(payload.get("evidence_identity", {}))
-            if isinstance(payload.get("evidence_identity", {}), dict)
-            else {},
+            evidence_identity=(
+                dict(payload.get("evidence_identity", {}))
+                if isinstance(payload.get("evidence_identity", {}), dict)
+                else {}
+            ),
         )
     return None
 
@@ -387,19 +434,22 @@ def inspect_architecture_drift_artifact(
         output_dir = project_dir / "output"
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="architecture-drift",
-        dependencies=_report_dependencies(project_dir, output_dir),
-    )
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    expected_identity = _expected_identity(project_dir, output_dir)
+    active_change_id, project_name = _artifact_context(project_dir)
+    report_paths = _report_paths(project_dir, output_dir)
+    for path in report_paths:
         if not path.exists():
             continue
         payload = load_json_payload(path)
         if not payload:
             return {
                 "status": "unreadable",
+                "path": str(path),
+                "expected_identity": expected_identity,
+            }
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
+            return {
+                "status": "identity_mismatch",
                 "path": str(path),
                 "expected_identity": expected_identity,
             }
@@ -424,7 +474,7 @@ def inspect_architecture_drift_artifact(
         }
     return {
         "status": "missing",
-        "path": str(prefixed_json),
+        "path": str(report_paths[0]),
         "expected_identity": expected_identity,
     }
 
@@ -447,12 +497,8 @@ def run_architecture_drift(
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
 
-    dependencies = _report_dependencies(project_dir, output_dir)
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="architecture-drift",
-        dependencies=dependencies,
-    )
+    _active_change_id, project_name = _artifact_context(project_dir)
+    expected_identity = _expected_identity(project_dir, output_dir)
     cached = _load_existing_report(
         project_dir,
         output_dir,
@@ -461,15 +507,11 @@ def run_architecture_drift(
     if cached is not None:
         return cached
 
-    report = DriftReport(
-        project_name=resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    )
+    report = DriftReport(project_name=project_name)
     report.evidence_identity = expected_identity
 
     # Find architecture doc
-    arch_files = list(output_dir.glob("*-architecture.md")) + list(
-        output_dir.glob("*architecture*.md")
-    )
+    arch_files = _architecture_files(project_dir, output_dir)
     if not arch_files:
         report.score = 100
         return report
@@ -523,15 +565,11 @@ def run_architecture_drift(
     prefixed_json = output_dir / f"{report.project_name}-architecture-drift.json"
     prefixed_md = output_dir / f"{report.project_name}-architecture-drift.md"
     payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-    (output_dir / "architecture-drift.json").write_text(
-        payload,
-        encoding="utf-8",
-    )
-    (output_dir / "architecture-drift.md").write_text(
-        report.to_markdown(), encoding="utf-8"
-    )
     prefixed_json.write_text(payload, encoding="utf-8")
     prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+    if not resolve_active_change_id(project_dir):
+        (output_dir / "architecture-drift.json").write_text(payload, encoding="utf-8")
+        (output_dir / "architecture-drift.md").write_text(report.to_markdown(), encoding="utf-8")
 
     return report
 

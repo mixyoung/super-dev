@@ -15,13 +15,20 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import __version__
 from .analyzer import FeatureChecklistBuilder
-from .artifact_utils import is_artifact_stale, latest_artifact, resolve_project_artifact_prefix
+from .artifact_utils import (
+    is_artifact_stale,
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+)
 from .baseline_governance import inspect_baseline_governance
+from .config import ConfigManager
 from .evidence_identity import build_evidence_identity, evidence_identity_matches, load_json_payload
+from .extensions.evidence import build_candidate_identity
 from .framework_harness import FrameworkHarnessBuilder
 from .frameworks import framework_playbook_complete, is_cross_platform_frontend
 from .harness_registry import derive_operational_focus
@@ -37,6 +44,13 @@ from .review_state import (
     load_recent_workflow_snapshots,
     load_workflow_state,
 )
+from .reviewers.quality_gate import (
+    fresh_verification_required,
+    inspect_current_fresh_verification,
+    quality_evidence_dependency_paths,
+    quality_fresh_binding_matches,
+    stored_quality_evidence_dependencies,
+)
 from .reviewers.redteam import load_redteam_evidence
 from .skills import SkillManager
 from .specs import SpecValidator
@@ -51,6 +65,7 @@ class ReleaseReadinessCheck:
     detail: str
     severity: str = "medium"
     recommendation: str = ""
+    evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +74,7 @@ class ReleaseReadinessCheck:
             "detail": self.detail,
             "severity": self.severity,
             "recommendation": self.recommendation,
+            "evidence": dict(self.evidence),
         }
 
 
@@ -158,7 +174,9 @@ class ReleaseReadinessReport:
             None,
         )
         if baseline_check is None:
-            baseline = self.baseline_governance if isinstance(self.baseline_governance, dict) else {}
+            baseline = (
+                self.baseline_governance if isinstance(self.baseline_governance, dict) else {}
+            )
             status = str(baseline.get("status", "")).strip()
             entry_gate = str(baseline.get("entry_gate", "")).strip()
             next_action = str(baseline.get("next_host_action", "")).strip()
@@ -192,7 +210,7 @@ class ReleaseReadinessReport:
         for label in ("spec", "architecture", "uiux"):
             match = re.search(rf"{label}=([a-z_]+)", detail)
             state = match.group(1) if match else ""
-            if state and state != "ready":
+            if state and state not in {"ready", "not_applicable"}:
                 source_issues.append(f"{label}={state}")
         if source_issues:
             return (
@@ -218,21 +236,33 @@ class ReleaseReadinessReport:
                 " 这会让设计、开发和验收对“什么叫完成”理解不一致。"
             )
         if "frontend runtime claude-design execution missing:" in detail:
-            missing = detail.split("frontend runtime claude-design execution missing:", 1)[1].split(";", 1)[0].strip()
+            missing = (
+                detail.split("frontend runtime claude-design execution missing:", 1)[1]
+                .split(";", 1)[0]
+                .strip()
+            )
             return (
                 " UI 阶段当前优先卡在 runtime 证明，缺少 "
                 + missing
                 + " 的运行证据。当前还无法向业务或管理者证明页面不只是写出来，而是真的跑起来并符合框架约束。"
             )
         if "ui review/runtime claude-design mismatch:" in detail:
-            observed = detail.split("ui review/runtime claude-design mismatch:", 1)[1].split(";", 1)[0].strip()
+            observed = (
+                detail.split("ui review/runtime claude-design mismatch:", 1)[1]
+                .split(";", 1)[0]
+                .strip()
+            )
             return (
                 " UI 阶段当前存在 source/runtime 证据漂移，"
                 + observed
                 + "。这意味着代码、预览和审查结论还没对齐，演示时容易出现“文档说可以、现场却不稳定”。"
             )
         if "ui review source claude-design protocol missing:" in detail:
-            observed = detail.split("ui review source claude-design protocol missing:", 1)[1].split(";", 1)[0].strip()
+            observed = (
+                detail.split("ui review source claude-design protocol missing:", 1)[1]
+                .split(";", 1)[0]
+                .strip()
+            )
             return (
                 " UI 阶段当前卡在源码/预览落地，缺少 "
                 + observed
@@ -248,12 +278,15 @@ class ReleaseReadinessReport:
                 " 这会直接拖慢跨端联调、演示验收和最终上线节奏。"
             )
         if "ui review screenshot visual judge failed:" in detail:
-            observed = detail.split("ui review screenshot visual judge failed:", 1)[1].split(";", 1)[0].strip()
+            observed = (
+                detail.split("ui review screenshot visual judge failed:", 1)[1]
+                .split(";", 1)[0]
+                .strip()
+            )
             observed_text = f" 当前观测：{observed}。" if observed else ""
             return (
                 " UI 阶段当前截图级视觉验收未通过，页面仍然过平、过空或过于单一。"
-                " 用户会直接感知为商业质感不足或像半成品。"
-                + observed_text
+                " 用户会直接感知为商业质感不足或像半成品。" + observed_text
             )
         return ""
 
@@ -279,11 +312,8 @@ class ReleaseReadinessReport:
         recommendation = str(framework_check.recommendation).strip()
         action_text = f" 下一步：{recommendation}" if recommendation else ""
         return (
-            " 跨平台框架专项当前卡在 "
-            + framework
-            + " playbook/执行闭环。"
-            " 这会直接影响跨端体验稳定性、专项验收效率和上线节奏。"
-            + action_text
+            " 跨平台框架专项当前卡在 " + framework + " playbook/执行闭环。"
+            " 这会直接影响跨端体验稳定性、专项验收效率和上线节奏。" + action_text
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -344,10 +374,10 @@ class ReleaseReadinessReport:
             )
         lines.extend(
             [
-            "## Checks",
-            "",
-            "| Check | Result | Severity | Detail | Recommendation |",
-            "|:---|:---:|:---:|:---|:---|",
+                "## Checks",
+                "",
+                "| Check | Result | Severity | Detail | Recommendation |",
+                "|:---|:---:|:---:|:---|:---|",
             ]
         )
         for check in self.checks:
@@ -463,17 +493,49 @@ class ReleaseReadinessEvaluator:
         "/.windsurf/",
         "/GEMINI.md",
     ]
+    VERSIONED_HOST_SURFACE_RULES = frozenset({"/.claude/", "/.cursor/"})
 
     def __init__(self, project_dir: Path):
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = resolve_project_artifact_prefix(
+        self.active_change_id = resolve_active_change_id(self.project_dir)
+        self.project_name = resolve_current_artifact_prefix(
             self.project_dir,
             fallback_name=self.project_dir.name,
         )
+        config = ConfigManager(self.project_dir).load()
+        frontend = str(config.frontend or "").strip().lower()
+        self.frontend_required = bool(frontend and frontend != "none")
+        self.fresh_verification_required = fresh_verification_required(config)
 
-    def evaluate(self, verify_tests: bool = False) -> ReleaseReadinessReport:
+    def _latest(self, pattern: str, base_dir: Path | None = None) -> Path | None:
+        return cast(
+            Path | None,
+            latest_artifact(
+                base_dir or self.output_dir,
+                pattern,
+                preferred_prefix=self.project_name,
+                strict_prefix=bool(self.active_change_id),
+            ),
+        )
+
+    def _operational_focus(self) -> dict[str, Any]:
+        focus = dict(derive_operational_focus(self.project_dir))
+        recommendation = str(focus.get("recommended_action", "")).strip()
+        if not self.frontend_required and any(
+            marker in recommendation.lower() for marker in ("frontend", "ui ", "ui-review", "前端")
+        ):
+            focus["recommended_action"] = (
+                "先修复当前 workflow / framework / hook 的适用阻塞项，再重新生成发布证据。"
+            )
+        return focus
+
+    def evaluate(
+        self,
+        verify_tests: bool = False,
+        preflight_checks: tuple[ReleaseReadinessCheck, ...] = (),
+    ) -> ReleaseReadinessReport:
         report = ReleaseReadinessReport(project_name=self.project_name)
         pipeline_summary = detect_pipeline_summary(self.project_dir)
         report.workflow_context = build_host_workflow_context(
@@ -486,7 +548,15 @@ class ReleaseReadinessEvaluator:
             output_dir=self.output_dir,
         )
         report.recent_timeline = load_recent_operational_timeline(self.project_dir, limit=5)
-        report.operational_focus = derive_operational_focus(self.project_dir)
+        report.operational_focus = self._operational_focus()
+        fresh_verification_preflight = next(
+            (
+                check
+                for check in preflight_checks
+                if check.name == "完成前验证（Fresh Verification）"
+            ),
+            None,
+        )
         report.checks.extend(
             [
                 self._check_version_alignment(),
@@ -502,7 +572,10 @@ class ReleaseReadinessEvaluator:
                 self._check_scope_coverage(),
                 self._check_compliance_closure(),
                 self._check_expert_stage_governance(),
-                self._check_delivery_closure(),
+                self._check_delivery_closure(
+                    include_fresh_verification=fresh_verification_preflight is None,
+                    fresh_verification_preflight=fresh_verification_preflight,
+                ),
                 self._check_workflow_recovery_trail(),
                 self._check_framework_harness_trail(),
                 self._check_hook_audit_trail(),
@@ -511,8 +584,10 @@ class ReleaseReadinessEvaluator:
         )
         # 治理能力检查（增量添加，不影响现有逻辑）
         report.checks.extend(self._check_governance_artifacts())
-        if verify_tests:
+        if verify_tests and not self.fresh_verification_required:
             report.checks.append(self._check_test_suite())
+        if preflight_checks:
+            report.checks = [*preflight_checks, *report.checks]
         return report
 
     def write(self, report: ReleaseReadinessReport) -> dict[str, Path]:
@@ -527,45 +602,40 @@ class ReleaseReadinessEvaluator:
         return {"markdown": md_path, "json": json_path}
 
     def _build_report_evidence_identity(self) -> dict[str, Any]:
-        return build_evidence_identity(
-            self.project_dir,
-            artifact_name="release-readiness",
-            dependencies=[
-                latest_artifact(
-                    self.output_dir, "*-quality-gate.json", preferred_prefix=self.project_name
-                )
-                or latest_artifact(
-                    self.output_dir, "*-quality-gate.md", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-task-execution.md", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-product-audit.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-ui-contract.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-frontend-runtime.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-ui-review.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-baseline-audit.json", preferred_prefix=self.project_name
-                )
-                or latest_artifact(
-                    self.output_dir, "*-baseline-audit.md", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir,
-                    "*-ui-contract-alignment.json",
-                    preferred_prefix=self.project_name,
-                ),
-                latest_artifact(self.output_dir, "*-uiux.md", preferred_prefix=self.project_name),
-            ],
+        dependencies = [
+            self._latest("*-quality-gate.json") or self._latest("*-quality-gate.md"),
+            self._latest("*-task-execution.md"),
+            self._latest("*-product-audit.json"),
+            self._latest("*-baseline-audit.json") or self._latest("*-baseline-audit.md"),
+            self._latest("*-uiux.md"),
+        ]
+        if self.frontend_required:
+            dependencies.extend(
+                [
+                    self._latest("*-ui-contract.json"),
+                    self._latest("*-frontend-runtime.json"),
+                    self._latest("*-ui-review.json"),
+                    self._latest("*-ui-contract-alignment.json"),
+                ]
+            )
+        fresh_evidence = None
+        if self.fresh_verification_required:
+            fresh_evidence = inspect_current_fresh_verification(self.project_dir)
+            dependencies.extend(fresh_evidence.dependencies)
+        identity = cast(
+            dict[str, Any],
+            build_evidence_identity(
+                self.project_dir,
+                artifact_name="release-readiness",
+                dependencies=dependencies,
+            ),
         )
+        identity["candidate_digest"] = (
+            fresh_evidence.candidate_digest
+            if fresh_evidence is not None
+            else build_candidate_identity(self.project_dir).candidate_digest
+        )
+        return identity
 
     def _check_version_alignment(self) -> ReleaseReadinessCheck:
         pyproject = self.project_dir / "pyproject.toml"
@@ -707,22 +777,55 @@ class ReleaseReadinessEvaluator:
             recommendation="确保 README 与 INSTALL_OPTIONS 统一为 uv-first，并且入口脚本与 update 命令文档一致。",
         )
 
+    def _versioned_host_surface(self, rule: str) -> bool:
+        if rule not in self.VERSIONED_HOST_SURFACE_RULES:
+            return False
+        pathspec = rule.strip("/")
+        if not pathspec:
+            return False
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "--", pathspec],
+                cwd=self.project_dir,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return result.returncode == 0 and bool(result.stdout.strip())
+
     def _check_runtime_boundary_rules(self) -> ReleaseReadinessCheck:
         gitignore = self.project_dir / ".gitignore"
         text = gitignore.read_text(encoding="utf-8", errors="ignore") if gitignore.exists() else ""
-        missing = [rule for rule in self.REQUIRED_RUNTIME_IGNORE_RULES if rule not in text]
+        versioned_surfaces = [
+            rule
+            for rule in self.REQUIRED_RUNTIME_IGNORE_RULES
+            if rule not in text and self._versioned_host_surface(rule)
+        ]
+        missing = [
+            rule
+            for rule in self.REQUIRED_RUNTIME_IGNORE_RULES
+            if rule not in text and rule not in versioned_surfaces
+        ]
         passed = not missing
-        detail = (
-            "runtime host surfaces and review-state ignore rules are present"
-            if passed
-            else f"missing ignore rules: {', '.join(missing[:8])}"
-        )
+        if passed:
+            detail = "runtime host surfaces and review-state boundary rules are present"
+            if versioned_surfaces:
+                detail += "; versioned integration surfaces: " + ", ".join(versioned_surfaces)
+        else:
+            detail = f"missing ignore rules: {', '.join(missing[:8])}"
         return ReleaseReadinessCheck(
             name="Runtime Boundary Rules",
             passed=passed,
             detail=detail,
             severity="medium" if not passed else "low",
-            recommendation="明确忽略宿主运行时目录、review-state 与项目级宿主接入产物，避免本机生成文件混入仓库。",
+            recommendation="明确隔离宿主运行时目录与 review-state；已纳入版本控制的规范宿主接入面不得用整目录规则隐藏。",
+            evidence={
+                "missing_rules": missing,
+                "versioned_host_surfaces": versioned_surfaces,
+            },
         )
 
     def _check_host_runtime_validation(self) -> ReleaseReadinessCheck:
@@ -741,7 +844,9 @@ class ReleaseReadinessEvaluator:
         failed_hosts: list[str] = []
         governance_gap = collect_layered_runtime_governance_gap(self.project_dir)
         repo_probe_failed_hosts = (
-            list(governance_gap.get("impacted_hosts", [])) if isinstance(governance_gap, dict) else []
+            list(governance_gap.get("impacted_hosts", []))
+            if isinstance(governance_gap, dict)
+            else []
         )
         for host_id, item in hosts.items():
             if not isinstance(item, dict):
@@ -764,12 +869,19 @@ class ReleaseReadinessEvaluator:
             if repo_probe_failed_hosts:
                 parts.append(f"repo_probe_failed={', '.join(repo_probe_failed_hosts[:3])}")
             detail = "host runtime validation incomplete: " + "; ".join(parts)
+        recommendation = (
+            "先让目标宿主完成人工 runtime validation，再修复 repo probe 暴露的 "
+            "workflow continuity / harness 闭环问题。"
+            if not self.frontend_required
+            else "先让目标宿主完成人工 runtime validation，再修复 repo probe 暴露的 "
+            "workflow continuity / harness / frontend runtime 闭环问题。"
+        )
         return ReleaseReadinessCheck(
             name="Host Runtime Validation",
             passed=passed,
             detail=detail,
             severity="medium" if not passed else "low",
-            recommendation="先让目标宿主完成人工 runtime validation，再修复 repo probe 暴露的 workflow continuity / harness / frontend runtime 闭环问题。",
+            recommendation=recommendation,
         )
 
     def _check_release_spec_exists(self) -> ReleaseReadinessCheck:
@@ -906,15 +1018,16 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_spec_compliance_artifact(self.project_dir, self.output_dir)
-            report = run_spec_compliance(self.project_dir, self.output_dir)
-            if report.total_requirements > 0:
+            spec_report = run_spec_compliance(self.project_dir, self.output_dir)
+            if spec_report.total_requirements > 0:
                 details.append(
-                    f"spec={inspection['status']},coverage={report.coverage_percent}%/{report.total_requirements} reqs"
+                    f"spec={inspection['status']},coverage={spec_report.coverage_percent}%/"
+                    f"{spec_report.total_requirements} reqs"
                 )
                 if inspection["status"] != "ready":
                     blockers.append(f"spec compliance artifact {inspection['status']}")
-                if report.score < 80:
-                    blockers.append(f"spec compliance score={report.score}")
+                if spec_report.score < 80:
+                    blockers.append(f"spec compliance score={spec_report.score}")
             else:
                 details.append(f"spec={inspection['status']},n/a")
         except Exception:
@@ -927,50 +1040,64 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_architecture_drift_artifact(self.project_dir, self.output_dir)
-            report = run_architecture_drift(self.project_dir, self.output_dir)
-            if report.total_drifts > 0 or report.declared_tech_stack:
+            architecture_report = run_architecture_drift(self.project_dir, self.output_dir)
+            if architecture_report.total_drifts > 0 or architecture_report.declared_tech_stack:
                 details.append(
-                    f"architecture={inspection['status']},drifts:{report.total_drifts},critical:{report.critical_count}"
+                    f"architecture={inspection['status']},drifts:"
+                    f"{architecture_report.total_drifts},critical:"
+                    f"{architecture_report.critical_count}"
                 )
                 if inspection["status"] != "ready":
                     blockers.append(f"architecture drift artifact {inspection['status']}")
-                if report.score < 80:
+                if architecture_report.score < 80:
                     blockers.append(
-                        f"architecture drift score={report.score}, critical={report.critical_count}"
+                        f"architecture drift score={architecture_report.score}, "
+                        f"critical={architecture_report.critical_count}"
                     )
             else:
                 details.append(f"architecture={inspection['status']},n/a")
         except Exception:
             blockers.append("architecture drift unreadable")
 
-        try:
-            from .reviewers.uiux_compliance import (
-                inspect_uiux_compliance_artifact,
-                run_uiux_compliance,
-            )
-
-            inspection = inspect_uiux_compliance_artifact(self.project_dir, self.output_dir)
-            report = run_uiux_compliance(self.project_dir, self.output_dir)
-            if report.files_scanned > 0:
-                details.append(
-                    f"uiux={inspection['status']},violations:{report.total_violations},files:{report.files_scanned}"
+        if self.frontend_required:
+            try:
+                from .reviewers.uiux_compliance import (
+                    inspect_uiux_compliance_artifact,
+                    run_uiux_compliance,
                 )
-                if inspection["status"] != "ready":
-                    blockers.append(f"uiux compliance artifact {inspection['status']}")
-                if report.score < 80:
-                    blockers.append(f"uiux compliance score={report.score}")
-            else:
-                details.append(f"uiux={inspection['status']},n/a")
-        except Exception:
-            blockers.append("uiux compliance unreadable")
+
+                inspection = inspect_uiux_compliance_artifact(self.project_dir, self.output_dir)
+                uiux_report = run_uiux_compliance(self.project_dir, self.output_dir)
+                if uiux_report.files_scanned > 0:
+                    details.append(
+                        f"uiux={inspection['status']},violations:"
+                        f"{uiux_report.total_violations},files:{uiux_report.files_scanned}"
+                    )
+                    if inspection["status"] != "ready":
+                        blockers.append(f"uiux compliance artifact {inspection['status']}")
+                    if uiux_report.score < 80:
+                        blockers.append(f"uiux compliance score={uiux_report.score}")
+                else:
+                    details.append(f"uiux={inspection['status']},n/a")
+            except Exception:
+                blockers.append("uiux compliance unreadable")
+        else:
+            details.append("uiux=not_applicable")
 
         passed = not blockers
         detail = "; ".join(details if passed else [*details, *blockers])
-        recommendation = (
-            "重新执行 `super-dev compliance --type all`，先修复 Requirement traceability、architecture drift 与 UIUX 违例，再生成 quality gate / proof-pack / release readiness。"
-            if not passed
-            else "当前 spec / architecture / UIUX 合规链已进入发布闭环。"
-        )
+        if not passed:
+            required_areas = "Requirement traceability 与 architecture drift"
+            if self.frontend_required:
+                required_areas += "、UIUX 违例"
+            recommendation = (
+                f"重新执行 `super-dev compliance --type all`，先修复 {required_areas}，"
+                "再生成 quality gate / proof-pack / release readiness。"
+            )
+        elif self.frontend_required:
+            recommendation = "当前 spec / architecture / UIUX 合规链已进入发布闭环。"
+        else:
+            recommendation = "当前 spec / architecture 合规链已进入发布闭环；前端不适用。"
         return ReleaseReadinessCheck(
             name="Compliance Closure",
             passed=passed,
@@ -998,9 +1125,7 @@ class ReleaseReadinessEvaluator:
             detail = "no active stage expert evidence required yet"
             passed = True
         elif passed:
-            detail = (
-                f"expert participation recorded for {covered_count}/{visible_stage_count} visible stages"
-            )
+            detail = f"expert participation recorded for {covered_count}/{visible_stage_count} visible stages"
         else:
             detail = "expert stage evidence missing: " + "、".join(missing_stages[:4])
         return ReleaseReadinessCheck(
@@ -1040,35 +1165,26 @@ class ReleaseReadinessEvaluator:
             recommendation="确保全量 pytest 通过后再执行对外发布。",
         )
 
-    def _check_delivery_closure(self) -> ReleaseReadinessCheck:
+    def _check_delivery_closure(
+        self,
+        *,
+        include_fresh_verification: bool = True,
+        fresh_verification_preflight: ReleaseReadinessCheck | None = None,
+    ) -> ReleaseReadinessCheck:
         redteam = load_redteam_evidence(self.project_dir, self.project_name)
-        quality_gate_json = latest_artifact(
-            self.output_dir, "*-quality-gate.json", preferred_prefix=self.project_name
+        quality_gate_json = self._latest("*-quality-gate.json")
+        quality_gate_file = quality_gate_json or self._latest("*-quality-gate.md")
+        task_execution_file = self._latest("*-task-execution.md")
+        product_audit_file = self._latest("*-product-audit.json")
+        ui_contract_file = self._latest("*-ui-contract.json") if self.frontend_required else None
+        frontend_runtime_file = (
+            self._latest("*-frontend-runtime.json") if self.frontend_required else None
         )
-        quality_gate_file = quality_gate_json or latest_artifact(
-            self.output_dir, "*-quality-gate.md", preferred_prefix=self.project_name
+        ui_review_file = self._latest("*-ui-review.json") if self.frontend_required else None
+        ui_alignment_file = (
+            self._latest("*-ui-contract-alignment.json") if self.frontend_required else None
         )
-        task_execution_file = latest_artifact(
-            self.output_dir, "*-task-execution.md", preferred_prefix=self.project_name
-        )
-        product_audit_file = latest_artifact(
-            self.output_dir, "*-product-audit.json", preferred_prefix=self.project_name
-        )
-        ui_contract_file = latest_artifact(
-            self.output_dir, "*-ui-contract.json", preferred_prefix=self.project_name
-        )
-        frontend_runtime_file = latest_artifact(
-            self.output_dir, "*-frontend-runtime.json", preferred_prefix=self.project_name
-        )
-        ui_review_file = latest_artifact(
-            self.output_dir, "*-ui-review.json", preferred_prefix=self.project_name
-        )
-        ui_alignment_file = latest_artifact(
-            self.output_dir, "*-ui-contract-alignment.json", preferred_prefix=self.project_name
-        )
-        uiux_file = latest_artifact(
-            self.output_dir, "*-uiux.md", preferred_prefix=self.project_name
-        )
+        uiux_file = self._latest("*-uiux.md")
         design_tokens_file = self.output_dir / "frontend" / "design-tokens.css"
 
         blockers: list[str] = []
@@ -1087,32 +1203,67 @@ class ReleaseReadinessEvaluator:
         if quality_gate_file is None or not quality_gate_file.exists():
             blockers.append("quality gate missing")
         else:
-            expected_quality_identity = build_evidence_identity(
-                self.project_dir,
-                artifact_name="quality-gate",
-                dependencies=[ui_review_file, ui_alignment_file, uiux_file],
-            )
+            quality_dependencies: list[Path] = []
             if quality_gate_json is not None:
                 quality_gate_payload = load_json_payload(quality_gate_json)
-                identity_ok, identity_reason = evidence_identity_matches(
-                    quality_gate_payload,
-                    expected=expected_quality_identity,
-                )
-                if not identity_ok:
-                    blockers.append(
-                        "quality gate evidence mismatch"
-                        if identity_reason == "digest_mismatch"
-                        else "quality gate evidence identity missing"
+                if fresh_verification_preflight is None:
+                    quality_dependencies = quality_evidence_dependency_paths(
+                        self.project_dir,
+                        project_name=self.project_name,
+                        frontend_required=self.frontend_required,
                     )
-            if is_artifact_stale(
-                quality_gate_file,
-                dependencies=[ui_review_file, ui_alignment_file, uiux_file],
-            ):
-                blockers.append("quality gate stale")
-            if quality_gate_json is not None:
-                quality_gate_payload = load_json_payload(quality_gate_json)
+                    expected_quality_identity = build_evidence_identity(
+                        self.project_dir,
+                        artifact_name="quality-gate",
+                        dependencies=quality_dependencies,
+                    )
+                    identity_ok, identity_reason = evidence_identity_matches(
+                        quality_gate_payload,
+                        expected=expected_quality_identity,
+                    )
+                else:
+                    quality_dependencies, identity_reason = stored_quality_evidence_dependencies(
+                        self.project_dir,
+                        quality_gate_payload,
+                    )
+                    identity_ok = identity_reason == "matched"
+                if not identity_ok:
+                    if identity_reason in {"digest_mismatch", "mismatch"}:
+                        blockers.append("quality gate evidence mismatch")
+                    elif identity_reason == "unsafe":
+                        blockers.append("quality gate evidence dependencies unsafe")
+                    else:
+                        blockers.append("quality gate evidence identity missing")
+                elif (
+                    fresh_verification_preflight is not None and fresh_verification_preflight.passed
+                ):
+                    candidate_digest = str(
+                        fresh_verification_preflight.evidence.get("candidate_digest", "")
+                    ).strip()
+                    binding_ok, binding_reason = quality_fresh_binding_matches(
+                        quality_dependencies,
+                        candidate_digest=candidate_digest,
+                    )
+                    if not binding_ok:
+                        binding_details = {
+                            "candidate_mismatch": "current candidate mismatch",
+                            "not_passed": "bound verification not passed",
+                            "incomplete": "bound verification evidence incomplete",
+                            "invalid": "bound verification evidence invalid",
+                            "candidate_missing": "bound candidate identity missing",
+                            "missing": "bound verification evidence missing",
+                        }
+                        blockers.append(
+                            "quality gate fresh verification "
+                            + binding_details.get(binding_reason, "binding mismatch")
+                        )
+                if quality_dependencies and is_artifact_stale(
+                    quality_gate_file,
+                    dependencies=quality_dependencies,
+                ):
+                    blockers.append("quality gate stale")
                 if quality_gate_payload:
-                    if not bool(quality_gate_payload.get("passed", False)):
+                    if quality_gate_payload.get("passed") is not True:
                         blockers.append("quality gate failed")
                 else:
                     quality_text = quality_gate_file.read_text(
@@ -1121,9 +1272,31 @@ class ReleaseReadinessEvaluator:
                     if "未通过" in quality_text or "failed" in quality_text:
                         blockers.append("quality gate failed")
             else:
-                quality_text = quality_gate_file.read_text(encoding="utf-8", errors="ignore").lower()
+                if fresh_verification_preflight is None:
+                    quality_dependencies = quality_evidence_dependency_paths(
+                        self.project_dir,
+                        project_name=self.project_name,
+                        frontend_required=self.frontend_required,
+                    )
+                    if is_artifact_stale(
+                        quality_gate_file,
+                        dependencies=quality_dependencies,
+                    ):
+                        blockers.append("quality gate stale")
+                else:
+                    blockers.append("quality gate evidence identity missing")
+                quality_text = quality_gate_file.read_text(
+                    encoding="utf-8", errors="ignore"
+                ).lower()
                 if "未通过" in quality_text or "failed" in quality_text:
                     blockers.append("quality gate failed")
+
+        if include_fresh_verification and self.fresh_verification_required:
+            fresh_evidence = inspect_current_fresh_verification(self.project_dir)
+            if not fresh_evidence.passed:
+                blockers.append(
+                    "当前代码版本的完成前验证不是通过（`PASS`）：" f"{fresh_evidence.detail}"
+                )
 
         if task_execution_file is None or not task_execution_file.exists():
             blockers.append("task execution missing")
@@ -1147,6 +1320,19 @@ class ReleaseReadinessEvaluator:
                 if product_status == "revision_required":
                     blockers.append("product audit requires revision")
 
+        if not self.frontend_required:
+            passed = not blockers
+            return ReleaseReadinessCheck(
+                name="Delivery Closure",
+                passed=passed,
+                detail="delivery closure evidence aligned" if passed else "; ".join(blockers),
+                severity="critical" if not passed else "low",
+                recommendation=(
+                    "先补齐 redteam / quality gate / task execution / product audit 证据，"
+                    "并确保它们指向同一轮交付；当前项目不要求前端证据。"
+                ),
+            )
+
         if ui_contract_file is None or not ui_contract_file.exists():
             blockers.append("ui contract missing")
         else:
@@ -1161,24 +1347,24 @@ class ReleaseReadinessEvaluator:
                     blockers.append("ui contract invalid")
                 else:
                     component_stack = (
-                        ui_contract_payload.get("component_stack", {})
+                        cast(dict[str, Any], ui_contract_payload.get("component_stack"))
                         if isinstance(ui_contract_payload.get("component_stack"), dict)
                         else {}
                     )
                     emoji_policy = (
-                        ui_contract_payload.get("emoji_policy")
+                        cast(dict[str, Any], ui_contract_payload.get("emoji_policy"))
                         if isinstance(ui_contract_payload.get("emoji_policy"), dict)
                         else {}
                     )
                     analysis = (
-                        ui_contract_payload.get("analysis", {})
+                        cast(dict[str, Any], ui_contract_payload.get("analysis"))
                         if isinstance(ui_contract_payload.get("analysis"), dict)
                         else {}
                     )
                     frontend_value = str(analysis.get("frontend") or "").lower().strip()
                     cross_platform_frontend = is_cross_platform_frontend(frontend_value)
                     framework_playbook = (
-                        ui_contract_payload.get("framework_playbook")
+                        cast(dict[str, Any], ui_contract_payload.get("framework_playbook"))
                         if isinstance(ui_contract_payload.get("framework_playbook"), dict)
                         else {}
                     )
@@ -1187,7 +1373,7 @@ class ReleaseReadinessEvaluator:
                         or component_stack.get("icon")
                         or component_stack.get("icons")
                     )
-                    required_sections = (
+                    required_sections: tuple[bool, ...] = (
                         bool(ui_contract_payload.get("style_direction")),
                         (
                             (
@@ -1342,12 +1528,16 @@ class ReleaseReadinessEvaluator:
                     ui_contract_payload if isinstance(ui_contract_payload, dict) else {},
                 ):
                     pass
-                elif runtime_protocol_alignment and not bool(runtime_protocol_alignment.get("passed", False)):
+                elif runtime_protocol_alignment and not bool(
+                    runtime_protocol_alignment.get("passed", False)
+                ):
                     blockers.append(
                         "ui review/runtime claude-design mismatch:"
                         + str(runtime_protocol_alignment.get("observed", "")).strip()
                     )
-                elif source_protocol_alignment and not bool(source_protocol_alignment.get("passed", False)):
+                elif source_protocol_alignment and not bool(
+                    source_protocol_alignment.get("passed", False)
+                ):
                     blockers.append(
                         "ui review source claude-design protocol missing:"
                         + str(source_protocol_alignment.get("observed", "")).strip()
@@ -1490,7 +1680,7 @@ class ReleaseReadinessEvaluator:
 
     def _check_operational_harness_trail(self) -> ReleaseReadinessCheck:
         harness = OperationalHarnessBuilder(self.project_dir).build()
-        focus = derive_operational_focus(self.project_dir)
+        focus = self._operational_focus()
         if not harness.enabled:
             return ReleaseReadinessCheck(
                 name="Operational Harness Trail",
@@ -1507,7 +1697,8 @@ class ReleaseReadinessEvaluator:
             else str(focus.get("summary", "")).strip()
             or f"operational harness has {len(harness.blockers)} blockers across {harness.enabled_count} enabled harnesses"
         )
-        recommendation = str(focus.get("recommended_action", "")).strip() or (
+        focus_recommendation = str(focus.get("recommended_action", "")).strip()
+        recommendation = focus_recommendation or (
             harness.next_actions[0]
             if harness.next_actions
             else "补齐 workflow / framework / hook harness 后重新生成 operational harness。"

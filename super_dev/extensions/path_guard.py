@@ -106,16 +106,22 @@ class PathGuard:
                 continue
             prefix = _static_prefix(pattern)
             if prefix and _within(self.project_dir / prefix, candidate):
-                return PathDecision(ExtensionStatus.BLOCKED, candidate, f"写入命中禁止范围: {pattern}")
+                return PathDecision(
+                    ExtensionStatus.BLOCKED, candidate, f"写入命中禁止范围: {pattern}"
+                )
             match_pattern = pattern.casefold() if os.name == "nt" else pattern
             if fnmatch.fnmatchcase(match_relative, match_pattern):
-                return PathDecision(ExtensionStatus.BLOCKED, candidate, f"写入命中禁止范围: {pattern}")
+                return PathDecision(
+                    ExtensionStatus.BLOCKED, candidate, f"写入命中禁止范围: {pattern}"
+                )
 
         for pattern in self.writes.allowed:
             prefix = _static_prefix(pattern)
             match_pattern = pattern.casefold() if os.name == "nt" else pattern
-            if prefix and _within(self.project_dir / prefix, candidate) and fnmatch.fnmatchcase(
-                match_relative, match_pattern
+            if (
+                prefix
+                and _within(self.project_dir / prefix, candidate)
+                and fnmatch.fnmatchcase(match_relative, match_pattern)
             ):
                 return PathDecision(ExtensionStatus.PASS, candidate, "写入位于允许范围")
         return PathDecision(ExtensionStatus.BLOCKED, candidate, "写入不在清单允许范围")

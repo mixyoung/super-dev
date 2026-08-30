@@ -275,7 +275,7 @@ class RequirementTracer:
         if specs_dir.exists():
             for spec_file in sorted(specs_dir.rglob("spec.md")):
                 content = spec_file.read_text(encoding="utf-8")
-                relative_path = str(spec_file.relative_to(change_dir))
+                relative_path = spec_file.relative_to(change_dir).as_posix()
                 current_req_name = ""
 
                 for line_num, line in enumerate(content.splitlines(), 1):
@@ -310,7 +310,7 @@ class RequirementTracer:
         file_contents: dict[str, str] = {}
         for fp in source_files:
             try:
-                file_contents[str(fp.relative_to(self.project_dir))] = fp.read_text(
+                file_contents[fp.relative_to(self.project_dir).as_posix()] = fp.read_text(
                     encoding="utf-8"
                 ).lower()
             except (OSError, UnicodeDecodeError):
@@ -335,7 +335,7 @@ class RequirementTracer:
         file_contents: dict[str, str] = {}
         for fp in test_files:
             try:
-                file_contents[str(fp.relative_to(self.project_dir))] = fp.read_text(
+                file_contents[fp.relative_to(self.project_dir).as_posix()] = fp.read_text(
                     encoding="utf-8"
                 ).lower()
             except (OSError, UnicodeDecodeError):
@@ -558,6 +558,7 @@ class RequirementTracer:
             if any(p in exclude_dirs for p in parts):
                 continue
             # 只收集测试文件
+            relative_path = item.relative_to(self.project_dir).as_posix()
             is_test = (
                 item.name.startswith("test_")
                 or item.name.endswith("_test.py")
@@ -567,8 +568,8 @@ class RequirementTracer:
                 or item.name.endswith(".spec.js")
                 or item.name.endswith(".spec.ts")
                 or item.name.endswith(".spec.tsx")
-                or "tests/" in str(item.relative_to(self.project_dir))
-                or "__tests__/" in str(item.relative_to(self.project_dir))
+                or "tests/" in relative_path
+                or "__tests__/" in relative_path
             )
             if is_test:
                 results.append(item)

@@ -169,6 +169,14 @@ This project uses a pipeline-driven development model.
 - Use Claude Code browse/search for research and Claude Code terminal/editing for implementation.
 - Use local `super-dev` commands whenever you need to generate/update docs, spec artifacts, quality reports, and delivery outputs.
 
+## 面向中国大陆用户的语言与术语契约（强制）
+- 面向中国大陆用户的用户界面、聊天、确认问题、错误提示和报告，优先使用自然、直接、符合中国大陆语言习惯的中文。
+- 技术概念第一次出现时，使用“中文名称（英文代码名）”；后续优先只用中文名称，仅在精确核对时再次显示英文代码名。
+- 状态统一显示为通过（`PASS`）、失败（`FAIL`）、受阻（`BLOCKED`）；不得面向用户只显示裸英文状态。
+- `candidate` 面向用户统一称“当前代码版本”，只在证据详情中显示字段（`candidate_digest`）。
+- 命令、文件名和程序字段保留精确英文原文并使用代码格式；解释仍先用中文。
+- 内部日志、JSON 和 API 字段可以保留英文，但不得直接照搬成用户文案。
+
 ## First-Response Contract
 - On the first reply after a host-supported Super Dev entry (for example `/super-dev ...`, `$super-dev`, `super-dev: ...`, `super-dev：...`, `/super-dev-seeai ...`, `$super-dev-seeai`, `super-dev-seeai: ...`, or `super-dev-seeai：...`), explicitly state that the matching Super Dev mode is now active rather than normal chat mode.
 - If the repository already contains `super-dev.yaml`, `.super-dev/WORKFLOW.md`, `output/*`, `.super-dev/review-state/*`, or an unfinished run state, the first natural-language requirement in a new host session must also default to continuing Super Dev rather than plain chat.

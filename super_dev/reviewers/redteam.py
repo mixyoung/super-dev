@@ -201,8 +201,16 @@ class RedTeamReport:
     def total_score(self) -> int:
         """计算总分 (0-100)"""
         base_score = 100
+        low_issue_counts: dict[tuple[str, str], int] = {}
 
-        # 扣分标准
+        def count_low_issue(issue_family: str, category: str) -> bool:
+            key = (issue_family, category)
+            count = low_issue_counts.get(key, 0) + 1
+            low_issue_counts[key] = count
+            return count <= 3
+
+        # 扣分标准。低风险启发式按“问题族 + 类别”最多扣三次，避免同一规则在
+        # 大型仓库中按文件数无限放大；报告仍保留全部命中供人工排查。
         for security_issue in self.security_issues:
             if security_issue.severity == "critical":
                 base_score -= 20
@@ -210,9 +218,9 @@ class RedTeamReport:
                 base_score -= 10
             elif security_issue.severity == "medium":
                 base_score -= 5
-            elif security_issue.severity in {"advisory", "info"}:
-                base_score -= 0
-            else:
+            elif security_issue.severity == "low" and count_low_issue(
+                "security", security_issue.category
+            ):
                 base_score -= 2
 
         for performance_issue in self.performance_issues:
@@ -222,9 +230,9 @@ class RedTeamReport:
                 base_score -= 8
             elif performance_issue.severity == "medium":
                 base_score -= 4
-            elif performance_issue.severity in {"advisory", "info"}:
-                base_score -= 0
-            else:
+            elif performance_issue.severity == "low" and count_low_issue(
+                "performance", performance_issue.category
+            ):
                 base_score -= 1
 
         for architecture_issue in self.architecture_issues:
@@ -234,9 +242,9 @@ class RedTeamReport:
                 base_score -= 8
             elif architecture_issue.severity == "medium":
                 base_score -= 4
-            elif architecture_issue.severity in {"advisory", "info"}:
-                base_score -= 0
-            else:
+            elif architecture_issue.severity == "low" and count_low_issue(
+                "architecture", architecture_issue.category
+            ):
                 base_score -= 1
 
         return max(0, base_score)
@@ -475,27 +483,33 @@ class RedTeamReport:
             project_name=str(payload.get("project_name", "")),
             pass_threshold=_coerce_int(payload.get("pass_threshold"), 70),
             scanned_files_count=_coerce_int(payload.get("scanned_files_count"), -1),
-            security_issues=[
-                SecurityIssue.from_dict(item)
-                for item in security_payload
-                if isinstance(item, dict)
-            ]
-            if isinstance(security_payload, list)
-            else [],
-            performance_issues=[
-                PerformanceIssue.from_dict(item)
-                for item in performance_payload
-                if isinstance(item, dict)
-            ]
-            if isinstance(performance_payload, list)
-            else [],
-            architecture_issues=[
-                ArchitectureIssue.from_dict(item)
-                for item in architecture_payload
-                if isinstance(item, dict)
-            ]
-            if isinstance(architecture_payload, list)
-            else [],
+            security_issues=(
+                [
+                    SecurityIssue.from_dict(item)
+                    for item in security_payload
+                    if isinstance(item, dict)
+                ]
+                if isinstance(security_payload, list)
+                else []
+            ),
+            performance_issues=(
+                [
+                    PerformanceIssue.from_dict(item)
+                    for item in performance_payload
+                    if isinstance(item, dict)
+                ]
+                if isinstance(performance_payload, list)
+                else []
+            ),
+            architecture_issues=(
+                [
+                    ArchitectureIssue.from_dict(item)
+                    for item in architecture_payload
+                    if isinstance(item, dict)
+                ]
+                if isinstance(architecture_payload, list)
+                else []
+            ),
         )
 
 
@@ -1032,8 +1046,14 @@ class RedTeamReviewer:
 
             # 硬编码凭据
             for match in secret_pattern.finditer(content):
+                secret_name = match.group(1).strip()
                 value = match.group(2).strip()
-                if self._looks_like_placeholder(value):
+                if self._looks_like_placeholder(value) or self._looks_like_color_token(
+                    secret_name,
+                    value,
+                    content=content,
+                    match_start=match.start(),
+                ):
                     continue
                 line_no = self._line_number_from_offset(content, match.start())
                 issue_key = (str(file_path), "硬编码凭据")
@@ -1364,10 +1384,79 @@ class RedTeamReviewer:
         return dirname.startswith(".") and dirname not in {".github"}
 
     def _is_scannable_file(self, path: Path) -> bool:
-        if self._is_test_file(path):
+        if self._is_test_file(path) or not self._is_source_path_active(path):
             return False
         suffix = path.suffix.lower()
         return suffix in self._CODE_EXTENSIONS or self._is_yaml_file(path)
+
+    def _is_source_path_active(self, path: Path) -> bool:
+        """Return whether a source path belongs to the configured release surface."""
+        candidate = path if path.is_absolute() else self.project_dir / path
+        try:
+            relative = candidate.resolve(strict=False).relative_to(self.project_dir)
+        except ValueError:
+            return False
+        if not relative.parts:
+            return True
+
+        top_level = relative.parts[0].lower()
+        frontend_active = self._stack_component_active(self.frontend)
+        backend_active = self._stack_component_active(self.backend)
+        suffix = path.suffix.lower()
+
+        if top_level == "frontend":
+            return frontend_active
+        if top_level == "backend":
+            if not backend_active:
+                return False
+            backend_package = self.project_dir / relative.parts[0] / "package.json"
+            if (
+                backend_package.is_file()
+                and not self._backend_uses_node()
+                and suffix in {".js", ".ts", ".tsx", ".jsx"}
+            ):
+                return False
+            return True
+
+        top_package = self.project_dir / relative.parts[0] / "package.json"
+        if top_package.is_file() and not (frontend_active or self._backend_uses_node()):
+            return False
+        return True
+
+    @staticmethod
+    def _stack_component_active(value: object) -> bool:
+        return str(value or "").strip().lower() not in {"", "none", "null", "false", "disabled"}
+
+    def _backend_uses_node(self) -> bool:
+        backend_kind = str(self.backend or "").strip().lower()
+        return any(
+            token in backend_kind
+            for token in (
+                "node",
+                "javascript",
+                "typescript",
+                "express",
+                "nestjs",
+                "nextjs",
+                "next.js",
+                "fastify",
+                "koa",
+            )
+        )
+
+    def _is_package_json_active(self, package_json: Path) -> bool:
+        try:
+            relative = package_json.resolve(strict=False).relative_to(self.project_dir)
+        except ValueError:
+            return False
+        if len(relative.parts) == 1:
+            return True
+        top_level = relative.parts[0].lower()
+        if top_level == "frontend":
+            return self._stack_component_active(self.frontend)
+        if top_level == "backend":
+            return self._backend_uses_node()
+        return self._stack_component_active(self.frontend) or self._backend_uses_node()
 
     def _is_yaml_file(self, path: Path) -> bool:
         return path.suffix.lower() in {".yml", ".yaml"}
@@ -1408,6 +1497,23 @@ class RedTeamReviewer:
         if lowered in {"password", "secret", "token", "api_key", "your_api_key_here"}:
             return True
         return False
+
+    def _looks_like_color_token(
+        self,
+        name: str,
+        value: str,
+        *,
+        content: str,
+        match_start: int,
+    ) -> bool:
+        """Exclude a color parser's local ``token`` without hiding real credentials."""
+        if name.strip().lower() != "token" or not re.fullmatch(r"[0-9a-fA-F]{6,8}", value):
+            return False
+        context_start = max(0, match_start - 240)
+        context_end = min(len(content), match_start + 240)
+        context = content[context_start:context_end].lower()
+        color_markers = ("hex_color", "color", 'lstrip("#")', "lstrip('#')", "0xff")
+        return any(marker in context for marker in color_markers)
 
     def _line_number_from_offset(self, content: str, start: int) -> int:
         return content.count("\n", 0, start) + 1
@@ -1560,10 +1666,8 @@ class RedTeamReviewer:
             return []
 
         issues: list[SecurityIssue] = []
-        for target in (self.project_dir / "frontend", self.project_dir / "backend"):
-            package_json = target / "package.json"
-            if not package_json.exists():
-                continue
+        for package_json in self._find_package_json_files():
+            target = package_json.parent
 
             result = self._run_command(
                 [npm_exec, "--prefix", str(target), "audit", "--json"],
@@ -1907,7 +2011,9 @@ class RedTeamReviewer:
                 d for d in dirnames if d not in {"node_modules", ".git", "dist", "build", ".next"}
             ]
             if "package.json" in filenames:
-                results.append(Path(dirpath) / "package.json")
+                package_json = Path(dirpath) / "package.json"
+                if self._is_package_json_active(package_json):
+                    results.append(package_json)
             if len(results) >= 20:
                 break
         return results

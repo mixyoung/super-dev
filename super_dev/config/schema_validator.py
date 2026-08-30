@@ -2,7 +2,9 @@
 
 import re
 
-VALID_PLATFORMS = {"web", "mobile", "desktop", "api"}
+from ..catalogs import PLATFORM_IDS
+
+VALID_PLATFORMS = set(PLATFORM_IDS)
 VALID_PHASES = {"discovery", "intelligence", "drafting", "redteam", "qa", "delivery", "deployment"}
 VALID_EXPERTS = {"PM", "ARCHITECT", "UI", "UX", "SECURITY", "CODE"}
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
@@ -143,9 +145,7 @@ def validate_config(config: dict) -> list[str]:
             adaptive_ledger.get("enabled") is not True
             or adaptive_ledger.get("auto_create") is not True
         ):
-            errors.append(
-                "'adaptive_ledger.scope_advisory' requires enabled automatic creation"
-            )
+            errors.append("'adaptive_ledger.scope_advisory' requires enabled automatic creation")
 
     extensions = config.get(
         "extensions",
@@ -162,6 +162,7 @@ def validate_config(config: dict) -> list[str]:
         unknown_extension_fields = set(extensions) - {
             "enabled",
             "allowed_builtin_methods",
+            "fresh_verification",
         }
         if unknown_extension_fields:
             errors.append(
@@ -176,8 +177,22 @@ def validate_config(config: dict) -> list[str]:
             errors.append("'extensions.allowed_builtin_methods' must be a string list")
         elif len(set(allowed_methods)) != len(allowed_methods):
             errors.append("'extensions.allowed_builtin_methods' must not contain duplicates")
-        elif any(item != "contract-probe" for item in allowed_methods):
-            errors.append("only 'contract-probe' is supported in phase 1")
+        elif any(item not in {"contract-probe", "fresh-verification"} for item in allowed_methods):
+            errors.append("only 'contract-probe' and 'fresh-verification' are supported")
+        fresh_verification = extensions.get("fresh_verification")
+        if fresh_verification is not None:
+            try:
+                from ..extensions.pytest_plan import parse_pytest_verification_plan
+
+                parse_pytest_verification_plan(fresh_verification)
+            except ValueError as exc:
+                errors.append(str(exc))
+        if (
+            isinstance(allowed_methods, list)
+            and "fresh-verification" in allowed_methods
+            and fresh_verification is None
+        ):
+            errors.append("'fresh-verification' requires 'extensions.fresh_verification'")
 
     return errors
 

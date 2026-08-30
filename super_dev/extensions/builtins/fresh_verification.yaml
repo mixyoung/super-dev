@@ -1,0 +1,44 @@
+schema_version: 1
+id: fresh-verification
+version: 0.1.0
+kind: builtin-test-adapter
+source:
+  kind: builtin
+  path: builtins/fresh_verification.py
+  content_digest: sha256:6058bc1ff206776b0dbcea2eacbc1ab15868aa8896e2c767d668d0cd9c4c7e28
+trigger:
+  mode: explicit
+  allowed_stages:
+    - delivery
+capabilities:
+  required:
+    - run_commands
+    - write_evidence
+ownership:
+  lifecycle: false
+  orchestration: false
+  production_writer: false
+  placement: false
+  may_spawn_subworkers: false
+writes:
+  allowed:
+    - .super-dev/extensions/runs/**
+    - .super-dev/extensions/metrics/**
+  forbidden:
+    - .git/**
+    - .super-dev/workflow-state.json
+    - $USER_SURFACES/**
+authority:
+  commit: false
+  merge: false
+  push: false
+  pull_request: false
+  deploy: false
+  external_write: false
+  global_install: false
+execution:
+  executor: builtin-python
+  entrypoint: super_dev.extensions.builtins.fresh_verification:run
+  timeout_seconds: 300
+result:
+  schema: extension-result-v1

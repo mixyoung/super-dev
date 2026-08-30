@@ -58,10 +58,7 @@ def test_rejects_project_escape_and_permanent_paths(tmp_path: Path) -> None:
 
     assert guard.check_write("../outside.txt").status == ExtensionStatus.BLOCKED
     assert guard.check_write(".git/config").status == ExtensionStatus.BLOCKED
-    assert (
-        guard.check_write(".super-dev/workflow-state.json").status
-        == ExtensionStatus.BLOCKED
-    )
+    assert guard.check_write(".super-dev/workflow-state.json").status == ExtensionStatus.BLOCKED
 
 
 def test_rejects_symlink_escape_when_supported(tmp_path: Path) -> None:

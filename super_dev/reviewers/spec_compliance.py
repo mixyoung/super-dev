@@ -1,9 +1,8 @@
 """
 Spec Compliance Checker — requirement-to-code traceability matrix.
 
-Parses PRD requirements from output/*-prd.md, scans implementation files,
-and generates a traceability matrix showing which requirements map to which
-code files, with confidence scoring.
+Uses the active change's specs when present, otherwise parses the current PRD,
+then scans implementation and test files to generate a traceability matrix.
 """
 
 from __future__ import annotations
@@ -15,7 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..artifact_utils import resolve_project_artifact_prefix
+from ..artifact_utils import (
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+    sanitize_artifact_name,
+)
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
@@ -121,13 +125,15 @@ class ComplianceReport:
             "|:---|:---|:---:|:---:|:---|",
         ]
         for m in self.matches:
-            status_label = {"found": "PASS", "partial": "PARTIAL", "missing": "MISS"}[
-                m.status
-            ]
+            status_label = {"found": "PASS", "partial": "PARTIAL", "missing": "MISS"}[m.status]
             files_str = ", ".join(m.files[:3])
             if len(m.files) > 3:
                 files_str += f" +{len(m.files) - 3} more"
-            req_text = m.requirement_text[:60] + "..." if len(m.requirement_text) > 60 else m.requirement_text
+            req_text = (
+                m.requirement_text[:60] + "..."
+                if len(m.requirement_text) > 60
+                else m.requirement_text
+            )
             lines.append(
                 f"| {m.requirement_id} | {req_text} | {status_label} | {m.confidence:.0%} | {files_str} |"
             )
@@ -157,10 +163,50 @@ def _parse_prd_requirements(prd_path: Path) -> list[tuple[str, str]]:
         req_match = re.match(r"^(?:\d+\.\s+|[-*]\s+)(.+)", line)
         if req_match and len(req_match.group(1).strip()) > 10:
             req_counter += 1
-            section_prefix = re.sub(r"[^a-zA-Z0-9]", "", current_section[:20]) if current_section else "REQ"
+            section_prefix = (
+                re.sub(r"[^a-zA-Z0-9]", "", current_section[:20]) if current_section else "REQ"
+            )
             req_id = f"{section_prefix}-{req_counter:03d}"
             requirements.append((req_id, req_match.group(1).strip()))
 
+    return requirements
+
+
+def _parse_change_spec_requirements(spec_path: Path) -> list[tuple[str, str]]:
+    """Extract one auditable requirement per ``### Requirement`` block."""
+    requirements: list[tuple[str, str]] = []
+    scope = sanitize_artifact_name(spec_path.parent.name) or "spec"
+    current_heading = ""
+    current_body: list[str] = []
+    req_counter = 0
+
+    def append_current() -> None:
+        nonlocal req_counter
+        if not current_heading:
+            return
+        req_counter += 1
+        requirement_text = " ".join([current_heading, *current_body]).strip()
+        requirements.append((f"{scope}-{req_counter:03d}", requirement_text))
+
+    for raw_line in spec_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = raw_line.strip()
+        heading_match = re.match(r"^###\s+Requirement:\s*(.+)$", line)
+        if heading_match:
+            append_current()
+            current_heading = heading_match.group(1).strip()
+            current_body = []
+            continue
+        if not current_heading:
+            continue
+        if line.startswith("#### ") or line.startswith("### "):
+            append_current()
+            current_heading = ""
+            current_body = []
+            continue
+        if line and not line.startswith("#"):
+            current_body.append(line)
+
+    append_current()
     return requirements
 
 
@@ -168,15 +214,80 @@ def _extract_keywords(text: str) -> list[str]:
     """Extract searchable keywords from requirement text."""
     # Remove common stop words
     stop_words = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "must", "shall", "can", "need", "dare",
-        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
-        "into", "through", "during", "before", "after", "above", "below",
-        "and", "or", "but", "not", "no", "nor", "so", "yet", "both",
-        "either", "neither", "each", "every", "all", "any", "few", "more",
-        "most", "other", "some", "such", "than", "too", "very",
-        "user", "system", "page", "feature", "function", "data",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "dare",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "and",
+        "or",
+        "but",
+        "not",
+        "no",
+        "nor",
+        "so",
+        "yet",
+        "both",
+        "either",
+        "neither",
+        "each",
+        "every",
+        "all",
+        "any",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "than",
+        "too",
+        "very",
+        "user",
+        "system",
+        "page",
+        "feature",
+        "function",
+        "data",
     }
     words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_-]{2,}", text.lower())
     return [w for w in words if w not in stop_words]
@@ -189,7 +300,7 @@ def _scan_code_files(project_dir: Path) -> dict[str, str]:
         if path.is_file() and path.suffix in _ALL_CODE_EXTENSIONS:
             # Skip ignored directories
             parts = path.relative_to(project_dir).parts
-            if any(p in _IGNORE_DIRS for p in parts):
+            if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
                 continue
             try:
                 rel = str(path.relative_to(project_dir))
@@ -205,23 +316,70 @@ def _scan_code_file_paths(project_dir: Path) -> list[Path]:
         if not path.is_file() or path.suffix not in _ALL_CODE_EXTENSIONS:
             continue
         parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS for p in parts):
+        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
             continue
         paths.append(path.resolve())
     return sorted(paths)
 
 
-def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, Path]:
-    project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    return (
-        output_dir / f"{project_name}-spec-compliance.json",
-        output_dir / "spec-compliance.json",
+def _artifact_context(project_dir: Path) -> tuple[str, str]:
+    active_change_id = resolve_active_change_id(project_dir)
+    resolved_prefix = resolve_current_artifact_prefix(
+        project_dir,
+        fallback_name=project_dir.name,
     )
+    return active_change_id, sanitize_artifact_name(active_change_id) or resolved_prefix
+
+
+def _prd_files(project_dir: Path, output_dir: Path) -> list[Path]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    if active_change_id:
+        current = latest_artifact(
+            output_dir,
+            f"{project_name}-prd.md",
+            preferred_prefix=project_name,
+            strict_prefix=True,
+        )
+        return [current] if current is not None else []
+    return list(output_dir.glob("*-prd.md")) + list(output_dir.glob("*prd*.md"))
+
+
+def _active_change_spec_files(project_dir: Path) -> list[Path]:
+    active_change_id = resolve_active_change_id(project_dir)
+    if not active_change_id:
+        return []
+    specs_dir = project_dir / ".super-dev" / "changes" / active_change_id / "specs"
+    if not specs_dir.is_dir():
+        return []
+    return sorted(path.resolve() for path in specs_dir.rglob("spec.md") if path.is_file())
+
+
+def _requirement_files(project_dir: Path, output_dir: Path) -> list[Path]:
+    active_specs = _active_change_spec_files(project_dir)
+    return active_specs or _prd_files(project_dir, output_dir)
+
+
+def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, ...]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    prefixed = output_dir / f"{project_name}-spec-compliance.json"
+    if active_change_id:
+        return (prefixed,)
+    return (prefixed, output_dir / "spec-compliance.json")
 
 
 def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
-    prd_files = sorted(list(output_dir.glob("*-prd.md")) + list(output_dir.glob("*prd*.md")))
-    return [*prd_files, *_scan_code_file_paths(project_dir)]
+    return [*_requirement_files(project_dir, output_dir), *_scan_code_file_paths(project_dir)]
+
+
+def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
+    _active_change_id, project_name = _artifact_context(project_dir)
+    identity: dict[str, Any] = build_evidence_identity(
+        project_dir,
+        artifact_name="spec-compliance",
+        dependencies=_report_dependencies(project_dir, output_dir),
+    )
+    identity["project_name"] = project_name
+    return identity
 
 
 def _load_existing_report(
@@ -230,20 +388,18 @@ def _load_existing_report(
     *,
     expected_identity: dict[str, Any],
 ) -> ComplianceReport | None:
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    active_change_id, project_name = _artifact_context(project_dir)
+    for path in _report_paths(project_dir, output_dir):
         payload = load_json_payload(path)
         if not payload:
+            continue
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
             continue
         identity_ok, _ = evidence_identity_matches(payload, expected=expected_identity)
         if not identity_ok:
             continue
         matches_payload = payload.get("matches", [])
-        matches = [
-            RequirementMatch(**item)
-            for item in matches_payload
-            if isinstance(item, dict)
-        ]
+        matches = [RequirementMatch(**item) for item in matches_payload if isinstance(item, dict)]
         return ComplianceReport(
             project_name=str(payload.get("project_name", "")).strip(),
             generated_at=str(payload.get("generated_at", "")).strip()
@@ -254,9 +410,11 @@ def _load_existing_report(
             missing=int(payload.get("missing", 0) or 0),
             score=int(payload.get("score", 0) or 0),
             matches=matches,
-            evidence_identity=dict(payload.get("evidence_identity", {}))
-            if isinstance(payload.get("evidence_identity", {}), dict)
-            else {},
+            evidence_identity=(
+                dict(payload.get("evidence_identity", {}))
+                if isinstance(payload.get("evidence_identity", {}), dict)
+                else {}
+            ),
         )
     return None
 
@@ -269,19 +427,22 @@ def inspect_spec_compliance_artifact(
         output_dir = project_dir / "output"
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="spec-compliance",
-        dependencies=_report_dependencies(project_dir, output_dir),
-    )
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    expected_identity = _expected_identity(project_dir, output_dir)
+    active_change_id, project_name = _artifact_context(project_dir)
+    report_paths = _report_paths(project_dir, output_dir)
+    for path in report_paths:
         if not path.exists():
             continue
         payload = load_json_payload(path)
         if not payload:
             return {
                 "status": "unreadable",
+                "path": str(path),
+                "expected_identity": expected_identity,
+            }
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
+            return {
+                "status": "identity_mismatch",
                 "path": str(path),
                 "expected_identity": expected_identity,
             }
@@ -306,7 +467,7 @@ def inspect_spec_compliance_artifact(
         }
     return {
         "status": "missing",
-        "path": str(prefixed_json),
+        "path": str(report_paths[0]),
         "expected_identity": expected_identity,
     }
 
@@ -392,12 +553,8 @@ def run_spec_compliance(
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
 
-    dependencies = _report_dependencies(project_dir, output_dir)
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="spec-compliance",
-        dependencies=dependencies,
-    )
+    _active_change_id, project_name = _artifact_context(project_dir)
+    expected_identity = _expected_identity(project_dir, output_dir)
     cached = _load_existing_report(
         project_dir,
         output_dir,
@@ -406,21 +563,24 @@ def run_spec_compliance(
     if cached is not None:
         return cached
 
-    report = ComplianceReport(
-        project_name=resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    )
+    report = ComplianceReport(project_name=project_name)
     report.evidence_identity = expected_identity
 
-    # Find PRD files
-    prd_files = list(output_dir.glob("*-prd.md")) + list(output_dir.glob("*prd*.md"))
-    if not prd_files:
+    # Active change specs are the execution contract. Fall back to the current PRD
+    # for legacy changes that do not yet have a specs/ tree.
+    requirement_files = _requirement_files(project_dir, output_dir)
+    if not requirement_files:
         report.score = 0
         return report
 
     # Collect all requirements
     all_requirements: list[tuple[str, str]] = []
-    for prd_path in prd_files:
-        all_requirements.extend(_parse_prd_requirements(prd_path))
+    active_specs = set(_active_change_spec_files(project_dir))
+    for requirement_path in requirement_files:
+        if requirement_path.resolve() in active_specs:
+            all_requirements.extend(_parse_change_spec_requirements(requirement_path))
+        else:
+            all_requirements.extend(_parse_prd_requirements(requirement_path))
 
     if not all_requirements:
         report.score = 100
@@ -463,14 +623,10 @@ def run_spec_compliance(
     prefixed_json = output_dir / f"{report.project_name}-spec-compliance.json"
     prefixed_md = output_dir / f"{report.project_name}-spec-compliance.md"
     payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-    (output_dir / "spec-compliance.json").write_text(
-        payload,
-        encoding="utf-8",
-    )
-    (output_dir / "spec-compliance.md").write_text(
-        report.to_markdown(), encoding="utf-8"
-    )
     prefixed_json.write_text(payload, encoding="utf-8")
     prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+    if not resolve_active_change_id(project_dir):
+        (output_dir / "spec-compliance.json").write_text(payload, encoding="utf-8")
+        (output_dir / "spec-compliance.md").write_text(report.to_markdown(), encoding="utf-8")
 
     return report

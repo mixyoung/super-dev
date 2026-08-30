@@ -15,7 +15,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..artifact_utils import resolve_project_artifact_prefix
+from ..artifact_utils import (
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+    sanitize_artifact_name,
+)
+from ..config import ConfigManager
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
@@ -47,16 +53,16 @@ _FRONTEND_EXTENSIONS: frozenset[str] = frozenset(
 
 _EMOJI_PATTERN = re.compile(
     "["
-    "\U0001F600-\U0001F64F"  # emoticons
-    "\U0001F300-\U0001F5FF"  # symbols & pictographs
-    "\U0001F680-\U0001F6FF"  # transport & map
-    "\U0001F1E0-\U0001F1FF"  # flags
-    "\U00002702-\U000027B0"
-    "\U000024C2-\U0001F251"
+    "\U0001f600-\U0001f64f"  # emoticons
+    "\U0001f300-\U0001f5ff"  # symbols & pictographs
+    "\U0001f680-\U0001f6ff"  # transport & map
+    "\U0001f1e0-\U0001f1ff"  # flags
+    "\U00002702-\U000027b0"
+    "\U000024c2-\U0001f251"
     "\U0001f926-\U0001f937"
     "\U00010000-\U0001ffff"
     "\u2640-\u2642"
-    "\u2600-\u2B55"
+    "\u2600-\u2b55"
     "\u200d"
     "\u23cf"
     "\u23e9"
@@ -92,7 +98,10 @@ _ICON_LIBRARIES: dict[str, dict[str, list[str]]] = {
 }
 
 # Hardcoded color patterns (violations of design token usage)
-_HEX_COLOR = re.compile(r"(?:color|background|border|bg|text|fill|stroke)\s*[:-]\s*['\"]?(#[0-9a-fA-F]{3,8})['\"]?", re.IGNORECASE)
+_HEX_COLOR = re.compile(
+    r"(?:color|background|border|bg|text|fill|stroke)\s*[:-]\s*['\"]?(#[0-9a-fA-F]{3,8})['\"]?",
+    re.IGNORECASE,
+)
 _RGB_COLOR = re.compile(r"rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)")
 _HSL_COLOR = re.compile(r"hsl\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*\)")
 
@@ -222,7 +231,7 @@ def _scan_frontend_files(project_dir: Path) -> list[tuple[str, str, list[str]]]:
         if not path.is_file() or path.suffix not in _FRONTEND_EXTENSIONS:
             continue
         parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS for p in parts):
+        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
             continue
         try:
             rel = str(path.relative_to(project_dir))
@@ -240,23 +249,63 @@ def _scan_frontend_file_paths(project_dir: Path) -> list[Path]:
         if not path.is_file() or path.suffix not in _FRONTEND_EXTENSIONS:
             continue
         parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS for p in parts):
+        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
             continue
         paths.append(path.resolve())
     return sorted(paths)
 
 
-def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, Path]:
-    project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    return (
-        output_dir / f"{project_name}-uiux-compliance.json",
-        output_dir / "uiux-compliance.json",
+def _artifact_context(project_dir: Path) -> tuple[str, str]:
+    active_change_id = resolve_active_change_id(project_dir)
+    resolved_prefix = resolve_current_artifact_prefix(
+        project_dir,
+        fallback_name=project_dir.name,
     )
+    return active_change_id, sanitize_artifact_name(active_change_id) or resolved_prefix
+
+
+def _frontend_required(project_dir: Path) -> bool:
+    frontend = str(ConfigManager(project_dir).load().frontend or "").strip().lower()
+    return bool(frontend and frontend != "none")
+
+
+def _uiux_files(project_dir: Path, output_dir: Path) -> list[Path]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    if active_change_id:
+        current = latest_artifact(
+            output_dir,
+            f"{project_name}-uiux.md",
+            preferred_prefix=project_name,
+            strict_prefix=True,
+        )
+        return [current] if current is not None else []
+    return list(output_dir.glob("*-uiux.md")) + list(output_dir.glob("*uiux*.md"))
+
+
+def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, ...]:
+    active_change_id, project_name = _artifact_context(project_dir)
+    prefixed = output_dir / f"{project_name}-uiux-compliance.json"
+    if active_change_id:
+        return (prefixed,)
+    return (prefixed, output_dir / "uiux-compliance.json")
 
 
 def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
-    uiux_files = sorted(list(output_dir.glob("*-uiux.md")) + list(output_dir.glob("*uiux*.md")))
+    uiux_files = sorted(_uiux_files(project_dir, output_dir))
+    if not _frontend_required(project_dir):
+        return uiux_files
     return [*uiux_files, *_scan_frontend_file_paths(project_dir)]
+
+
+def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
+    _active_change_id, project_name = _artifact_context(project_dir)
+    identity: dict[str, Any] = build_evidence_identity(
+        project_dir,
+        artifact_name="uiux-compliance",
+        dependencies=_report_dependencies(project_dir, output_dir),
+    )
+    identity["project_name"] = project_name
+    return identity
 
 
 def _load_existing_report(
@@ -265,19 +314,19 @@ def _load_existing_report(
     *,
     expected_identity: dict[str, Any],
 ) -> UIUXComplianceReport | None:
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    active_change_id, project_name = _artifact_context(project_dir)
+    for path in _report_paths(project_dir, output_dir):
         payload = load_json_payload(path)
         if not payload:
+            continue
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
             continue
         identity_ok, _ = evidence_identity_matches(payload, expected=expected_identity)
         if not identity_ok:
             continue
         violations_payload = payload.get("violations", [])
         violations = [
-            UIUXViolation(**item)
-            for item in violations_payload
-            if isinstance(item, dict)
+            UIUXViolation(**item) for item in violations_payload if isinstance(item, dict)
         ]
         return UIUXComplianceReport(
             project_name=str(payload.get("project_name", "")).strip(),
@@ -289,9 +338,11 @@ def _load_existing_report(
             violations=violations,
             score=int(payload.get("score", 0) or 0),
             files_scanned=int(payload.get("files_scanned", 0) or 0),
-            evidence_identity=dict(payload.get("evidence_identity", {}))
-            if isinstance(payload.get("evidence_identity", {}), dict)
-            else {},
+            evidence_identity=(
+                dict(payload.get("evidence_identity", {}))
+                if isinstance(payload.get("evidence_identity", {}), dict)
+                else {}
+            ),
         )
     return None
 
@@ -304,19 +355,22 @@ def inspect_uiux_compliance_artifact(
         output_dir = project_dir / "output"
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="uiux-compliance",
-        dependencies=_report_dependencies(project_dir, output_dir),
-    )
-    prefixed_json, fallback_json = _report_paths(project_dir, output_dir)
-    for path in (prefixed_json, fallback_json):
+    expected_identity = _expected_identity(project_dir, output_dir)
+    active_change_id, project_name = _artifact_context(project_dir)
+    report_paths = _report_paths(project_dir, output_dir)
+    for path in report_paths:
         if not path.exists():
             continue
         payload = load_json_payload(path)
         if not payload:
             return {
                 "status": "unreadable",
+                "path": str(path),
+                "expected_identity": expected_identity,
+            }
+        if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
+            return {
+                "status": "identity_mismatch",
                 "path": str(path),
                 "expected_identity": expected_identity,
             }
@@ -341,9 +395,30 @@ def inspect_uiux_compliance_artifact(
         }
     return {
         "status": "missing",
-        "path": str(prefixed_json),
+        "path": str(report_paths[0]),
         "expected_identity": expected_identity,
     }
+
+
+def _persist_report(
+    project_dir: Path,
+    output_dir: Path,
+    report: UIUXComplianceReport,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
+    markdown = report.to_markdown()
+    (output_dir / f"{report.project_name}-uiux-compliance.json").write_text(
+        payload,
+        encoding="utf-8",
+    )
+    (output_dir / f"{report.project_name}-uiux-compliance.md").write_text(
+        markdown,
+        encoding="utf-8",
+    )
+    if not resolve_active_change_id(project_dir):
+        (output_dir / "uiux-compliance.json").write_text(payload, encoding="utf-8")
+        (output_dir / "uiux-compliance.md").write_text(markdown, encoding="utf-8")
 
 
 def _check_emoji_usage(
@@ -491,12 +566,9 @@ def run_uiux_compliance(
     project_dir = project_dir.resolve()
     output_dir = output_dir.resolve()
 
-    dependencies = _report_dependencies(project_dir, output_dir)
-    expected_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="uiux-compliance",
-        dependencies=dependencies,
-    )
+    _active_change_id, project_name = _artifact_context(project_dir)
+    frontend_required = _frontend_required(project_dir)
+    expected_identity = _expected_identity(project_dir, output_dir)
     cached = _load_existing_report(
         project_dir,
         output_dir,
@@ -505,13 +577,11 @@ def run_uiux_compliance(
     if cached is not None:
         return cached
 
-    report = UIUXComplianceReport(
-        project_name=resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
-    )
+    report = UIUXComplianceReport(project_name=project_name)
     report.evidence_identity = expected_identity
 
     # Find UIUX doc
-    uiux_files = list(output_dir.glob("*-uiux.md")) + list(output_dir.glob("*uiux*.md"))
+    uiux_files = _uiux_files(project_dir, output_dir)
 
     declared: dict[str, Any] = {}
     if uiux_files:
@@ -520,12 +590,18 @@ def run_uiux_compliance(
         report.declared_typography = declared.get("typography", [])
         report.declared_tokens = declared.get("tokens", [])
 
+    if not frontend_required:
+        report.score = 100
+        _persist_report(project_dir, output_dir, report)
+        return report
+
     # Scan frontend
     frontend_files = _scan_frontend_files(project_dir)
     report.files_scanned = len(frontend_files)
 
     if not frontend_files:
         report.score = 100
+        _persist_report(project_dir, output_dir, report)
         return report
 
     # Run all checks
@@ -550,19 +626,6 @@ def run_uiux_compliance(
             penalty += 1
     report.score = max(0, 100 - penalty)
 
-    # Persist
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prefixed_json = output_dir / f"{report.project_name}-uiux-compliance.json"
-    prefixed_md = output_dir / f"{report.project_name}-uiux-compliance.md"
-    payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-    (output_dir / "uiux-compliance.json").write_text(
-        payload,
-        encoding="utf-8",
-    )
-    (output_dir / "uiux-compliance.md").write_text(
-        report.to_markdown(), encoding="utf-8"
-    )
-    prefixed_json.write_text(payload, encoding="utf-8")
-    prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+    _persist_report(project_dir, output_dir, report)
 
     return report

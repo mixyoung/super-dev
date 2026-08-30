@@ -1202,6 +1202,30 @@ class TestCLIQuality:
         finally:
             os.chdir(original_cwd)
 
+    def test_quality_all_uses_configured_threshold(self, temp_project_dir: Path, monkeypatch):
+        from super_dev.reviewers.quality_gate import QualityGateChecker, QualityGateResult
+
+        observed: list[int | None] = []
+
+        def fake_check(self, redteam_report=None):
+            observed.append(self.threshold_override)
+            return QualityGateResult(passed=True, total_score=100, weighted_score=100.0)
+
+        monkeypatch.setattr(QualityGateChecker, "check", fake_check)
+        (temp_project_dir / "super-dev.yaml").write_text(
+            "name: demo\nplatform: cli\nfrontend: none\nbackend: python\nquality_gate: 95\n",
+            encoding="utf-8",
+        )
+        original_cwd = os.getcwd()
+        os.chdir(temp_project_dir)
+        try:
+            result = SuperDevCLI().run(["quality", "--type", "all"])
+        finally:
+            os.chdir(original_cwd)
+
+        assert result == 0
+        assert observed == [95]
+
     def test_quality_ui_review_generates_report(self, temp_project_dir: Path):
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
@@ -1308,7 +1332,9 @@ class TestCLIDesignInspiration:
             result = cli.run(["design", "apply", "vercel"])
             assert result == 0
 
-            config = yaml.safe_load((temp_project_dir / "super-dev.yaml").read_text(encoding="utf-8"))
+            config = yaml.safe_load(
+                (temp_project_dir / "super-dev.yaml").read_text(encoding="utf-8")
+            )
             assert config["design_inspiration_slug"] == "vercel"
 
             output_dir = temp_project_dir / "output"
@@ -1371,7 +1397,14 @@ class TestCLISkillAndIntegrate:
             assert "setup               内部维护：一步接入安装" in output
             assert "detect              内部维护：宿主探测与兼容性报告" in output
             assert "resume              回到当前仓库的 Super Dev 流程" in output
-            for hidden_entry in ("generate", "enforce", "config", "completion", "feedback", "migrate"):
+            for hidden_entry in (
+                "generate",
+                "enforce",
+                "config",
+                "completion",
+                "feedback",
+                "migrate",
+            ):
                 assert f"{hidden_entry} " not in output
         finally:
             os.chdir(original_cwd)
@@ -1502,25 +1535,25 @@ class TestCLISkillAndIntegrate:
                 Path(report_files["history_onepage_markdown"]).parent.name
                 == "host-hardening-history"
             )
-            assert (
-                Path(report_files["json"]).read_text(encoding="utf-8")
-                == Path(report_files["history_json"]).read_text(encoding="utf-8")
-            )
-            assert (
-                Path(report_files["markdown"]).read_text(encoding="utf-8")
-                == Path(report_files["history_markdown"]).read_text(encoding="utf-8")
-            )
+            assert Path(report_files["json"]).read_text(encoding="utf-8") == Path(
+                report_files["history_json"]
+            ).read_text(encoding="utf-8")
+            assert Path(report_files["markdown"]).read_text(encoding="utf-8") == Path(
+                report_files["history_markdown"]
+            ).read_text(encoding="utf-8")
             hardening_markdown = Path(report_files["markdown"]).read_text(encoding="utf-8")
             assert "Adaptation Maturity:" in hardening_markdown
             assert "$super-dev 继续当前流程" in hardening_markdown
             assert not (fake_home / ".codex" / "AGENTS.md").exists()
 
-            onepage_lines = Path(report_files["onepage_markdown"]).read_text(
-                encoding="utf-8"
-            ).splitlines()
-            history_onepage_lines = Path(report_files["history_onepage_markdown"]).read_text(
-                encoding="utf-8"
-            ).splitlines()
+            onepage_lines = (
+                Path(report_files["onepage_markdown"]).read_text(encoding="utf-8").splitlines()
+            )
+            history_onepage_lines = (
+                Path(report_files["history_onepage_markdown"])
+                .read_text(encoding="utf-8")
+                .splitlines()
+            )
             assert onepage_lines[0] == "# Host Parity Onepage"
             assert history_onepage_lines[0] == "# Host Parity Onepage"
             assert any("| codex-cli |" in line for line in onepage_lines)
@@ -1630,7 +1663,9 @@ class TestCLISkillAndIntegrate:
             assert (temp_project_dir / "CLAUDE.md").exists()
             assert (temp_project_dir / ".claude" / "CLAUDE.md").exists()
             assert (temp_project_dir / ".claude" / "skills" / "super-dev" / "SKILL.md").exists()
-            assert (temp_project_dir / ".claude" / "skills" / "super-dev-seeai" / "SKILL.md").exists()
+            assert (
+                temp_project_dir / ".claude" / "skills" / "super-dev-seeai" / "SKILL.md"
+            ).exists()
             assert (fake_home / ".claude" / "skills" / "super-dev" / "SKILL.md").exists()
             assert (fake_home / ".claude" / "skills" / "super-dev-seeai" / "SKILL.md").exists()
             assert not (fake_home / ".claude" / "CLAUDE.md").exists()
@@ -1900,7 +1935,9 @@ class TestCLISkillAndIntegrate:
         finally:
             os.chdir(original_cwd)
 
-    def test_onboard_kiro_defaults_to_project_steering_and_skill(self, temp_project_dir: Path, monkeypatch):
+    def test_onboard_kiro_defaults_to_project_steering_and_skill(
+        self, temp_project_dir: Path, monkeypatch
+    ):
         fake_home = temp_project_dir / "fake-home"
         fake_home.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv("HOME", str(fake_home))
@@ -1920,7 +1957,9 @@ class TestCLISkillAndIntegrate:
         finally:
             os.chdir(original_cwd)
 
-    def test_onboard_with_user_surfaces_writes_codex_global_agents(self, temp_project_dir: Path, monkeypatch):
+    def test_onboard_with_user_surfaces_writes_codex_global_agents(
+        self, temp_project_dir: Path, monkeypatch
+    ):
         fake_home = Path.home()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
@@ -1974,9 +2013,7 @@ class TestCLISkillAndIntegrate:
         finally:
             os.chdir(original_cwd)
 
-    def test_onboard_writes_smoke_guide_reports(
-        self, temp_project_dir: Path, monkeypatch, capsys
-    ):
+    def test_onboard_writes_smoke_guide_reports(self, temp_project_dir: Path, monkeypatch, capsys):
         fake_home = temp_project_dir / "fake-home"
         fake_home.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv("HOME", str(fake_home))
@@ -2407,12 +2444,14 @@ class TestCLISkillAndIntegrate:
                 payload["primary_repair_action"]["secondary_actions"]
                 == payload["decision_card"]["secondary_actions"]
             )
-            assert payload["decision_card"]["next_actions"][0] == payload["decision_card"][
-                "first_action"
-            ]
-            assert payload["decision_card"]["secondary_actions"] == payload["decision_card"][
-                "next_actions"
-            ][1:]
+            assert (
+                payload["decision_card"]["next_actions"][0]
+                == payload["decision_card"]["first_action"]
+            )
+            assert (
+                payload["decision_card"]["secondary_actions"]
+                == payload["decision_card"]["next_actions"][1:]
+            )
         finally:
             os.chdir(original_cwd)
 
@@ -2608,7 +2647,9 @@ class TestCLISkillAndIntegrate:
             assert payload["decision_card"]["first_action"]
             assert payload["decision_card"]["candidates"][0]["id"] == "codex-cli"
             assert payload["decision_card"]["candidates"][0]["recommended"] is True
-            assert payload["decision_card"]["candidates"][0]["adaptation_contract"]["level"] == "elite"
+            assert (
+                payload["decision_card"]["candidates"][0]["adaptation_contract"]["level"] == "elite"
+            )
             assert payload["decision_card"]["candidates"][0]["primary_entry"]
             assert payload["decision_card"]["candidates"][0]["usage_mode"] == "agents-and-skill"
             assert payload["compatibility"]["total_hosts"] >= 1
@@ -2628,7 +2669,9 @@ class TestCLISkillAndIntegrate:
                 payload["usage_profiles"]["codex-cli"]["final_trigger"]
                 == "CLI: $super-dev | 回退: super-dev: 你的需求"
             )
-            assert payload["usage_profiles"]["codex-cli"]["entry_variants"][0]["entry"] == "$super-dev"
+            assert (
+                payload["usage_profiles"]["codex-cli"]["entry_variants"][0]["entry"] == "$super-dev"
+            )
             assert any(
                 item["entry"] == "super-dev: <需求描述>"
                 for item in payload["usage_profiles"]["codex-cli"]["entry_variants"]
@@ -2899,7 +2942,9 @@ class TestCLISkillAndIntegrate:
             assert all("super-dev fix" not in item for item in resume_card["action_examples"])
             assert all("super-dev workflow" not in item for item in resume_card["action_examples"])
             baseline_card = next(
-                item for item in resume_card["scenario_cards"] if item["id"] == "existing_project_baseline"
+                item
+                for item in resume_card["scenario_cards"]
+                if item["id"] == "existing_project_baseline"
             )
             assert baseline_card["title"] == "当前项目不是从零开始，先做 baseline"
             assert "1-N+1" in baseline_card["when"]
@@ -2908,8 +2953,14 @@ class TestCLISkillAndIntegrate:
             assert resume_card["workflow_context"]["baseline_audit_status"] == "not_required"
             assert resume_card["workflow_context"]["baseline_confirmation_status"] == "not_required"
             assert resume_card["workflow_context"]["blocking_gate"] == "waiting_docs_confirmation"
-            assert resume_card["workflow_context"]["recommended_host_action"] == "$super-dev 继续当前流程"
-            assert resume_card["workflow_context"]["recommended_host_sentence"] == "super-dev: 继续当前流程"
+            assert (
+                resume_card["workflow_context"]["recommended_host_action"]
+                == "$super-dev 继续当前流程"
+            )
+            assert (
+                resume_card["workflow_context"]["recommended_host_sentence"]
+                == "super-dev: 继续当前流程"
+            )
             assert resume_card["workflow_context"]["can_resume"] is True
             assert resume_card["workflow_context"]["can_progress"] is False
         finally:
@@ -3052,14 +3103,11 @@ class TestCLISkillAndIntegrate:
             assert Path(report_files["history_json"]).exists()
             assert Path(report_files["history_markdown"]).exists()
             assert Path(report_files["history_json"]).parent.name == "host-surface-audit-history"
-            assert (
-                Path(report_files["json"]).read_text(encoding="utf-8")
-                == Path(report_files["history_json"]).read_text(encoding="utf-8")
-            )
+            assert Path(report_files["json"]).read_text(encoding="utf-8") == Path(
+                report_files["history_json"]
+            ).read_text(encoding="utf-8")
             markdown = Path(report_files["markdown"]).read_text(encoding="utf-8")
-            history_markdown = Path(report_files["history_markdown"]).read_text(
-                encoding="utf-8"
-            )
+            history_markdown = Path(report_files["history_markdown"]).read_text(encoding="utf-8")
             assert markdown == history_markdown
             assert markdown.startswith("# Host Surface Audit Report\n")
             assert "codex-cli" in markdown
@@ -3124,29 +3172,20 @@ class TestCLISkillAndIntegrate:
             assert Path(report_files["history_json"]).exists()
             assert Path(report_files["history_markdown"]).exists()
             assert (
-                Path(report_files["history_json"]).parent.name
-                == "host-runtime-validation-history"
+                Path(report_files["history_json"]).parent.name == "host-runtime-validation-history"
             )
-            assert (
-                Path(report_files["json"]).read_text(encoding="utf-8")
-                == Path(report_files["history_json"]).read_text(encoding="utf-8")
-            )
-            assert (
-                Path(report_files["markdown"]).read_text(encoding="utf-8")
-                == Path(report_files["history_markdown"]).read_text(encoding="utf-8")
-            )
+            assert Path(report_files["json"]).read_text(encoding="utf-8") == Path(
+                report_files["history_json"]
+            ).read_text(encoding="utf-8")
+            assert Path(report_files["markdown"]).read_text(encoding="utf-8") == Path(
+                report_files["history_markdown"]
+            ).read_text(encoding="utf-8")
             assert len(payload["hosts"]) == 1
             host = payload["hosts"][0]
             assert host["host"] == "codex-cli"
             assert host["surface_ready"] is True
-            assert (
-                host["final_trigger"]
-                == "CLI: $super-dev | 回退: super-dev: 你的需求"
-            )
-            assert (
-                host["host_protocol_summary"]
-                == "官方 AGENTS.md + Skills + CLI $skill entry"
-            )
+            assert host["final_trigger"] == "CLI: $super-dev | 回退: super-dev: 你的需求"
+            assert host["host_protocol_summary"] == "官方 AGENTS.md + Skills + CLI $skill entry"
             assert host["manual_runtime_status"] == "pending"
             assert host["repo_probe"]["status"] == "pending"
             assert host["competition_evidence_ready"] is False
@@ -3220,8 +3259,14 @@ class TestCLISkillAndIntegrate:
             assert any("uni-app 的专项 playbook" in item for item in host["resume_checklist"])
             assert payload["workflow_context"]["blocking_gate"] == "waiting_docs_confirmation"
             assert payload["baseline_governance"]["entry_gate"] == "ready"
-            assert host["repo_probe"]["workflow_context"]["blocking_gate"] == "waiting_docs_confirmation"
-            assert host["repo_probe"]["workflow_context"]["recommended_host_action"] == "$super-dev 继续当前流程"
+            assert (
+                host["repo_probe"]["workflow_context"]["blocking_gate"]
+                == "waiting_docs_confirmation"
+            )
+            assert (
+                host["repo_probe"]["workflow_context"]["recommended_host_action"]
+                == "$super-dev 继续当前流程"
+            )
             assert host["repo_probe"]["baseline_governance"]["entry_gate"] == "ready"
         finally:
             os.chdir(original_cwd)
@@ -3323,7 +3368,10 @@ class TestCLISkillAndIntegrate:
             assert host["repo_probe"]["status"] == "failed"
             assert host["ready_for_delivery"] is False
             assert "所需仓库级连续性证据不完整" in host["blocking_reason"]
-            assert "确认三文档" in host["recommended_action"] or "review docs" in host["recommended_action"]
+            assert (
+                "确认三文档" in host["recommended_action"]
+                or "review docs" in host["recommended_action"]
+            )
             assert payload["summary"]["repo_probe_failed_count"] == 1
             assert payload["summary"]["fully_ready_count"] == 0
             assert payload["blockers"][0]["type"] == "repo_probe"
@@ -3706,9 +3754,7 @@ class TestCLISkillAndIntegrate:
             os.environ["PATH"] = original_path
             os.chdir(original_cwd)
 
-    def test_start_json_exposes_framework_coaching_focus(
-        self, temp_project_dir: Path, capsys
-    ):
+    def test_start_json_exposes_framework_coaching_focus(self, temp_project_dir: Path, capsys):
         original_cwd = os.getcwd()
         original_path = os.environ.get("PATH", "")
         os.chdir(temp_project_dir)
@@ -3822,12 +3868,14 @@ class TestCLISkillAndIntegrate:
             assert payload["decision_card"]["recommended_reason"]
             assert payload["decision_card"]["first_action"]
             assert payload["decision_card"]["next_actions"]
-            assert payload["decision_card"]["next_actions"][0] == payload["decision_card"][
-                "first_action"
-            ]
-            assert payload["decision_card"]["secondary_actions"] == payload["decision_card"][
-                "next_actions"
-            ][1:]
+            assert (
+                payload["decision_card"]["next_actions"][0]
+                == payload["decision_card"]["first_action"]
+            )
+            assert (
+                payload["decision_card"]["secondary_actions"]
+                == payload["decision_card"]["next_actions"][1:]
+            )
             assert payload["decision_card"]["path_override_examples"][0]["env_key"]
             recommended_ids = {item["id"] for item in payload["recommended_hosts"]}
             assert {"claude-code", "codex-cli"}.issubset(recommended_ids)
@@ -4406,9 +4454,10 @@ class TestCLIPipeline:
             assert payload["recommended_workflow_command"]
             assert decision_card["workflow_mode"] == "continue"
             assert decision_card["session_resume_card"]["enabled"] is True
-            assert decision_card["session_resume_card"]["host_first_sentence"] == resume_card[
-                "host_first_sentence"
-            ]
+            assert (
+                decision_card["session_resume_card"]["host_first_sentence"]
+                == resume_card["host_first_sentence"]
+            )
             assert decision_card["action_title"] == resume_card["action_title"]
             assert decision_card["action_examples"] == resume_card["action_examples"]
             assert decision_card["first_action"].endswith(resume_card["host_first_sentence"])
@@ -4419,18 +4468,9 @@ class TestCLIPipeline:
             assert resume_card["enabled"] is True
             assert resume_card["preferred_entry"] == "app_desktop"
             assert resume_card["host_first_sentence"].startswith("/super-dev ")
-            assert (
-                ".super-dev/SESSION_BRIEF.md"
-                in resume_card["session_brief_path"]
-            )
-            assert (
-                ".super-dev/workflow-state.json"
-                in resume_card["workflow_state_path"]
-            )
-            assert (
-                ".super-dev/workflow-events.jsonl"
-                in resume_card["workflow_event_log_path"]
-            )
+            assert ".super-dev/SESSION_BRIEF.md" in resume_card["session_brief_path"]
+            assert ".super-dev/workflow-state.json" in resume_card["workflow_state_path"]
+            assert ".super-dev/workflow-events.jsonl" in resume_card["workflow_event_log_path"]
             assert resume_card["operational_harnesses"]
             assert resume_card["recent_snapshots"]
             assert resume_card["recent_events"]

@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from ..config import ConfigManager
+
 
 @dataclass(frozen=True)
 class ArtifactSpec:
@@ -23,6 +25,22 @@ class ArtifactSpec:
     reason: str
 
 
+def derive_delivery_applicability(config: object) -> dict[str, str | bool]:
+    """Derive delivery requirements from the configured product surface."""
+
+    platform = str(getattr(config, "platform", "") or "web").strip().lower()
+    frontend = str(getattr(config, "frontend", "") or "").strip().lower()
+    backend = str(getattr(config, "backend", "") or "").strip().lower()
+    database = str(getattr(config, "database", "") or "").strip().lower()
+    return {
+        "platform": platform,
+        "frontend_required": bool(frontend and frontend != "none"),
+        "backend_contract_required": bool(platform != "cli" and backend and backend != "none"),
+        "database_migration_required": bool(database and database != "none"),
+        "deployment_assets_required": platform != "cli",
+    }
+
+
 class DeliveryPackager:
     """交付包生成器"""
 
@@ -30,6 +48,13 @@ class DeliveryPackager:
         self.project_dir = Path(project_dir).resolve()
         self.name = name
         self.version = version
+        config = ConfigManager(self.project_dir).load()
+        self.applicability = derive_delivery_applicability(config)
+        self.platform = str(self.applicability["platform"])
+        self.frontend_required = bool(self.applicability["frontend_required"])
+        self.backend_contract_required = bool(self.applicability["backend_contract_required"])
+        self.database_migration_required = bool(self.applicability["database_migration_required"])
+        self.deployment_assets_required = bool(self.applicability["deployment_assets_required"])
 
     def package(self, cicd_platform: str = "all") -> dict[str, object]:
         """生成交付清单、报告和压缩包"""
@@ -52,20 +77,25 @@ class DeliveryPackager:
                 )
 
         migration_files = self._collect_migration_files()
-        if migration_files:
-            included_files.extend(self._relative(path) for path in migration_files)
-        else:
-            missing_required.append(
-                {
-                    "path": "migrations/*",
-                    "reason": "缺少数据库迁移脚本（至少应生成一种 ORM 迁移文件）",
-                }
-            )
+        if self.database_migration_required:
+            if migration_files:
+                included_files.extend(self._relative(path) for path in migration_files)
+            else:
+                missing_required.append(
+                    {
+                        "path": "migrations/*",
+                        "reason": "缺少数据库迁移脚本（至少应生成一种 ORM 迁移文件）",
+                    }
+                )
 
         spec_task_summary = self._collect_spec_task_summary()
+        target_change = str(spec_task_summary.get("target_change", "")).strip()
+        if target_change:
+            task_file = self.project_dir / ".super-dev" / "changes" / target_change / "tasks.md"
+            if task_file.is_file():
+                included_files.append(self._relative(task_file))
         if int(spec_task_summary["task_files"]) > 0:
             if int(spec_task_summary["pending"]) > 0:
-                target_change = str(spec_task_summary.get("target_change", "")).strip()
                 target_path = ".super-dev/changes/*/tasks.md"
                 if target_change:
                     target_path = f".super-dev/changes/{target_change}/tasks.md"
@@ -75,6 +105,13 @@ class DeliveryPackager:
                         "reason": f"存在未完成 Spec 任务: {spec_task_summary['pending']}",
                     }
                 )
+        elif not (self.project_dir / "output" / f"{self.name}-execution-plan.md").is_file():
+            missing_required.append(
+                {
+                    "path": f"output/{self.name}-execution-plan.md or .super-dev/changes/*/tasks.md",
+                    "reason": "缺少执行路线图或 Spec 任务清单",
+                }
+            )
 
         included_files = sorted(set(included_files))
         status = "ready" if not missing_required else "incomplete"
@@ -85,6 +122,7 @@ class DeliveryPackager:
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "status": status,
             "cicd_platform": cicd_platform,
+            "applicability": dict(self.applicability),
             "included_files": included_files,
             "missing_required": missing_required,
             "spec_tasks": spec_task_summary,
@@ -122,43 +160,114 @@ class DeliveryPackager:
 
     def _artifact_specs(self, cicd_platform: str) -> list[ArtifactSpec]:
         output_dir = self.project_dir / "output"
+        execution_plan_required = self.platform != "cli"
+        extended_playbooks_required = self.platform != "cli"
         specs = [
             ArtifactSpec(output_dir / f"{self.name}-research.md", True, "缺少需求增强报告"),
             ArtifactSpec(output_dir / f"{self.name}-prd.md", True, "缺少 PRD"),
             ArtifactSpec(output_dir / f"{self.name}-architecture.md", True, "缺少架构文档"),
             ArtifactSpec(output_dir / f"{self.name}-uiux.md", True, "缺少 UI/UX 文档"),
-            ArtifactSpec(output_dir / f"{self.name}-ui-contract.json", True, "缺少 UI 系统契约"),
-            ArtifactSpec(output_dir / f"{self.name}-execution-plan.md", True, "缺少执行路线图"),
-            ArtifactSpec(output_dir / f"{self.name}-frontend-blueprint.md", True, "缺少前端蓝图"),
+            ArtifactSpec(
+                output_dir / f"{self.name}-execution-plan.md",
+                execution_plan_required,
+                "缺少执行路线图",
+            ),
             ArtifactSpec(output_dir / f"{self.name}-redteam.md", True, "缺少红队报告"),
             ArtifactSpec(output_dir / f"{self.name}-quality-gate.md", True, "缺少质量门禁报告"),
-            ArtifactSpec(output_dir / f"{self.name}-code-review.md", True, "缺少代码审查指南"),
-            ArtifactSpec(output_dir / f"{self.name}-ai-prompt.md", True, "缺少 AI 提示词"),
+            ArtifactSpec(
+                output_dir / f"{self.name}-code-review.md",
+                extended_playbooks_required,
+                "缺少代码审查指南",
+            ),
+            ArtifactSpec(
+                output_dir / f"{self.name}-ai-prompt.md",
+                extended_playbooks_required,
+                "缺少 AI 提示词",
+            ),
             ArtifactSpec(
                 output_dir / f"{self.name}-task-execution.md", True, "缺少 Spec 任务执行报告"
             ),
             ArtifactSpec(
-                output_dir / f"{self.name}-frontend-runtime.md", True, "缺少前端运行验证报告"
+                output_dir / f"{self.name}-quality-gate.json",
+                False,
+                "质量门禁结构化数据未生成",
             ),
             ArtifactSpec(
-                output_dir / f"{self.name}-frontend-runtime.json", True, "缺少前端运行验证数据"
-            ),
-            ArtifactSpec(self.project_dir / "preview.html", True, "缺少前端预览页"),
-            ArtifactSpec(output_dir / "frontend" / "index.html", True, "缺少前端演示页面"),
-            ArtifactSpec(output_dir / "frontend" / "styles.css", True, "缺少前端演示样式"),
-            ArtifactSpec(
-                output_dir / "frontend" / "design-tokens.css", True, "缺少前端 Design Token 样式"
-            ),
-            ArtifactSpec(output_dir / "frontend" / "app.js", True, "缺少前端演示脚本"),
-            ArtifactSpec(self.project_dir / "backend" / "API_CONTRACT.md", True, "缺少 API 契约"),
-            ArtifactSpec(self.project_dir / ".env.deploy.example", True, "缺少部署环境模板"),
-            ArtifactSpec(
-                self.project_dir / "output" / "deploy" / "all-secrets-checklist.md",
-                True,
-                "缺少部署 Secrets 检查清单",
+                output_dir / f"{self.name}-release-readiness.json",
+                False,
+                "发布就绪结构化数据未生成",
             ),
         ]
-        specs.extend(self._cicd_specs(cicd_platform=cicd_platform))
+        if self.frontend_required:
+            specs.extend(
+                [
+                    ArtifactSpec(
+                        output_dir / f"{self.name}-ui-contract.json",
+                        True,
+                        "缺少 UI 系统契约",
+                    ),
+                    ArtifactSpec(
+                        output_dir / f"{self.name}-frontend-blueprint.md",
+                        True,
+                        "缺少前端蓝图",
+                    ),
+                    ArtifactSpec(
+                        output_dir / f"{self.name}-frontend-runtime.md",
+                        True,
+                        "缺少前端运行验证报告",
+                    ),
+                    ArtifactSpec(
+                        output_dir / f"{self.name}-frontend-runtime.json",
+                        True,
+                        "缺少前端运行验证数据",
+                    ),
+                    ArtifactSpec(self.project_dir / "preview.html", True, "缺少前端预览页"),
+                    ArtifactSpec(
+                        output_dir / "frontend" / "index.html",
+                        True,
+                        "缺少前端演示页面",
+                    ),
+                    ArtifactSpec(
+                        output_dir / "frontend" / "styles.css",
+                        True,
+                        "缺少前端演示样式",
+                    ),
+                    ArtifactSpec(
+                        output_dir / "frontend" / "design-tokens.css",
+                        True,
+                        "缺少前端 Design Token 样式",
+                    ),
+                    ArtifactSpec(
+                        output_dir / "frontend" / "app.js",
+                        True,
+                        "缺少前端演示脚本",
+                    ),
+                ]
+            )
+        if self.backend_contract_required:
+            specs.append(
+                ArtifactSpec(
+                    self.project_dir / "backend" / "API_CONTRACT.md",
+                    True,
+                    "缺少 API 契约",
+                )
+            )
+        if self.deployment_assets_required:
+            specs.extend(
+                [
+                    ArtifactSpec(
+                        self.project_dir / ".env.deploy.example",
+                        True,
+                        "缺少部署环境模板",
+                    ),
+                    ArtifactSpec(
+                        output_dir / "deploy" / "all-secrets-checklist.md",
+                        True,
+                        "缺少部署 Secrets 检查清单",
+                    ),
+                ]
+            )
+            specs.extend(self._cicd_specs(cicd_platform=cicd_platform))
         return specs
 
     def _cicd_specs(self, cicd_platform: str) -> list[ArtifactSpec]:
@@ -266,9 +375,9 @@ class DeliveryPackager:
 
     def _relative(self, path: Path) -> str:
         try:
-            return str(path.relative_to(self.project_dir))
+            return path.relative_to(self.project_dir).as_posix()
         except ValueError:
-            return str(path)
+            return path.as_posix()
 
     # ------------------------------------------------------------------
     # Kubernetes 部署配置生成
@@ -294,9 +403,7 @@ class DeliveryPackager:
         configs: dict[str, str] = {}
 
         # --- Deployment ---
-        configs[
-            "deployment.yaml"
-        ] = f"""apiVersion: apps/v1
+        configs["deployment.yaml"] = f"""apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {app_label}
@@ -369,9 +476,7 @@ spec:
 """
 
         # --- Service ---
-        configs[
-            "service.yaml"
-        ] = f"""apiVersion: v1
+        configs["service.yaml"] = f"""apiVersion: v1
 kind: Service
 metadata:
   name: {app_label}
@@ -389,9 +494,7 @@ spec:
 """
 
         # --- Ingress ---
-        configs[
-            "ingress.yaml"
-        ] = f"""apiVersion: networking.k8s.io/v1
+        configs["ingress.yaml"] = f"""apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {app_label}
@@ -423,9 +526,7 @@ spec:
 """
 
         # --- HPA ---
-        configs[
-            "hpa.yaml"
-        ] = f"""apiVersion: autoscaling/v2
+        configs["hpa.yaml"] = f"""apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {app_label}
@@ -467,9 +568,7 @@ spec:
 """
 
         # --- ConfigMap placeholder ---
-        configs[
-            "configmap.yaml"
-        ] = f"""apiVersion: v1
+        configs["configmap.yaml"] = f"""apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {app_label}-config
@@ -482,9 +581,7 @@ data:
 """
 
         # --- Secret placeholder ---
-        configs[
-            "secret.yaml"
-        ] = f"""apiVersion: v1
+        configs["secret.yaml"] = f"""apiVersion: v1
 kind: Secret
 metadata:
   name: {app_label}-secrets

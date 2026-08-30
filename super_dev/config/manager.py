@@ -32,14 +32,14 @@ class ProjectConfig:
     license: str = "MIT"
 
     # 技术栈
-    platform: str = "web"  # web, mobile(H5/APP), wechat(miniapp), desktop
+    platform: str = "web"  # web, mobile(H5/APP), wechat(miniapp), desktop, cli(命令行工具)
     frontend: str = (
         "next"  # 扩展支持：next, remix, react-vite, gatsby, nuxt, vue-vite, angular, sveltekit, astro, solid, qwik
     )
     backend: str = (
         "node"  # node, python, go, java, rust, php, ruby, csharp, kotlin, swift, elixir, scala, dart
     )
-    database: str = "postgresql"  # postgresql, mysql, mongodb, redis
+    database: str = "postgresql"  # postgresql, mysql, mongodb, redis, sqlite, none
 
     # 前端配置 (扩展)
     ui_library: str | None = None  # UI 组件库
@@ -440,9 +440,7 @@ class ConfigManager:
                 adaptive_ledger.get("enabled") is not True
                 or adaptive_ledger.get("auto_create") is not True
             ):
-                errors.append(
-                    "adaptive_ledger.scope_advisory 只能在自动影子建账开启时启用"
-                )
+                errors.append("adaptive_ledger.scope_advisory 只能在自动影子建账开启时启用")
         extensions = config.extensions
         if not isinstance(extensions, dict):
             errors.append("extensions 必须是对象")
@@ -450,11 +448,10 @@ class ConfigManager:
             unknown_extension_fields = set(extensions) - {
                 "enabled",
                 "allowed_builtin_methods",
+                "fresh_verification",
             }
             if unknown_extension_fields:
-                errors.append(
-                    f"extensions 包含未知字段: {sorted(unknown_extension_fields)}"
-                )
+                errors.append(f"extensions 包含未知字段: {sorted(unknown_extension_fields)}")
             if not isinstance(extensions.get("enabled"), bool):
                 errors.append("extensions.enabled 必须是布尔值")
             allowed_methods = extensions.get("allowed_builtin_methods")
@@ -464,8 +461,24 @@ class ConfigManager:
                 errors.append("extensions.allowed_builtin_methods 必须是非空字符串数组")
             elif len(set(allowed_methods)) != len(allowed_methods):
                 errors.append("extensions.allowed_builtin_methods 不能重复")
-            elif any(item != "contract-probe" for item in allowed_methods):
-                errors.append("阶段 1 只支持内置方法 contract-probe")
+            elif any(
+                item not in {"contract-probe", "fresh-verification"} for item in allowed_methods
+            ):
+                errors.append("扩展只支持内置方法 contract-probe 和 fresh-verification")
+            fresh_verification = extensions.get("fresh_verification")
+            if fresh_verification is not None:
+                try:
+                    from ..extensions.pytest_plan import parse_pytest_verification_plan
+
+                    parse_pytest_verification_plan(fresh_verification)
+                except ValueError as exc:
+                    errors.append(str(exc))
+            if (
+                isinstance(allowed_methods, list)
+                and "fresh-verification" in allowed_methods
+                and fresh_verification is None
+            ):
+                errors.append("fresh-verification 需要 extensions.fresh_verification 配置")
         if not isinstance(config.host_profile_enforce_selected, bool):
             errors.append("host_profile_enforce_selected 必须是布尔值")
         if not isinstance(config.host_profile_targets, list):
@@ -536,7 +549,7 @@ class ConfigManager:
         "database": {
             "type": "str",
             "required": False,
-            "allowed": ["postgresql", "mysql", "mongodb", "redis", "sqlite", ""],
+            "allowed": ["postgresql", "mysql", "mongodb", "redis", "sqlite", "none", ""],
         },
         "quality_gate": {"type": "int", "required": False, "min": 0, "max": 100},
         "execution_mode": {

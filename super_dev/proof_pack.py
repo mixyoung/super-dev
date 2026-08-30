@@ -13,11 +13,18 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .analyzer import FeatureChecklistBuilder
-from .artifact_utils import is_artifact_stale, latest_artifact, resolve_project_artifact_prefix
+from .artifact_utils import (
+    is_artifact_stale,
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+)
 from .baseline_governance import inspect_baseline_governance
+from .config import ConfigManager
+from .deployers.delivery import derive_delivery_applicability
 from .evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
@@ -37,6 +44,13 @@ from .review_state import (
     load_host_runtime_validation,
     load_quality_revision,
     load_ui_revision,
+)
+from .reviewers.quality_gate import (
+    fresh_verification_required,
+    inspect_current_fresh_verification,
+    quality_evidence_dependency_paths,
+    quality_fresh_binding_matches,
+    stored_quality_evidence_dependencies,
 )
 from .reviewers.redteam import load_redteam_evidence
 from .specs import SpecValidator
@@ -138,7 +152,9 @@ class ProofPackReport:
             actions.append("先在宿主里确认三文档；如果通过，直接说“文档确认，可以继续”。")
         baseline = artifact_names.get("Baseline Confirmation")
         if baseline and baseline.status != "ready":
-            actions.append("先在宿主里确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”。")
+            actions.append(
+                "先在宿主里确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”。"
+            )
         spec_quality = artifact_names.get("Spec Quality")
         if spec_quality and spec_quality.status != "ready":
             change_id = str(spec_quality.details.get("change_id", "<change_id>"))
@@ -230,9 +246,16 @@ class ProofPackReport:
                 )
         host_runtime = artifact_names.get("Host Runtime Validation")
         if host_runtime and host_runtime.status != "ready":
-            actions.append(
-                "重新执行宿主 runtime validation，并先修复 repo probe 中暴露的 workflow continuity / frontend runtime / harness 阻塞项。"
-            )
+            if host_runtime.details.get("frontend_required") is False:
+                actions.append(
+                    "重新执行宿主 runtime validation，并先修复 repo probe 中暴露的 "
+                    "workflow continuity / harness 阻塞项。"
+                )
+            else:
+                actions.append(
+                    "重新执行宿主 runtime validation，并先修复 repo probe 中暴露的 "
+                    "workflow continuity / frontend runtime / harness 阻塞项。"
+                )
         hook_audit = artifact_names.get("Hook Audit Trail")
         if hook_audit and hook_audit.status != "ready":
             actions.append(
@@ -254,7 +277,9 @@ class ProofPackReport:
             actions.append("先补齐 Spec 任务执行报告与交付前自检摘要，确认实现链路已经真实闭环。")
         expert_governance = artifact_names.get("Expert Stage Governance")
         if expert_governance and expert_governance.status != "ready":
-            actions.append("先把已进入的主流程阶段写成显式专家证据，避免专家只在提示词里存在而没有阶段级落盘记录。")
+            actions.append(
+                "先把已进入的主流程阶段写成显式专家证据，避免专家只在提示词里存在而没有阶段级落盘记录。"
+            )
         frontend = artifact_names.get("Frontend Runtime")
         if frontend and frontend.status != "ready":
             actions.append("重新执行前端运行验证，确认前端可真实运行而不是只生成页面文件。")
@@ -449,7 +474,9 @@ class ProofPackReport:
         if frontend_runtime and frontend_runtime.status != "ready":
             summary = str(frontend_runtime.summary).strip()
             if "missing Claude-Design execution protocol evidence:" in summary:
-                missing = summary.split("missing Claude-Design execution protocol evidence:", 1)[1].strip()
+                missing = summary.split("missing Claude-Design execution protocol evidence:", 1)[
+                    1
+                ].strip()
                 return (
                     " UI 阶段当前优先卡在 runtime 证明，缺少 "
                     + missing
@@ -474,8 +501,7 @@ class ProofPackReport:
                 observed_text = f" 当前观测：{observed}。" if observed else ""
                 return (
                     " UI 阶段当前截图级视觉验收未通过，页面仍然过平、过空或过于单一。"
-                    " 用户会直接感知为商业质感不足或像半成品。"
-                    + observed_text
+                    " 用户会直接感知为商业质感不足或像半成品。" + observed_text
                 )
         return ""
 
@@ -499,20 +525,14 @@ class ProofPackReport:
             return " 跨平台框架专项当前已闭环，framework playbook、runtime 执行与交付证据均已纳入交付证明。"
         if framework:
             return (
-                " 跨平台框架专项当前卡在 "
-                + framework
-                + " playbook/执行闭环。"
+                " 跨平台框架专项当前卡在 " + framework + " playbook/执行闭环。"
                 " 这会直接影响跨端体验稳定性、专项验收效率和上线节奏。"
-                " 当前摘要："
-                + summary
-                + "。"
+                " 当前摘要：" + summary + "。"
             )
         return (
             " 跨平台框架专项当前仍有缺口。"
             " 这会直接影响跨端体验稳定性、专项验收效率和上线节奏。"
-            " 当前摘要："
-            + summary
-            + "。"
+            " 当前摘要：" + summary + "。"
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -724,10 +744,16 @@ class ProofPackBuilder:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = resolve_project_artifact_prefix(
+        self.active_change_id = resolve_active_change_id(self.project_dir)
+        self.project_name = resolve_current_artifact_prefix(
             self.project_dir,
             fallback_name=self.project_dir.name,
         )
+        config = ConfigManager(self.project_dir).load()
+        self.delivery_applicability = derive_delivery_applicability(config)
+        self.platform = str(self.delivery_applicability["platform"])
+        self.frontend_required = bool(self.delivery_applicability["frontend_required"])
+        self.fresh_verification_required = fresh_verification_required(config)
 
     def build(self, verify_tests: bool = False) -> ProofPackReport:
         report = ProofPackReport(project_name=self.project_name)
@@ -804,46 +830,51 @@ class ProofPackBuilder:
         return {"markdown": md_path, "json": json_path, "summary": summary_path}
 
     def _build_report_evidence_identity(self) -> dict[str, Any]:
-        return build_evidence_identity(
-            self.project_dir,
-            artifact_name="proof-pack",
-            dependencies=[
-                latest_artifact(
-                    self.output_dir, "*-quality-gate.json", preferred_prefix=self.project_name
-                )
-                or latest_artifact(
-                    self.output_dir, "*-quality-gate.md", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-release-readiness.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-frontend-runtime.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-ui-review.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir,
-                    "*-ui-contract-alignment.json",
-                    preferred_prefix=self.project_name,
-                ),
-                latest_artifact(
-                    self.output_dir, "*-host-runtime-validation.json", preferred_prefix=self.project_name
-                ),
-                latest_artifact(
-                    self.output_dir, "*-baseline-audit.json", preferred_prefix=self.project_name
-                )
-                or latest_artifact(
-                    self.output_dir, "*-baseline-audit.md", preferred_prefix=self.project_name
-                ),
-                self.project_dir / ".super-dev" / "review-state" / "stage-ledger.json",
-            ],
+        dependencies = [
+            self._latest("*-quality-gate.json") or self._latest("*-quality-gate.md"),
+            self._latest("*-release-readiness.json"),
+            self._latest("*-host-runtime-validation.json"),
+            self._latest("*-baseline-audit.json") or self._latest("*-baseline-audit.md"),
+            self.project_dir / ".super-dev" / "review-state" / "stage-ledger.json",
+        ]
+        if self.frontend_required:
+            dependencies[2:2] = [
+                self._latest("*-frontend-runtime.json"),
+                self._latest("*-ui-review.json"),
+                self._latest("*-ui-contract-alignment.json"),
+            ]
+        return cast(
+            dict[str, Any],
+            build_evidence_identity(
+                self.project_dir,
+                artifact_name="proof-pack",
+                dependencies=dependencies,
+            ),
         )
 
     def _latest(self, pattern: str, base_dir: Path | None = None) -> Path | None:
         directory = base_dir or self.output_dir
-        return latest_artifact(directory, pattern, preferred_prefix=self.project_name)
+        return cast(
+            Path | None,
+            latest_artifact(
+                directory,
+                pattern,
+                preferred_prefix=self.project_name,
+                strict_prefix=bool(self.active_change_id),
+            ),
+        )
+
+    @staticmethod
+    def _not_applicable_artifact(
+        name: str,
+        reason: str = "frontend is none",
+    ) -> ProofPackArtifact:
+        return ProofPackArtifact(
+            name=name,
+            status="ready",
+            summary=f"not applicable: {reason}",
+            details={"applicable": False, "reason": reason},
+        )
 
     def _document_artifact(self, name: str, pattern: str) -> ProofPackArtifact:
         file_path = self._latest(pattern)
@@ -916,6 +947,8 @@ class ProofPackBuilder:
         )
 
     def _ui_revision_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("UI Revision State")
         payload = load_ui_revision(self.project_dir)
         file_path = self.project_dir / ".super-dev" / "review-state" / "ui-revision.json"
         if not payload:
@@ -1092,6 +1125,8 @@ class ProofPackBuilder:
         )
 
     def _frontend_runtime_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("Frontend Runtime")
         file_path = self._latest("*-frontend-runtime.json")
         if file_path is None:
             return ProofPackArtifact(
@@ -1231,6 +1266,8 @@ class ProofPackBuilder:
         )
 
     def _ui_contract_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("UI Contract")
         file_path = self._latest("*-ui-contract.json")
         if file_path is None:
             return ProofPackArtifact(
@@ -1262,18 +1299,24 @@ class ProofPackBuilder:
                 path=str(file_path),
             )
         component_stack = (
-            payload.get("component_stack", {})
+            cast(dict[str, Any], payload.get("component_stack"))
             if isinstance(payload.get("component_stack"), dict)
             else {}
         )
         emoji_policy = (
-            payload.get("emoji_policy") if isinstance(payload.get("emoji_policy"), dict) else {}
+            cast(dict[str, Any], payload.get("emoji_policy"))
+            if isinstance(payload.get("emoji_policy"), dict)
+            else {}
         )
-        analysis = payload.get("analysis", {}) if isinstance(payload.get("analysis"), dict) else {}
+        analysis = (
+            cast(dict[str, Any], payload.get("analysis"))
+            if isinstance(payload.get("analysis"), dict)
+            else {}
+        )
         frontend_value = str(analysis.get("frontend") or "").lower().strip()
         cross_platform_frontend = is_cross_platform_frontend(frontend_value)
         framework_playbook = (
-            payload.get("framework_playbook")
+            cast(dict[str, Any], payload.get("framework_playbook"))
             if isinstance(payload.get("framework_playbook"), dict)
             else {}
         )
@@ -1329,6 +1372,8 @@ class ProofPackBuilder:
         )
 
     def _ui_contract_alignment_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("UI Contract Alignment")
         file_path = self._latest("*-ui-contract-alignment.json")
         if file_path is None:
             return ProofPackArtifact(
@@ -1360,7 +1405,9 @@ class ProofPackBuilder:
                 summary="UI contract alignment report must be a JSON object",
                 path=str(file_path),
             )
-        identity_ok, identity_reason = evidence_identity_matches(payload, expected=expected_identity)
+        identity_ok, identity_reason = evidence_identity_matches(
+            payload, expected=expected_identity
+        )
         if not identity_ok:
             summary = (
                 "UI contract alignment evidence identity mismatches current UI contract/UIUX"
@@ -1438,6 +1485,14 @@ class ProofPackBuilder:
         report = builder.build()
         report_files = builder.write(report)
         focus = derive_operational_focus(self.project_dir)
+        focus_action = str(focus.get("recommended_action", "")).strip()
+        if not self.frontend_required and any(
+            marker in focus_action.lower() for marker in ("frontend", "ui ", "ui-review", "前端")
+        ):
+            focus = dict(focus)
+            focus["recommended_action"] = (
+                "先修复当前 workflow / framework / hook 的适用阻塞项，再重新生成 proof-pack。"
+            )
         summary = (
             f"operational harness verified across {report.passed_count}/{report.enabled_count} enabled harnesses"
             if report.passed
@@ -1487,14 +1542,16 @@ class ProofPackBuilder:
                 name="Host Runtime Validation",
                 status="ready",
                 summary="no host runtime validation state recorded",
-                details={},
+                details={"frontend_required": self.frontend_required},
             )
 
         pending_hosts: list[str] = []
         failed_hosts: list[str] = []
         governance_gap = collect_layered_runtime_governance_gap(self.project_dir)
         probe_failed_hosts = (
-            list(governance_gap.get("impacted_hosts", [])) if isinstance(governance_gap, dict) else []
+            list(governance_gap.get("impacted_hosts", []))
+            if isinstance(governance_gap, dict)
+            else []
         )
         probe_payloads = (
             dict(governance_gap.get("repo_probes", {})) if isinstance(governance_gap, dict) else {}
@@ -1510,7 +1567,9 @@ class ProofPackBuilder:
                 pending_hosts.append(str(host_id))
 
         status = (
-            "ready" if not pending_hosts and not failed_hosts and not probe_failed_hosts else "pending"
+            "ready"
+            if not pending_hosts and not failed_hosts and not probe_failed_hosts
+            else "pending"
         )
         if status == "ready":
             summary = f"validated hosts ready: {len(probe_payloads)}/{len(hosts)}"
@@ -1528,10 +1587,13 @@ class ProofPackBuilder:
             name="Host Runtime Validation",
             status=status,
             summary=summary,
-            path=str(self.project_dir / ".super-dev" / "review-state" / "host-runtime-validation.json"),
+            path=str(
+                self.project_dir / ".super-dev" / "review-state" / "host-runtime-validation.json"
+            ),
             details={
                 "hosts": hosts,
                 "repo_probes": probe_payloads,
+                "frontend_required": self.frontend_required,
             },
         )
 
@@ -1645,6 +1707,8 @@ class ProofPackBuilder:
         )
 
     def _ui_review_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("UI Review")
         file_path = self._latest("*-ui-review.json")
         if file_path is None:
             return ProofPackArtifact(
@@ -1708,26 +1772,55 @@ class ProofPackBuilder:
             return ProofPackArtifact(
                 name="Quality Gate", status="missing", summary="quality gate report missing"
             )
-        ui_review_path = self._latest("*-ui-review.json")
-        ui_alignment_path = self._latest("*-ui-contract-alignment.json")
-        uiux_path = self._latest("*-uiux.md")
-        expected_identity = build_evidence_identity(
+        payload = load_json_payload(json_path) if json_path is not None else {}
+        fresh_evidence = None
+        if self.fresh_verification_required:
+            fresh_evidence = inspect_current_fresh_verification(self.project_dir)
+            if not fresh_evidence.passed:
+                return ProofPackArtifact(
+                    name="Quality Gate",
+                    status="pending",
+                    summary=(
+                        "quality gate cannot prove the current code version: "
+                        f"{fresh_evidence.detail}"
+                    ),
+                    path=str(file_path),
+                    details=payload,
+                )
+        quality_dependencies = quality_evidence_dependency_paths(
             self.project_dir,
-            artifact_name="quality-gate",
-            dependencies=[ui_review_path, ui_alignment_path, uiux_path],
+            project_name=self.project_name,
+            frontend_required=self.frontend_required,
         )
         if json_path is not None:
-            payload = load_json_payload(json_path)
-            identity_ok, identity_reason = evidence_identity_matches(
-                payload,
-                expected=expected_identity,
-            )
-            if not identity_ok:
-                summary = (
-                    "quality gate report evidence identity mismatches current UI evidence"
-                    if identity_reason == "digest_mismatch"
-                    else "quality gate report is missing evidence identity"
+            if fresh_evidence is not None:
+                quality_dependencies, identity_reason = stored_quality_evidence_dependencies(
+                    self.project_dir,
+                    payload,
                 )
+                identity_ok = identity_reason == "matched"
+            else:
+                expected_identity = build_evidence_identity(
+                    self.project_dir,
+                    artifact_name="quality-gate",
+                    dependencies=quality_dependencies,
+                )
+                identity_ok, identity_reason = evidence_identity_matches(
+                    payload,
+                    expected=expected_identity,
+                )
+            if not identity_ok:
+                evidence_scope = (
+                    "current UI evidence"
+                    if self.frontend_required
+                    else "current applicable evidence"
+                )
+                if identity_reason in {"digest_mismatch", "mismatch"}:
+                    summary = f"quality gate report evidence identity mismatches {evidence_scope}"
+                elif identity_reason == "unsafe":
+                    summary = "quality gate report has unsafe evidence dependencies"
+                else:
+                    summary = "quality gate report is missing evidence identity"
                 return ProofPackArtifact(
                     name="Quality Gate",
                     status="pending",
@@ -1735,21 +1828,57 @@ class ProofPackBuilder:
                     path=str(file_path),
                     details=payload if isinstance(payload, dict) else {},
                 )
-        if is_artifact_stale(file_path, dependencies=[ui_review_path, ui_alignment_path, uiux_path]):
+            if fresh_evidence is not None:
+                binding_ok, binding_reason = quality_fresh_binding_matches(
+                    quality_dependencies,
+                    candidate_digest=fresh_evidence.candidate_digest,
+                )
+                if not binding_ok:
+                    binding_summaries = {
+                        "candidate_mismatch": (
+                            "quality gate fresh verification does not match the current code version"
+                        ),
+                        "not_passed": "quality gate is bound to a non-passing fresh verification",
+                        "incomplete": "quality gate fresh verification evidence is incomplete",
+                        "invalid": "quality gate fresh verification evidence is invalid",
+                        "candidate_missing": (
+                            "quality gate fresh verification candidate identity is missing"
+                        ),
+                        "missing": "quality gate fresh verification evidence is missing",
+                    }
+                    return ProofPackArtifact(
+                        name="Quality Gate",
+                        status="pending",
+                        summary=binding_summaries.get(
+                            binding_reason,
+                            "quality gate fresh verification binding does not match",
+                        ),
+                        path=str(file_path),
+                        details=payload if isinstance(payload, dict) else {},
+                    )
+        if is_artifact_stale(file_path, dependencies=quality_dependencies):
             return ProofPackArtifact(
                 name="Quality Gate",
                 status="pending",
-                summary="quality gate report is stale relative to current UI evidence",
+                summary="quality gate report is stale relative to current applicable evidence",
                 path=str(file_path),
             )
-        text = file_path.read_text(encoding="utf-8", errors="ignore").lower()
-        if "fail" in text or "未通过" in text:
-            status = "pending"
-            summary = "quality gate indicates unresolved issues"
+        if json_path is not None:
+            passed = payload.get("passed") is True
+            status = "ready" if passed else "pending"
+            summary = (
+                "quality gate report generated"
+                if passed
+                else "quality gate indicates unresolved issues"
+            )
         else:
-            status = "ready"
-            summary = "quality gate report generated"
-        payload = load_json_payload(json_path) if json_path is not None else {}
+            text = file_path.read_text(encoding="utf-8", errors="ignore").lower()
+            if "fail" in text or "未通过" in text:
+                status = "pending"
+                summary = "quality gate indicates unresolved issues"
+            else:
+                status = "ready"
+                summary = "quality gate report generated"
         return ProofPackArtifact(
             name="Quality Gate",
             status=status,
@@ -1769,12 +1898,19 @@ class ProofPackBuilder:
         except Exception as e:
             _logger.debug(f"Failed to parse delivery manifest JSON: {e}")
             payload = {}
-        ready = isinstance(payload, dict) and payload.get("status") == "ready"
-        summary = (
-            f"status={payload.get('status', 'unknown')}"
-            if isinstance(payload, dict)
-            else "manifest unreadable"
+        applicability = payload.get("applicability", {}) if isinstance(payload, dict) else {}
+        applicability_matches = applicability == self.delivery_applicability
+        ready = (
+            isinstance(payload, dict) and payload.get("status") == "ready" and applicability_matches
         )
+        if not applicability_matches:
+            summary = "delivery manifest applicability does not match the current project"
+        else:
+            summary = (
+                f"status={payload.get('status', 'unknown')}"
+                if isinstance(payload, dict)
+                else "manifest unreadable"
+            )
         return ProofPackArtifact(
             name="Delivery Manifest",
             status="ready" if ready else "pending",
@@ -1784,6 +1920,11 @@ class ProofPackBuilder:
         )
 
     def _rehearsal_artifact(self) -> ProofPackArtifact:
+        if self.platform == "cli":
+            return self._not_applicable_artifact(
+                "Release Rehearsal",
+                "platform is cli; release closure uses readiness and proof-pack evidence",
+            )
         rehearsal_dir = self.output_dir / "rehearsal"
         file_path = self._latest("*-rehearsal-report.json", rehearsal_dir)
         if file_path is None:
@@ -1810,6 +1951,102 @@ class ProofPackBuilder:
         )
 
     def _release_readiness_artifact(self, verify_tests: bool) -> ProofPackArtifact:
+        existing_path = self.output_dir / f"{self.project_name}-release-readiness.json"
+        reuse_existing = self.fresh_verification_required or not verify_tests
+        payload = load_json_payload(existing_path)
+        if reuse_existing and existing_path.is_file():
+            stale_reason = ""
+            if not payload:
+                stale_reason = "report is unreadable or empty"
+            else:
+                evaluator = ReleaseReadinessEvaluator(self.project_dir)
+                expected_identity = evaluator._build_report_evidence_identity()
+                identity_ok, identity_reason = evidence_identity_matches(
+                    payload,
+                    expected=expected_identity,
+                )
+                identity = payload.get("evidence_identity", {})
+                if not isinstance(identity, dict):
+                    identity = {}
+                expected_candidate = str(expected_identity.get("candidate_digest", "")).strip()
+                actual_candidate = str(identity.get("candidate_digest", "")).strip()
+                if not identity_ok:
+                    stale_reason = (
+                        "evidence identity does not match current dependencies"
+                        if identity_reason == "digest_mismatch"
+                        else "evidence identity is missing"
+                    )
+                elif not actual_candidate or actual_candidate != expected_candidate:
+                    stale_reason = "candidate identity does not match the current code version"
+
+                if not stale_reason and self.fresh_verification_required:
+                    fresh_evidence = inspect_current_fresh_verification(self.project_dir)
+                    if not fresh_evidence.passed:
+                        stale_reason = fresh_evidence.detail
+                    else:
+                        checks = payload.get("checks", [])
+                        completion_check = next(
+                            (
+                                item
+                                for item in checks
+                                if isinstance(item, dict)
+                                and item.get("name") == "完成前验证（Fresh Verification）"
+                            ),
+                            None,
+                        )
+                        check_evidence = (
+                            completion_check.get("evidence", {})
+                            if isinstance(completion_check, dict)
+                            else {}
+                        )
+                        check_matches = (
+                            isinstance(completion_check, dict)
+                            and completion_check.get("passed") is True
+                            and isinstance(check_evidence, dict)
+                            and str(check_evidence.get("status", "")).strip().upper() == "PASS"
+                            and str(check_evidence.get("run_id", "")).strip()
+                            == fresh_evidence.run_id
+                            and str(check_evidence.get("candidate_digest", "")).strip()
+                            == fresh_evidence.candidate_digest
+                        )
+                        if not check_matches:
+                            stale_reason = (
+                                "report lacks a completion verification check that proves "
+                                "the current code version passed (`PASS`)"
+                            )
+
+            if stale_reason:
+                return ProofPackArtifact(
+                    name="Release Readiness",
+                    status="pending",
+                    summary=(
+                        f"release readiness report is stale: {stale_reason}; "
+                        "run `super-dev release readiness` first"
+                    ),
+                    path=str(existing_path),
+                    details=payload,
+                )
+
+            passed = bool(payload.get("passed", False))
+            return ProofPackArtifact(
+                name="Release Readiness",
+                status="ready" if passed else "pending",
+                summary=f"score={payload.get('score', 'unknown')}/100, passed={passed}",
+                path=str(existing_path),
+                details=payload,
+            )
+
+        if self.fresh_verification_required:
+            return ProofPackArtifact(
+                name="Release Readiness",
+                status="pending",
+                summary=(
+                    "release readiness evidence for the current code version is missing; "
+                    "run `super-dev release readiness` first"
+                ),
+                path=str(existing_path),
+            )
+
         evaluator = ReleaseReadinessEvaluator(self.project_dir)
         report = evaluator.evaluate(verify_tests=verify_tests)
         files = evaluator.write(report)
@@ -1913,6 +2150,8 @@ class ProofPackBuilder:
         )
 
     def _uiux_compliance_artifact(self) -> ProofPackArtifact:
+        if not self.frontend_required:
+            return self._not_applicable_artifact("UIUX Compliance")
         from .reviewers.uiux_compliance import (
             inspect_uiux_compliance_artifact,
             run_uiux_compliance,

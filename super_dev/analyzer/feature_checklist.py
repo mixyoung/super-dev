@@ -6,6 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..artifact_utils import (
+    latest_artifact,
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+)
+
 
 def _normalize_text(value: str) -> str:
     return re.sub(r"[\s`*_#>|:：,，.。/\\\\\\-]+", "", value.strip().lower())
@@ -153,7 +159,11 @@ class FeatureChecklistBuilder:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = self.project_dir.name
+        self.active_change_id = resolve_active_change_id(self.project_dir)
+        self.project_name = resolve_current_artifact_prefix(
+            self.project_dir,
+            fallback_name=self.project_dir.name,
+        )
 
     def build(self) -> FeatureCoverageReport:
         prd_path = self._latest("*-prd.md")
@@ -162,6 +172,7 @@ class FeatureChecklistBuilder:
             path
             for path in self.output_dir.glob("*.md")
             if path.name.endswith(".md")
+            and (not self.active_change_id or path.name.startswith(f"{self.project_name}-"))
             and "feature-checklist" not in path.name
             and "proof-pack" not in path.name
             and "release-readiness" not in path.name
@@ -228,12 +239,17 @@ class FeatureChecklistBuilder:
         if not directory.exists():
             return None
         if pattern == "tasks.md":
+            if self.active_change_id:
+                active_tasks = directory / self.active_change_id / "tasks.md"
+                return active_tasks if active_tasks.is_file() else None
             candidates = [path for path in directory.glob("*/tasks.md") if path.is_file()]
-        else:
-            candidates = [path for path in directory.glob(pattern) if path.is_file()]
-        if not candidates:
-            return None
-        return max(candidates, key=lambda item: item.stat().st_mtime)
+            return max(candidates, key=lambda item: item.stat().st_mtime) if candidates else None
+        return latest_artifact(
+            directory,
+            pattern,
+            preferred_prefix=self.project_name,
+            strict_prefix=bool(self.active_change_id),
+        )
 
     def _extract_prd_features(self, prd_path: Path | None) -> list[FeatureChecklistItem]:
         if prd_path is None or not prd_path.exists():

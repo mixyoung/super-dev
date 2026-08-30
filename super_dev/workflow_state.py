@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .artifact_utils import (
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+    sanitize_artifact_name,
+)
 from .baseline_governance import inspect_baseline_governance
+from .config.manager import ConfigManager
 from .expert_stage_governance import collect_expert_stage_governance
 from .frameworks import summarize_framework_playbook
 from .host_adapters import get_special_flow_probe
@@ -231,9 +237,7 @@ def build_host_action_prompt(
 ) -> dict[str, Any]:
     instruction = _normalize_host_action_instruction(action_text)
     slash_supported = (
-        supports_slash(target)
-        if supports_slash_entry is None
-        else bool(supports_slash_entry)
+        supports_slash(target) if supports_slash_entry is None else bool(supports_slash_entry)
     )
     entry_bundle = build_host_entry_prompts(
         target=target,
@@ -379,7 +383,8 @@ def load_framework_playbook_summary(project_dir: Path) -> dict[str, Any]:
         return {}
     playbook_payload = payload.get("framework_playbook")
     playbook: dict[str, Any] = playbook_payload if isinstance(playbook_payload, dict) else {}
-    return summarize_framework_playbook(playbook, limit=4)
+    summary = summarize_framework_playbook(playbook, limit=4)
+    return summary if isinstance(summary, dict) else {}
 
 
 def workflow_mode_label(workflow_mode: str) -> str:
@@ -517,9 +522,11 @@ def _normalize_review_payload(
         "run_id": str(payload.get("run_id", "")).strip(),
         "updated_at": str(payload.get("updated_at", "")).strip(),
         "actor": str(payload.get("actor", "")).strip(),
-        "artifact_binding": payload.get("artifact_binding", {})
-        if isinstance(payload.get("artifact_binding", {}), dict)
-        else {},
+        "artifact_binding": (
+            payload.get("artifact_binding", {})
+            if isinstance(payload.get("artifact_binding", {}), dict)
+            else {}
+        ),
         "exists": bool(payload),
     }
 
@@ -826,47 +833,146 @@ def detect_pipeline_summary(
     flow_variant = detect_flow_variant(project_dir)
     workflow_payload = load_workflow_state(project_dir) or {}
     work_mode = detect_work_mode(project_dir, workflow_payload)
+    active_change_id = resolve_active_change_id(project_dir)
+    artifact_prefix = resolve_current_artifact_prefix(
+        project_dir,
+        fallback_name=project_dir.name,
+    )
+    active_artifact_prefix = sanitize_artifact_name(active_change_id)
 
-    research_done = any(output_dir.glob("*-research.md"))
-    prd_done = any(output_dir.glob("*-prd.md"))
-    architecture_done = any(output_dir.glob("*-architecture.md"))
-    uiux_done = any(output_dir.glob("*-uiux.md"))
+    def _active_output_path(suffix: str) -> Path:
+        return output_dir / f"{active_artifact_prefix}-{suffix}"
+
+    if active_change_id:
+        research_file = _active_output_path("research.md")
+        prd_file = _active_output_path("prd.md")
+        architecture_file = _active_output_path("architecture.md")
+        uiux_file = _active_output_path("uiux.md")
+        research_done = research_file.is_file()
+        prd_done = prd_file.is_file()
+        architecture_done = architecture_file.is_file()
+        uiux_done = uiux_file.is_file()
+        active_change_dir = changes_dir / active_change_id
+        spec_done = (active_change_dir / "proposal.md").is_file() and (
+            active_change_dir / "tasks.md"
+        ).is_file()
+    else:
+        research_done = any(output_dir.glob("*-research.md"))
+        prd_done = any(output_dir.glob("*-prd.md"))
+        architecture_done = any(output_dir.glob("*-architecture.md"))
+        uiux_done = any(output_dir.glob("*-uiux.md"))
+        spec_done = any(changes_dir.glob("*/proposal.md")) and any(changes_dir.glob("*/tasks.md"))
     docs_done = prd_done and architecture_done and uiux_done
-    spec_done = any(changes_dir.glob("*/proposal.md")) and any(changes_dir.glob("*/tasks.md"))
 
-    frontend_runtime_payload, frontend_runtime_path = _latest_json(
-        sorted(output_dir.glob("*-frontend-runtime.json"))
-    )
-    ui_contract_payload, ui_contract_path = _latest_json(sorted(output_dir.glob("*-ui-contract.json")))
-    ui_alignment_payload, ui_alignment_path = _latest_json(
-        sorted(output_dir.glob("*-ui-contract-alignment.json"))
-    )
-    ui_review_payload, ui_review_path = _latest_json(sorted(output_dir.glob("*-ui-review.json")))
-    quality_gate_payload, quality_gate_path = _latest_json(
-        sorted(output_dir.glob("*-quality-gate.md"))
-    )
-    uiux_files = sorted(output_dir.glob("*-uiux.md"))
-    latest_uiux_path = str(max(uiux_files, key=lambda item: item.stat().st_mtime)) if uiux_files else ""
+    try:
+        project_config = ConfigManager(project_dir).load()
+        frontend_kind = str(project_config.frontend or "").strip().lower()
+        backend_kind = str(project_config.backend or "").strip().lower()
+    except Exception:  # pragma: no cover - malformed config keeps the legacy requirements
+        frontend_kind = "unknown"
+        backend_kind = "unknown"
+    frontend_required = frontend_kind not in {"", "none"}
+    backend_required = backend_kind not in {"", "none"}
 
+    if active_change_id:
+        frontend_runtime_file = _active_output_path("frontend-runtime.json")
+        ui_contract_file = _active_output_path("ui-contract.json")
+        ui_alignment_file = _active_output_path("ui-contract-alignment.json")
+        ui_review_file = _active_output_path("ui-review.json")
+        quality_gate_file = _active_output_path("quality-gate.json")
+        frontend_runtime_payload, frontend_runtime_path = _latest_json(
+            [frontend_runtime_file] if frontend_runtime_file.is_file() else []
+        )
+        ui_contract_payload, ui_contract_path = _latest_json(
+            [ui_contract_file] if ui_contract_file.is_file() else []
+        )
+        ui_alignment_payload, ui_alignment_path = _latest_json(
+            [ui_alignment_file] if ui_alignment_file.is_file() else []
+        )
+        ui_review_payload, ui_review_path = _latest_json(
+            [ui_review_file] if ui_review_file.is_file() else []
+        )
+        quality_gate_payload, quality_gate_path = _latest_json(
+            [quality_gate_file] if quality_gate_file.is_file() else []
+        )
+        uiux_files = [uiux_file] if uiux_file.is_file() else []
+    else:
+        frontend_runtime_payload, frontend_runtime_path = _latest_json(
+            sorted(output_dir.glob("*-frontend-runtime.json"))
+        )
+        ui_contract_payload, ui_contract_path = _latest_json(
+            sorted(output_dir.glob("*-ui-contract.json"))
+        )
+        ui_alignment_payload, ui_alignment_path = _latest_json(
+            sorted(output_dir.glob("*-ui-contract-alignment.json"))
+        )
+        ui_review_payload, ui_review_path = _latest_json(
+            sorted(output_dir.glob("*-ui-review.json"))
+        )
+        quality_gate_payload, quality_gate_path = _latest_json(
+            sorted(output_dir.glob("*-quality-gate.md"))
+        )
+        uiux_files = sorted(output_dir.glob("*-uiux.md"))
+    latest_uiux_path = (
+        str(max(uiux_files, key=lambda item: item.stat().st_mtime)) if uiux_files else ""
+    )
+
+    ui_runtime_dependencies: list[str | Path] = (
+        [path for path in [ui_contract_path, ui_alignment_path] if path]
+        if frontend_required
+        else []
+    )
+    ui_contract_dependencies: list[str | Path] = (
+        [latest_uiux_path] if frontend_required and latest_uiux_path else []
+    )
+    ui_review_dependencies: list[str | Path] = (
+        [path for path in [ui_contract_path, latest_uiux_path] if path] if frontend_required else []
+    )
     frontend_runtime_state = _artifact_state(
         frontend_runtime_path,
-        dependencies=[path for path in [ui_contract_path, ui_alignment_path] if path],
+        dependencies=ui_runtime_dependencies,
     )
     ui_contract_state = _artifact_state(
         ui_contract_path,
-        dependencies=[latest_uiux_path] if latest_uiux_path else [],
+        dependencies=ui_contract_dependencies,
     )
     ui_alignment_state = _artifact_state(
         ui_alignment_path,
-        dependencies=[path for path in [ui_contract_path, latest_uiux_path] if path],
+        dependencies=ui_review_dependencies,
     )
     ui_review_state = _artifact_state(
         ui_review_path,
-        dependencies=[path for path in [ui_contract_path, latest_uiux_path] if path],
+        dependencies=ui_review_dependencies,
     )
-    quality_gate_state = _artifact_state(
-        quality_gate_path,
-        dependencies=[
+    if active_change_id:
+        active_change_dir = changes_dir / active_change_id
+        quality_dependencies: list[str | Path] = [
+            path
+            for path in [
+                research_file,
+                prd_file,
+                architecture_file,
+                uiux_file,
+                active_change_dir / "proposal.md",
+                active_change_dir / "tasks.md",
+                _active_output_path("redteam.json"),
+                _active_output_path("redteam.md"),
+            ]
+            if path.is_file()
+        ]
+        if frontend_required:
+            quality_dependencies.extend(
+                path
+                for path in [
+                    ui_review_path,
+                    ui_alignment_path,
+                    frontend_runtime_path,
+                    ui_contract_path,
+                ]
+                if path
+            )
+    else:
+        quality_dependencies = [
             path
             for path in [
                 ui_review_path,
@@ -876,12 +982,16 @@ def detect_pipeline_summary(
                 latest_uiux_path,
             ]
             if path
-        ],
+        ]
+    quality_gate_state = _artifact_state(
+        quality_gate_path,
+        dependencies=quality_dependencies,
     )
     frontend_runtime_passed = bool(frontend_runtime_payload.get("passed", False))
-    frontend_done = frontend_runtime_passed and not frontend_runtime_state["stale"]
+    frontend_implementation_done = frontend_runtime_passed and not frontend_runtime_state["stale"]
+    frontend_done = not frontend_required or frontend_implementation_done
 
-    backend_done = _has_any(
+    scaffold_backend_done = _has_any(
         [
             project_dir / "backend" / "src",
             project_dir / "backend" / "package.json",
@@ -890,24 +1000,49 @@ def detect_pipeline_summary(
             project_dir / "backend" / "go.mod",
         ]
     )
-    quality_done = any(output_dir.glob("*-quality-gate.md")) or any(
-        output_dir.glob("*-ui-review.md")
+    root_python_backend_done = (
+        backend_kind == "python"
+        and (project_dir / "pyproject.toml").is_file()
+        and (project_dir / "super_dev").is_dir()
     )
+    backend_implementation_done = scaffold_backend_done or root_python_backend_done
+    backend_done = not backend_required or backend_implementation_done
+    if active_change_id:
+        quality_gate_passed = bool(quality_gate_payload.get("passed", False))
+        quality_done = quality_gate_passed and not quality_gate_state["stale"]
+        quality_gate_state["passed"] = quality_gate_passed
+        if quality_gate_state["exists"] and not quality_gate_passed:
+            quality_gate_state["status"] = "failed"
+            quality_gate_state["reason"] = "quality gate JSON did not pass"
+    else:
+        quality_done = any(output_dir.glob("*-quality-gate.md")) or any(
+            output_dir.glob("*-ui-review.md")
+        )
 
-    delivery_manifest_payload, delivery_manifest_path = _latest_json(
-        sorted((output_dir / "delivery").glob("*-delivery-manifest.json"))
-        if (output_dir / "delivery").exists()
-        else []
-    )
+    delivery_dir = output_dir / "delivery"
+    if active_change_id:
+        delivery_manifest_file = delivery_dir / f"{active_artifact_prefix}-delivery-manifest.json"
+        delivery_manifest_candidates = (
+            [delivery_manifest_file] if delivery_manifest_file.is_file() else []
+        )
+    else:
+        delivery_manifest_candidates = (
+            sorted(delivery_dir.glob("*-delivery-manifest.json")) if delivery_dir.exists() else []
+        )
+    delivery_manifest_payload, delivery_manifest_path = _latest_json(delivery_manifest_candidates)
     delivery_manifest_ready = (
         str(delivery_manifest_payload.get("status", "")).strip().lower() == "ready"
     )
 
-    rehearsal_payload, rehearsal_report_path = _latest_json(
-        sorted((output_dir / "rehearsal").glob("*-rehearsal-report.json"))
-        if (output_dir / "rehearsal").exists()
-        else []
-    )
+    rehearsal_dir = output_dir / "rehearsal"
+    if active_change_id:
+        rehearsal_file = rehearsal_dir / f"{active_artifact_prefix}-rehearsal-report.json"
+        rehearsal_candidates = [rehearsal_file] if rehearsal_file.is_file() else []
+    else:
+        rehearsal_candidates = (
+            sorted(rehearsal_dir.glob("*-rehearsal-report.json")) if rehearsal_dir.exists() else []
+        )
+    rehearsal_payload, rehearsal_report_path = _latest_json(rehearsal_candidates)
     rehearsal_report_passed = bool(rehearsal_payload.get("passed", False))
     delivery_done = delivery_manifest_ready and rehearsal_report_passed
 
@@ -952,9 +1087,11 @@ def detect_pipeline_summary(
     docs_confirmation = _normalize_review_payload(load_docs_confirmation(project_dir))
     preview_confirmation = _normalize_review_payload(load_preview_confirmation(project_dir))
     resume_gate = _normalize_review_payload(
-        baseline_governance.get("resume_gate")
-        if isinstance(baseline_governance.get("resume_gate"), dict)
-        else {},
+        (
+            baseline_governance.get("resume_gate")
+            if isinstance(baseline_governance.get("resume_gate"), dict)
+            else {}
+        ),
         default_status="clear",
     )
     ui_revision = _normalize_review_payload(load_ui_revision(project_dir))
@@ -962,32 +1099,39 @@ def detect_pipeline_summary(
     quality_revision = _normalize_review_payload(load_quality_revision(project_dir))
     baseline_done = bool(baseline_governance.get("audit_exists", False))
     baseline_required = bool(baseline_governance.get("required", False))
-    explicit_baseline_revision_requested = baseline_governance.get("baseline_state") == "revision_requested"
+    explicit_baseline_revision_requested = (
+        baseline_governance.get("baseline_state") == "revision_requested"
+    )
     baseline_confirmation_waiting = baseline_governance.get("baseline_state") in {
         "missing_confirmation",
         "pending_confirmation",
     }
 
     explicit_docs_revision_requested = docs_confirmation["status"] == "revision_requested"
-    explicit_ui_revision_requested = ui_revision["status"] == "revision_requested"
+    explicit_ui_revision_requested = (
+        frontend_required and ui_revision["status"] == "revision_requested"
+    )
     explicit_architecture_revision_requested = (
         architecture_revision["status"] == "revision_requested"
     )
     explicit_quality_revision_requested = quality_revision["status"] == "revision_requested"
-    explicit_preview_revision_requested = preview_confirmation["status"] == "revision_requested"
+    explicit_preview_revision_requested = (
+        frontend_required and preview_confirmation["status"] == "revision_requested"
+    )
 
     docs_confirmed = bool(docs_gate.get("confirmed", False))
     preview_confirmed = bool(preview_gate.get("confirmed", False))
     docs_confirmation_waiting = docs_done and not (
         docs_confirmed
         or spec_done
-        or frontend_done
-        or backend_done
+        or frontend_implementation_done
+        or backend_implementation_done
         or quality_done
         or delivery_done
     )
     preview_confirmation_waiting = (
-        flow_variant != "seeai"
+        frontend_required
+        and flow_variant != "seeai"
         and frontend_done
         and not (
             preview_confirmed
@@ -1058,112 +1202,127 @@ def detect_pipeline_summary(
                 "description": PHASE_CHAIN[0][2],
                 "expected_experts": list(active_experts_for_stage("research")),
             },
-        {
-            "id": "core_docs",
-            "canonical_id": "docs",
-            "name": "三份核心文档",
-            "status": _stage_status(
-                docs_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "docs"
-                and not docs_done,
-            ),
-            "description": PHASE_CHAIN[1][2],
-            "expected_experts": list(active_experts_for_stage("docs")),
-        },
-        {
-            "id": "confirmation_gate",
-            "canonical_id": "docs_confirm",
-            "name": "等待用户确认",
-            "status": _stage_status(
-                docs_confirmed
-                or spec_done
-                or frontend_done
-                or backend_done
-                or quality_done
-                or delivery_done,
-                waiting=docs_confirmation_waiting or explicit_docs_revision_requested,
-            ),
-            "description": PHASE_CHAIN[2][2],
-            "expected_experts": list(active_experts_for_stage("docs_confirm")),
-        },
-        {
-            "id": "spec",
-            "canonical_id": "spec",
-            "name": "Spec 与任务清单",
-            "status": _stage_status(
-                spec_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "docs"
-                and docs_done
-                and docs_confirmed
-                and not spec_done,
-            ),
-            "description": PHASE_CHAIN[3][2],
-            "expected_experts": list(active_experts_for_stage("spec")),
-        },
-        {
-            "id": "frontend",
-            "canonical_id": "frontend",
-            "name": "前端实现与运行验证",
-            "status": _stage_status(
-                frontend_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
-                and spec_done
-                and not frontend_done,
-            ),
-            "description": PHASE_CHAIN[4][2],
-            "expected_experts": list(active_experts_for_stage("frontend")),
-        },
-        {
-            "id": "preview_gate",
-            "canonical_id": "preview_confirm",
-            "name": "等待预览确认",
-            "status": _stage_status(
-                preview_confirmed or backend_done or quality_done or delivery_done,
-                waiting=preview_confirmation_waiting or explicit_preview_revision_requested,
-            ),
-            "description": PHASE_CHAIN[5][2],
-            "expected_experts": list(active_experts_for_stage("preview_confirm")),
-        },
-        {
-            "id": "backend",
-            "canonical_id": "backend",
-            "name": "后端实现与联调",
-            "status": _stage_status(
-                backend_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
-                and frontend_done
-                and preview_confirmed
-                and not backend_done,
-            ),
-            "description": PHASE_CHAIN[6][2],
-            "expected_experts": list(active_experts_for_stage("backend")),
-        },
-        {
-            "id": "quality",
-            "canonical_id": "quality",
-            "name": "质量门禁",
-            "status": _stage_status(
-                quality_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "quality"
-                and backend_done
-                and not quality_done,
-            ),
-            "description": PHASE_CHAIN[7][2],
-            "expected_experts": list(active_experts_for_stage("quality")),
-        },
-        {
-            "id": "delivery",
-            "canonical_id": "delivery",
-            "name": "交付与发布",
-            "status": _stage_status(
-                delivery_done,
-                running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
-                and quality_done
-                and not delivery_done,
-            ),
-            "description": PHASE_CHAIN[8][2],
-            "expected_experts": list(active_experts_for_stage("delivery")),
-        },
+            {
+                "id": "core_docs",
+                "canonical_id": "docs",
+                "name": "三份核心文档",
+                "status": _stage_status(
+                    docs_done,
+                    running=canonical_stage_for_engine_phase(running_phase_name) == "docs"
+                    and not docs_done,
+                ),
+                "description": PHASE_CHAIN[1][2],
+                "expected_experts": list(active_experts_for_stage("docs")),
+            },
+            {
+                "id": "confirmation_gate",
+                "canonical_id": "docs_confirm",
+                "name": "等待用户确认",
+                "status": _stage_status(
+                    docs_confirmed
+                    or spec_done
+                    or frontend_implementation_done
+                    or backend_implementation_done
+                    or quality_done
+                    or delivery_done,
+                    waiting=docs_confirmation_waiting or explicit_docs_revision_requested,
+                ),
+                "description": PHASE_CHAIN[2][2],
+                "expected_experts": list(active_experts_for_stage("docs_confirm")),
+            },
+            {
+                "id": "spec",
+                "canonical_id": "spec",
+                "name": "Spec 与任务清单",
+                "status": _stage_status(
+                    spec_done,
+                    running=canonical_stage_for_engine_phase(running_phase_name) == "docs"
+                    and docs_done
+                    and docs_confirmed
+                    and not spec_done,
+                ),
+                "description": PHASE_CHAIN[3][2],
+                "expected_experts": list(active_experts_for_stage("spec")),
+            },
+            {
+                "id": "frontend",
+                "canonical_id": "frontend",
+                "name": "前端实现与运行验证",
+                "status": (
+                    "not_applicable"
+                    if not frontend_required
+                    else _stage_status(
+                        frontend_implementation_done,
+                        running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
+                        and spec_done
+                        and not frontend_implementation_done,
+                    )
+                ),
+                "description": PHASE_CHAIN[4][2],
+                "expected_experts": list(active_experts_for_stage("frontend")),
+            },
+            {
+                "id": "preview_gate",
+                "canonical_id": "preview_confirm",
+                "name": "等待预览确认",
+                "status": (
+                    "not_applicable"
+                    if not frontend_required
+                    else _stage_status(
+                        preview_confirmed
+                        or backend_implementation_done
+                        or quality_done
+                        or delivery_done,
+                        waiting=preview_confirmation_waiting or explicit_preview_revision_requested,
+                    )
+                ),
+                "description": PHASE_CHAIN[5][2],
+                "expected_experts": list(active_experts_for_stage("preview_confirm")),
+            },
+            {
+                "id": "backend",
+                "canonical_id": "backend",
+                "name": "后端实现与联调",
+                "status": (
+                    "not_applicable"
+                    if not backend_required
+                    else _stage_status(
+                        backend_implementation_done,
+                        running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
+                        and frontend_done
+                        and (preview_confirmed or not frontend_required)
+                        and not backend_implementation_done,
+                    )
+                ),
+                "description": PHASE_CHAIN[6][2],
+                "expected_experts": list(active_experts_for_stage("backend")),
+            },
+            {
+                "id": "quality",
+                "canonical_id": "quality",
+                "name": "质量门禁",
+                "status": _stage_status(
+                    quality_done,
+                    running=canonical_stage_for_engine_phase(running_phase_name) == "quality"
+                    and backend_done
+                    and not quality_done,
+                ),
+                "description": PHASE_CHAIN[7][2],
+                "expected_experts": list(active_experts_for_stage("quality")),
+            },
+            {
+                "id": "delivery",
+                "canonical_id": "delivery",
+                "name": "交付与发布",
+                "status": _stage_status(
+                    delivery_done,
+                    running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
+                    and quality_done
+                    and not delivery_done,
+                ),
+                "description": PHASE_CHAIN[8][2],
+                "expected_experts": list(active_experts_for_stage("delivery")),
+            },
         ]
     )
     expert_governance = collect_expert_stage_governance(
@@ -1186,14 +1345,15 @@ def detect_pipeline_summary(
             if isinstance(expert_entry.get("recorded_experts", []), list)
             else []
         )
-        stage["expert_evidence_status"] = str(
-            expert_entry.get("evidence_status", "pending")
-        ).strip() or "pending"
+        stage["expert_evidence_status"] = (
+            str(expert_entry.get("evidence_status", "pending")).strip() or "pending"
+        )
     current_stage = next(
         (stage for stage in stages if stage["status"] in {"running", "waiting", "pending"}),
         stages[-1],
     )
-    if all(stage["status"] == "completed" for stage in stages):
+    terminal_stage_statuses = {"completed", "not_applicable"}
+    if all(stage["status"] in terminal_stage_statuses for stage in stages):
         current_stage = stages[-1]
 
     blocker = ""
@@ -1201,15 +1361,29 @@ def detect_pipeline_summary(
     recommended_command = "在宿主里说“继续当前流程”"
     evidence = "未检测到更高优先级阻断项"
     if baseline_governance.get("entry_gate") == "waiting_resume_gate":
-        blocker = str(baseline_governance.get("blocking_reason", "")).strip() or "当前存在恢复门，必须先明确恢复点，再继续当前流程。"
+        blocker = (
+            str(baseline_governance.get("blocking_reason", "")).strip()
+            or "当前存在恢复门，必须先明确恢复点，再继续当前流程。"
+        )
         checkpoint_status = "waiting_resume_gate"
-        recommended_command = str(baseline_governance.get("recommended_command", "")).strip() or "在宿主里先确认恢复点；如果通过，直接说“恢复点确认，可以继续当前流程”"
+        recommended_command = (
+            str(baseline_governance.get("recommended_command", "")).strip()
+            or "在宿主里先确认恢复点；如果通过，直接说“恢复点确认，可以继续当前流程”"
+        )
         evidence = f"resume gate {baseline_governance.get('resume_state') or resume_gate['status']}"
     elif baseline_governance.get("entry_gate") == "waiting_baseline_confirmation":
-        blocker = str(baseline_governance.get("blocking_reason", "")).strip() or "已有项目已完成 baseline，但当前必须先确认基线边界、影响范围和差量计划。"
+        blocker = (
+            str(baseline_governance.get("blocking_reason", "")).strip()
+            or "已有项目已完成 baseline，但当前必须先确认基线边界、影响范围和差量计划。"
+        )
         checkpoint_status = "waiting_baseline_confirmation"
-        recommended_command = str(baseline_governance.get("recommended_command", "")).strip() or "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
-        evidence = str(baseline_governance.get("summary", "")).strip() or "baseline confirmation pending"
+        recommended_command = (
+            str(baseline_governance.get("recommended_command", "")).strip()
+            or "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
+        )
+        evidence = (
+            str(baseline_governance.get("summary", "")).strip() or "baseline confirmation pending"
+        )
     elif explicit_docs_revision_requested:
         blocker = "用户已要求修改三份核心文档，当前应先修正文档并再次提交确认。"
         checkpoint_status = "waiting_docs_confirmation"
@@ -1233,7 +1407,9 @@ def detect_pipeline_summary(
         recommended_command = "在宿主里完成架构返工后直接说“架构调整已完成，继续当前流程”"
         evidence = "architecture revision requested"
     elif explicit_quality_revision_requested:
-        blocker = "当前存在质量返工请求，应先修复质量/安全问题，并重新执行 quality gate 与交付证据刷新。"
+        blocker = (
+            "当前存在质量返工请求，应先修复质量/安全问题，并重新执行 quality gate 与交付证据刷新。"
+        )
         checkpoint_status = "waiting_quality_revision"
         recommended_command = "在宿主里完成质量整改后直接说“质量整改已完成，继续当前流程”"
         evidence = "quality revision requested"
@@ -1248,10 +1424,19 @@ def detect_pipeline_summary(
         recommended_command = "在宿主里确认前端预览；如果通过，直接说“前端预览确认，可以继续”"
         evidence = "preview confirmation pending"
     elif baseline_governance.get("entry_gate") == "missing_baseline":
-        blocker = str(baseline_governance.get("blocking_reason", "")).strip() or "当前属于已有项目工作模式，必须先完成 baseline 审计与差量范围识别。"
+        blocker = (
+            str(baseline_governance.get("blocking_reason", "")).strip()
+            or "当前属于已有项目工作模式，必须先完成 baseline 审计与差量范围识别。"
+        )
         checkpoint_status = "missing_baseline"
-        recommended_command = str(baseline_governance.get("recommended_command", "")).strip() or "在宿主里说“先扫描当前项目并建立 baseline，再继续当前流程”"
-        evidence = str(baseline_governance.get("summary", "")).strip() or "缺少 output/*-baseline-audit.md / *-baseline-audit.json"
+        recommended_command = (
+            str(baseline_governance.get("recommended_command", "")).strip()
+            or "在宿主里说“先扫描当前项目并建立 baseline，再继续当前流程”"
+        )
+        evidence = (
+            str(baseline_governance.get("summary", "")).strip()
+            or "缺少 output/*-baseline-audit.md / *-baseline-audit.json"
+        )
     elif not research_done:
         blocker = "当前尚未完成同类产品研究。"
         checkpoint_status = "missing_research"
@@ -1275,7 +1460,9 @@ def detect_pipeline_summary(
         else:
             recommended_command = "在宿主里说“继续当前流程，进入前端实现与运行验证”"
         if frontend_runtime_state["exists"] and frontend_runtime_state["stale"]:
-            evidence = "output/*-frontend-runtime.json 已过期，需要基于最新 ui-contract/alignment 重新生成"
+            evidence = (
+                "output/*-frontend-runtime.json 已过期，需要基于最新 ui-contract/alignment 重新生成"
+            )
         else:
             evidence = "缺少通过的 output/*-frontend-runtime.json"
     elif not backend_done:
@@ -1293,7 +1480,14 @@ def detect_pipeline_summary(
             recommended_command = "在宿主里说“继续当前 SEEAI 流程，做最终 polish 和演示检查”"
         else:
             recommended_command = "在宿主里说“继续当前流程，进入质量门禁与发布前检查”"
-        evidence = "缺少 quality gate / ui review 证据"
+        if active_change_id and quality_gate_state["stale"]:
+            evidence = f"output/{artifact_prefix}-quality-gate.json 已过期"
+        elif active_change_id and quality_gate_state["exists"]:
+            evidence = f"output/{artifact_prefix}-quality-gate.json 未通过"
+        elif active_change_id:
+            evidence = f"缺少通过的 output/{artifact_prefix}-quality-gate.json"
+        else:
+            evidence = "缺少 quality gate / ui review 证据"
     elif not delivery_done:
         checkpoint_status = "missing_delivery"
         recommended_command = "在宿主里说“继续当前流程，补齐交付证据和发布产物”"
@@ -1326,15 +1520,23 @@ def detect_pipeline_summary(
     )
 
     summary = {
+        "active_change_id": active_change_id,
+        "artifact_prefix": artifact_prefix,
         "current_stage_id": current_stage["id"],
         "current_stage_canonical_id": current_stage.get("canonical_id", current_stage["id"]),
         "current_stage_name": current_stage["name"],
         "blocker": blocker,
-        "completed_count": len([stage for stage in stages if stage["status"] == "completed"]),
+        "completed_count": len(
+            [stage for stage in stages if stage["status"] in terminal_stage_statuses]
+        ),
         "total_count": len(stages),
+        "frontend_required": frontend_required,
+        "backend_required": backend_required,
         "stages": stages,
         "expert_governance": expert_governance,
         "artifacts": {
+            "active_change_id": active_change_id,
+            "artifact_prefix": artifact_prefix,
             "baseline": baseline_done,
             "baseline_required": baseline_required,
             "baseline_governance": baseline_governance,

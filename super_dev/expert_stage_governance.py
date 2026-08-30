@@ -76,7 +76,9 @@ def collect_expert_stage_governance(
         if not recorded_experts and stage == current_stage:
             recorded_experts = list(current_active_experts)
 
-        if stage_status == "pending":
+        if stage_status in {"not_applicable", "skipped"}:
+            evidence_status = "not_required"
+        elif stage_status == "pending":
             evidence_status = "pending"
         elif not expected_experts:
             evidence_status = "not_required"

@@ -233,14 +233,14 @@ class LaunchRehearsalRunner:
                 payload = {}
             if isinstance(payload, dict) and payload:
                 passed = bool(payload.get("passed", False))
-                total_score = payload.get("total_score", 0)
+                gate_score = payload.get("gate_score", payload.get("total_score", 0))
                 summary_payload = payload.get("summary", {})
                 if not isinstance(summary_payload, dict):
                     summary_payload = {}
                 executive_summary = str(summary_payload.get("executive_summary", "")).strip()
-                detail = f"quality score={total_score}"
+                detail = f"quality score={gate_score}"
                 if not passed:
-                    detail = f"quality gate report indicates failed; quality score={total_score}"
+                    detail = f"quality gate report indicates failed; quality score={gate_score}"
                 if executive_summary:
                     detail = f"{detail}: {executive_summary}"
                 governance_state = self._extract_frontend_governance_state(executive_summary)
@@ -267,9 +267,7 @@ class LaunchRehearsalRunner:
             governance_state = self._extract_frontend_governance_state(executive_summary)
             if governance_state:
                 detail = f"{detail}; ui_governance={governance_state}"
-            return RehearsalCheck(
-                "Quality Gate", False, detail, severity="critical"
-            )
+            return RehearsalCheck("Quality Gate", False, detail, severity="critical")
 
         score_match = re.search(r"(总分|Score)\D+(\d{1,3})/100", text, re.IGNORECASE)
         score = int(score_match.group(2)) if score_match else 0

@@ -15,6 +15,22 @@ from .models import ExtensionManifest, ExtensionStatus
 _IGNORED_PARTS = {".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 
 
+def _stable_file_bytes(path: Path) -> bytes:
+    """Return cross-platform bytes for content identity.
+
+    Git may materialize the same committed UTF-8 text with LF or CRLF depending
+    on the checkout.  Text sources therefore use LF for hashing, while binary
+    sources retain their exact bytes.
+    """
+
+    payload = path.read_bytes()
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return payload
+    return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+
+
 def _inside(root: Path, path: Path) -> bool:
     try:
         path.relative_to(root)
@@ -35,7 +51,7 @@ def stable_content_digest(path: Path) -> str:
     target = Path(path).resolve()
     hasher = hashlib.sha256()
     if target.is_file():
-        hasher.update(target.read_bytes())
+        hasher.update(_stable_file_bytes(target))
         return f"sha256:{hasher.hexdigest()}"
     if not target.is_dir():
         raise FileNotFoundError(f"来源不存在: {target}")
@@ -51,7 +67,7 @@ def stable_content_digest(path: Path) -> str:
         label = item.relative_to(target).as_posix()
         hasher.update(label.encode("utf-8"))
         hasher.update(b"\0")
-        hasher.update(item.read_bytes())
+        hasher.update(_stable_file_bytes(item))
         hasher.update(b"\0")
     return f"sha256:{hasher.hexdigest()}"
 
@@ -146,14 +162,17 @@ class SourceLockVerifier:
             "source": expected,
             "manifest_digest": str(locked.get("manifest_digest", "")).strip(),
         }
-        identity_digest = "sha256:" + hashlib.sha256(
-            json.dumps(
-                identity_payload,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        ).hexdigest()
+        identity_digest = (
+            "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    identity_payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+        )
 
         return SourceVerification(
             status=ExtensionStatus.PASS if not errors else ExtensionStatus.BLOCKED,

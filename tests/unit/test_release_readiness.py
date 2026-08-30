@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 from super_dev import __version__
@@ -17,6 +18,9 @@ from super_dev.review_state import (
 )
 from super_dev.reviewers.architecture_drift import (
     _report_dependencies as _architecture_drift_dependencies,
+)
+from super_dev.reviewers.quality_gate import (
+    quality_evidence_dependency_paths,
 )
 from super_dev.reviewers.spec_compliance import (
     _report_dependencies as _spec_compliance_dependencies,
@@ -40,7 +44,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         parents=True,
         exist_ok=True,
     )
-    (project_dir / "pyproject.toml").write_text(f'[project]\nversion = "{__version__}"\n[project.scripts]\nsuper-dev = "super_dev.cli:main"\n', encoding="utf-8")
+    (project_dir / "pyproject.toml").write_text(
+        f'[project]\nversion = "{__version__}"\n[project.scripts]\nsuper-dev = "super_dev.cli:main"\n',
+        encoding="utf-8",
+    )
     (project_dir / ".gitignore").write_text(
         "\n".join(
             [
@@ -66,7 +73,9 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    (project_dir / "super_dev" / "__init__.py").write_text(f'__version__ = "{__version__}"\n', encoding="utf-8")
+    (project_dir / "super_dev" / "__init__.py").write_text(
+        f'__version__ = "{__version__}"\n', encoding="utf-8"
+    )
     (project_dir / "README.md").write_text(
         f"当前版本：`{__version__}`\nuv tool install super-dev\n/super-dev\nsuper-dev:\nsuper-dev update\n",
         encoding="utf-8",
@@ -110,7 +119,9 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     )
     (project_dir / "install.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     for name in ("change.yaml", "proposal.md", "tasks.md"):
-        (project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / name).write_text(
+        (
+            project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / name
+        ).write_text(
             "ok\n",
             encoding="utf-8",
         )
@@ -188,14 +199,18 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         json.dumps({"score": 92, "critical_count": 0}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    (project_dir / "output" / f"{project_dir.name}-uiux.md").write_text(
+        "# UIUX\n", encoding="utf-8"
+    )
+    quality_deps = quality_evidence_dependency_paths(
+        project_dir,
+        project_name=project_dir.name,
+        frontend_required=True,
+    )
     quality_gate_identity = build_evidence_identity(
         project_dir,
         artifact_name="quality-gate",
-        dependencies=[
-            project_dir / "output" / f"{project_dir.name}-ui-review.json",
-            project_dir / "output" / f"{project_dir.name}-ui-contract-alignment.json",
-            project_dir / "output" / f"{project_dir.name}-uiux.md",
-        ],
+        dependencies=quality_deps,
     )
     (project_dir / "output" / f"{project_dir.name}-quality-gate.json").write_text(
         json.dumps(
@@ -293,6 +308,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     record_stage_progress(project_dir, stage="spec", status="completed")
     record_stage_progress(project_dir, stage="frontend", status="completed")
     save_bound_preview_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
+    record_stage_progress(project_dir, stage="backend", status="completed")
     record_stage_progress(project_dir, stage="quality", status="completed")
 
     ui_contract_path = project_dir / "output" / f"{project_dir.name}-ui-contract.json"
@@ -302,14 +318,15 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
 
+    quality_deps = quality_evidence_dependency_paths(
+        project_dir,
+        project_name=project_dir.name,
+        frontend_required=True,
+    )
     quality_gate_identity = build_evidence_identity(
         project_dir,
         artifact_name="quality-gate",
-        dependencies=[
-            project_dir / "output" / f"{project_dir.name}-ui-review.json",
-            project_dir / "output" / f"{project_dir.name}-ui-contract-alignment.json",
-            project_dir / "output" / f"{project_dir.name}-uiux.md",
-        ],
+        dependencies=quality_deps,
     )
     (project_dir / "output" / f"{project_dir.name}-quality-gate.json").write_text(
         json.dumps(
@@ -543,7 +560,9 @@ def test_release_readiness_fails_when_host_runtime_validation_repo_probe_breaks(
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
 
-    runtime_check = next(check for check in report.checks if check.name == "Host Runtime Validation")
+    runtime_check = next(
+        check for check in report.checks if check.name == "Host Runtime Validation"
+    )
     assert runtime_check.passed is False
     assert "repo_probe_failed=codex-cli" in runtime_check.detail
     assert "codex-cli 已人工通过，但仓库级 repo probe 仍未通过" in report.executive_summary
@@ -600,7 +619,9 @@ def test_release_readiness_executive_summary_exposes_workflow_and_baseline_conte
     assert "## Baseline Governance" in markdown
 
 
-def test_release_readiness_fails_when_delivery_closure_is_incomplete(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_delivery_closure_is_incomplete(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     (temp_project_dir / "output" / f"{temp_project_dir.name}-task-execution.md").unlink()
 
@@ -612,7 +633,9 @@ def test_release_readiness_fails_when_delivery_closure_is_incomplete(temp_projec
     assert "task execution missing" in closure_check.detail
 
 
-def test_release_readiness_fails_when_ui_contract_closure_is_incomplete(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_ui_contract_closure_is_incomplete(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     (temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json").unlink()
 
@@ -624,7 +647,9 @@ def test_release_readiness_fails_when_ui_contract_closure_is_incomplete(temp_pro
     assert "ui contract missing" in closure_check.detail
 
 
-def test_release_readiness_fails_when_frontend_runtime_structural_ui_checks_fail(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_frontend_runtime_structural_ui_checks_fail(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     runtime_file = temp_project_dir / "output" / f"{temp_project_dir.name}-frontend-runtime.json"
     runtime_file.write_text(
@@ -858,7 +883,9 @@ def test_release_readiness_fails_when_cross_platform_runtime_missing_framework_e
     assert "uni-app frontend runtime framework execution missing" in closure_check.detail
 
 
-def test_release_readiness_fails_when_ui_contract_missing_emoji_policy(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_ui_contract_missing_emoji_policy(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     contract_file = temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json"
     payload = json.loads(contract_file.read_text(encoding="utf-8"))
@@ -969,7 +996,9 @@ def test_release_readiness_treats_waiting_baseline_confirmation_as_blocker(
     report = evaluator.evaluate(verify_tests=False)
 
     assert report.passed is False
-    recovery_check = next(check for check in report.checks if check.name == "Workflow Recovery Trail")
+    recovery_check = next(
+        check for check in report.checks if check.name == "Workflow Recovery Trail"
+    )
     assert recovery_check.passed is False
     assert "baseline confirmation pending" in recovery_check.detail
     assert "baseline" in report.executive_summary
@@ -1029,7 +1058,9 @@ def test_release_readiness_fails_when_frontend_runtime_evidence_identity_mismatc
     runtime_file = output_dir / f"{temp_project_dir.name}-frontend-runtime.json"
     runtime_payload = json.loads(runtime_file.read_text(encoding="utf-8"))
     runtime_payload["evidence_identity"] = identity
-    runtime_file.write_text(json.dumps(runtime_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    runtime_file.write_text(
+        json.dumps(runtime_payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (output_dir / f"{temp_project_dir.name}-ui-contract.json").write_text(
         json.dumps(
             {
@@ -1076,12 +1107,16 @@ def test_release_readiness_fails_when_active_workflow_recovery_trail_is_incomple
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
 
-    continuity_check = next(check for check in report.checks if check.name == "Workflow Recovery Trail")
+    continuity_check = next(
+        check for check in report.checks if check.name == "Workflow Recovery Trail"
+    )
     assert continuity_check.passed is False
     assert "workflow recovery trail incomplete" in continuity_check.detail
 
 
-def test_release_readiness_fails_when_hook_audit_contains_blocked_event(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_hook_audit_contains_blocked_event(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     history_file = HookManager.hook_history_file(temp_project_dir)
     history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -1191,11 +1226,17 @@ def test_release_readiness_fails_when_operational_harness_has_blockers(
     assert "需要先处理" in operational_check.detail
 
 
-def test_release_readiness_fails_when_latest_spec_contains_tbd_placeholders(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_latest_spec_contains_tbd_placeholders(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     _prepare_spec_quality_change(temp_project_dir, change_id="placeholder-change")
 
-    spec_file = next((temp_project_dir / ".super-dev" / "changes" / "placeholder-change" / "specs").rglob("spec.md"))
+    spec_file = next(
+        (temp_project_dir / ".super-dev" / "changes" / "placeholder-change" / "specs").rglob(
+            "spec.md"
+        )
+    )
     spec_file.write_text(
         "# Placeholder Change\n\n## Requirements\n\n### Requirement: Example\n\nSHALL keep placeholder\n\n#### Scenario 1: TBD\n- DETAIL REQUIRED\n",
         encoding="utf-8",
@@ -1209,7 +1250,9 @@ def test_release_readiness_fails_when_latest_spec_contains_tbd_placeholders(temp
     assert "placeholder-change" in spec_check.detail
 
 
-def test_release_readiness_fails_when_scope_coverage_has_high_priority_gap(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_scope_coverage_has_high_priority_gap(
+    temp_project_dir: Path,
+) -> None:
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1245,3 +1288,55 @@ def test_release_readiness_fails_when_scope_coverage_has_high_priority_gap(temp_
     scope_check = next(check for check in report.checks if check.name == "Scope Coverage")
     assert scope_check.passed is False
     assert "high_priority_gaps=1" in scope_check.detail
+
+
+def test_runtime_boundary_accepts_versioned_host_integration_surfaces(
+    temp_project_dir: Path,
+) -> None:
+    _prepare_release_ready_project(temp_project_dir)
+    gitignore = temp_project_dir / ".gitignore"
+    gitignore.write_text(
+        gitignore.read_text(encoding="utf-8").replace("/.claude/\n", "").replace("/.cursor/\n", ""),
+        encoding="utf-8",
+    )
+    (temp_project_dir / ".claude").mkdir()
+    (temp_project_dir / ".cursor").mkdir()
+    (temp_project_dir / ".claude" / "CLAUDE.md").write_text("# Integration\n", encoding="utf-8")
+    (temp_project_dir / ".cursor" / "rules.md").write_text("# Integration\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "init", "-q"],
+        cwd=temp_project_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "add", ".claude/CLAUDE.md", ".cursor/rules.md"],
+        cwd=temp_project_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    check = ReleaseReadinessEvaluator(temp_project_dir)._check_runtime_boundary_rules()
+
+    assert check.passed is True
+    assert check.evidence["missing_rules"] == []
+    assert check.evidence["versioned_host_surfaces"] == ["/.claude/", "/.cursor/"]
+
+
+def test_runtime_boundary_rejects_unversioned_host_surface_without_ignore_rule(
+    temp_project_dir: Path,
+) -> None:
+    _prepare_release_ready_project(temp_project_dir)
+    gitignore = temp_project_dir / ".gitignore"
+    gitignore.write_text(
+        gitignore.read_text(encoding="utf-8").replace("/.claude/\n", ""),
+        encoding="utf-8",
+    )
+
+    check = ReleaseReadinessEvaluator(temp_project_dir)._check_runtime_boundary_rules()
+
+    assert check.passed is False
+    assert check.evidence["missing_rules"] == ["/.claude/"]
+    assert check.evidence["versioned_host_surfaces"] == []

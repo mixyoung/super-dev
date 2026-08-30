@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from super_dev.change_ledger import ChangeLedger
@@ -126,6 +127,242 @@ def test_detect_pipeline_summary_seeai_skips_preview_gate(temp_project_dir: Path
     assert "SEEAI" in summary["recommended_command"]
 
 
+def _prepare_implemented_project(temp_project_dir: Path, *, frontend: str, backend: str) -> None:
+    superdev_dir = temp_project_dir / ".super-dev"
+    output_dir = temp_project_dir / "output"
+    changes_dir = superdev_dir / "changes" / "demo-change"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    changes_dir.mkdir(parents=True, exist_ok=True)
+    (superdev_dir / "workflow-state.json").write_text(
+        json.dumps({"work_mode": "evolve"}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "\n".join(
+            [
+                "name: existing-cli",
+                "platform: cli",
+                f"frontend: {frontend}",
+                f"backend: {backend}",
+                "database: none",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    for suffix in ("research", "prd", "architecture", "uiux"):
+        (output_dir / f"{temp_project_dir.name}-{suffix}.md").write_text(
+            suffix,
+            encoding="utf-8",
+        )
+    (output_dir / f"{temp_project_dir.name}-baseline-audit.md").write_text(
+        "baseline",
+        encoding="utf-8",
+    )
+    (changes_dir / "proposal.md").write_text("proposal", encoding="utf-8")
+    (changes_dir / "tasks.md").write_text("tasks", encoding="utf-8")
+    save_baseline_confirmation(
+        temp_project_dir,
+        {
+            "status": "confirmed",
+            "comment": "existing project baseline confirmed",
+            "actor": "pytest",
+        },
+    )
+
+
+def test_detect_pipeline_summary_treats_root_python_cli_as_implemented_backend(
+    temp_project_dir: Path,
+) -> None:
+    _prepare_implemented_project(temp_project_dir, frontend="none", backend="python")
+    (temp_project_dir / "pyproject.toml").write_text(
+        '[project]\nname = "existing-cli"\nversion = "1.0.0"\n',
+        encoding="utf-8",
+    )
+    (temp_project_dir / "super_dev").mkdir()
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["frontend_required"] is False
+    assert summary["backend_required"] is True
+    assert summary["artifacts"]["frontend"] is True
+    assert summary["artifacts"]["frontend_runtime_report"] == ""
+    assert summary["artifacts"]["backend"] is True
+    assert summary["workflow_status"] == "missing_quality"
+    assert summary["workflow_status"] not in {"missing_frontend", "waiting_preview_confirmation"}
+    stage_statuses = {stage["canonical_id"]: stage["status"] for stage in summary["stages"]}
+    assert stage_statuses["frontend"] == "not_applicable"
+    assert stage_statuses["preview_confirm"] == "not_applicable"
+    assert stage_statuses["backend"] == "completed"
+    expert_stages = {stage["stage"]: stage for stage in summary["expert_governance"]["stages"]}
+    assert expert_stages["frontend"]["evidence_status"] == "not_required"
+    assert expert_stages["preview_confirm"]["evidence_status"] == "not_required"
+
+
+def test_detect_pipeline_summary_still_requires_runtime_for_configured_frontend(
+    temp_project_dir: Path,
+) -> None:
+    _prepare_implemented_project(temp_project_dir, frontend="react", backend="none")
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["frontend_required"] is True
+    assert summary["backend_required"] is False
+    assert summary["artifacts"]["frontend"] is False
+    assert summary["artifacts"]["backend"] is True
+    assert summary["workflow_status"] == "missing_frontend"
+    backend_stage = next(stage for stage in summary["stages"] if stage["canonical_id"] == "backend")
+    assert backend_stage["status"] == "not_applicable"
+    assert backend_stage["expert_evidence_status"] == "not_required"
+
+
+def _prepare_active_change_pipeline(
+    project_dir: Path,
+    *,
+    active_change_id: str = "active-change",
+    frontend: str = "none",
+) -> tuple[Path, Path]:
+    superdev_dir = project_dir / ".super-dev"
+    output_dir = project_dir / "output"
+    change_dir = superdev_dir / "changes" / active_change_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+    change_dir.mkdir(parents=True, exist_ok=True)
+    (superdev_dir / "workflow-state.json").write_text(
+        json.dumps(
+            {"active_change_id": active_change_id, "work_mode": "new"},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "super-dev.yaml").write_text(
+        f"name: configured-project\nfrontend: {frontend}\nbackend: none\n",
+        encoding="utf-8",
+    )
+    for suffix in ("research", "prd", "architecture", "uiux"):
+        (output_dir / f"{active_change_id}-{suffix}.md").write_text(
+            suffix,
+            encoding="utf-8",
+        )
+    (change_dir / "proposal.md").write_text("proposal", encoding="utf-8")
+    (change_dir / "tasks.md").write_text("tasks", encoding="utf-8")
+    return output_dir, change_dir
+
+
+def test_active_change_research_docs_and_spec_ignore_other_changes(
+    temp_project_dir: Path,
+) -> None:
+    superdev_dir = temp_project_dir / ".super-dev"
+    output_dir = temp_project_dir / "output"
+    active_dir = superdev_dir / "changes" / "active-change"
+    other_dir = superdev_dir / "changes" / "other-change"
+    output_dir.mkdir(parents=True)
+    active_dir.mkdir(parents=True)
+    other_dir.mkdir(parents=True)
+    (superdev_dir / "workflow-state.json").write_text(
+        json.dumps({"active_change_id": "active-change", "work_mode": "new"}),
+        encoding="utf-8",
+    )
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "frontend: none\nbackend: none\n",
+        encoding="utf-8",
+    )
+    for suffix in ("research", "prd", "architecture", "uiux"):
+        (output_dir / f"other-change-{suffix}.md").write_text(suffix, encoding="utf-8")
+    (other_dir / "proposal.md").write_text("proposal", encoding="utf-8")
+    (other_dir / "tasks.md").write_text("tasks", encoding="utf-8")
+
+    missing_active_docs = detect_pipeline_summary(temp_project_dir)
+    assert missing_active_docs["workflow_status"] == "missing_research"
+    assert missing_active_docs["artifacts"]["spec"] is False
+
+    for suffix in ("research", "prd", "architecture", "uiux"):
+        (output_dir / f"active-change-{suffix}.md").write_text(suffix, encoding="utf-8")
+    save_bound_docs_confirmation(
+        temp_project_dir,
+        {"status": "confirmed", "actor": "pytest"},
+    )
+
+    missing_active_spec = detect_pipeline_summary(temp_project_dir)
+    assert missing_active_spec["workflow_status"] == "missing_spec"
+    assert missing_active_spec["artifacts"]["spec"] is False
+
+
+def test_active_change_quality_requires_passed_json_not_markdown_or_failed_json(
+    temp_project_dir: Path,
+) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir)
+    quality_markdown = output_dir / "active-change-quality-gate.md"
+    quality_json = output_dir / "active-change-quality-gate.json"
+    quality_markdown.write_text("# generated only", encoding="utf-8")
+
+    markdown_only = detect_pipeline_summary(temp_project_dir)
+    assert markdown_only["active_change_id"] == "active-change"
+    assert markdown_only["artifact_prefix"] == "active-change"
+    assert markdown_only["workflow_status"] == "missing_quality"
+    assert markdown_only["artifacts"]["quality"] is False
+
+    quality_json.write_text(json.dumps({"passed": False}), encoding="utf-8")
+    failed = detect_pipeline_summary(temp_project_dir)
+    assert failed["workflow_status"] == "missing_quality"
+    assert failed["artifacts"]["quality_gate_state"]["status"] == "failed"
+
+
+def test_active_change_stale_quality_json_is_not_complete(temp_project_dir: Path) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir)
+    quality_json = output_dir / "active-change-quality-gate.json"
+    quality_json.write_text(json.dumps({"passed": True}), encoding="utf-8")
+    quality_mtime = quality_json.stat().st_mtime
+    prd_file = output_dir / "active-change-prd.md"
+    os.utime(prd_file, (quality_mtime + 5, quality_mtime + 5))
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["workflow_status"] == "missing_quality"
+    assert summary["artifacts"]["quality"] is False
+    assert summary["artifacts"]["quality_gate_state"]["stale"] is True
+    assert str(prd_file) in summary["artifacts"]["quality_gate_state"]["newer_dependencies"]
+
+
+def test_active_change_passed_current_quality_json_enters_delivery(
+    temp_project_dir: Path,
+) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir)
+    quality_json = output_dir / "active-change-quality-gate.json"
+    quality_json.write_text(json.dumps({"passed": True}), encoding="utf-8")
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["workflow_status"] == "missing_delivery"
+    assert summary["artifacts"]["quality"] is True
+    assert summary["artifacts"]["quality_gate_report"] == str(quality_json)
+
+
+def test_frontend_none_quality_freshness_ignores_ui_and_other_change_artifacts(
+    temp_project_dir: Path,
+) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir, frontend="none")
+    quality_json = output_dir / "active-change-quality-gate.json"
+    quality_json.write_text(json.dumps({"passed": True}), encoding="utf-8")
+    quality_mtime = quality_json.stat().st_mtime
+    for filename in (
+        "active-change-ui-contract.json",
+        "active-change-frontend-runtime.json",
+        "other-change-ui-review.json",
+        "other-change-prd.md",
+    ):
+        artifact = output_dir / filename
+        artifact.write_text(json.dumps({"passed": True}), encoding="utf-8")
+        os.utime(artifact, (quality_mtime + 5, quality_mtime + 5))
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["frontend_required"] is False
+    assert summary["workflow_status"] == "missing_delivery"
+    assert summary["artifacts"]["quality"] is True
+    assert summary["artifacts"]["quality_gate_state"]["stale"] is False
+
+
 def test_detect_pipeline_summary_includes_read_only_shadow_ledger(
     temp_project_dir: Path,
 ) -> None:
@@ -162,9 +399,7 @@ def test_shadow_ledger_does_not_change_workflow_control_fields(
         governance_depth="commercial",
         work_mode="evolve",
     )
-    ledger_path = (
-        temp_project_dir / ".super-dev" / "changes" / "control-check" / "ledger.json"
-    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "control-check" / "ledger.json"
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     ledger_path.write_text(json.dumps(ledger.to_dict()), encoding="utf-8")
 

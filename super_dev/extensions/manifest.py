@@ -91,7 +91,9 @@ def parse_manifest(data: Any, *, manifest_path: Path | None = None) -> Extension
         "execution",
         "result",
     }
-    _strict_keys(root, field="manifest", required=root_required, allowed=root_required, errors=errors)
+    _strict_keys(
+        root, field="manifest", required=root_required, allowed=root_required, errors=errors
+    )
 
     schema_version = root.get("schema_version")
     if schema_version != 1:

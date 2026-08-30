@@ -270,6 +270,38 @@ class TestSpecConsistencyChecker:
         task_drifts = [i for i in issues if i.category == "task_drift"]
         assert len(task_drifts) == 0
 
+    def test_task_completion_ignores_review_and_negative_scope_items(self, project_dir: Path):
+        change_dir = project_dir / ".super-dev" / "changes" / "test-change"
+        (change_dir / "tasks.md").write_text(
+            "# Tasks\n\n"
+            "- [x] A3. Grok Build 最终复审为 `VERDICT=ACCEPT`。\n"
+            "- [x] I7. 未接入系统化调试、TDD、Forge 或 Grill。\n",
+            encoding="utf-8",
+        )
+
+        checker = SpecConsistencyChecker(project_dir)
+
+        assert checker._check_task_completion("test-change") == []
+
+    def test_task_identifier_is_not_treated_as_code_evidence(self, project_dir: Path):
+        change_dir = project_dir / ".super-dev" / "changes" / "test-change"
+        (change_dir / "tasks.md").write_text(
+            "# Tasks\n\n- [x] J10. Fix compliance command routing\n",
+            encoding="utf-8",
+        )
+        src_dir = project_dir / "src"
+        src_dir.mkdir()
+        (src_dir / "cli.py").write_text(
+            "def route_compliance_command():\n    return 'compliance routing'\n",
+            encoding="utf-8",
+        )
+
+        checker = SpecConsistencyChecker(project_dir)
+        issues = checker._check_task_completion("test-change")
+
+        assert issues == []
+        assert "j10" not in checker._extract_keywords("J10. Fix compliance command routing")
+
     def test_calculate_score(self, project_dir: Path):
         """分数计算逻辑"""
         checker = SpecConsistencyChecker(project_dir)

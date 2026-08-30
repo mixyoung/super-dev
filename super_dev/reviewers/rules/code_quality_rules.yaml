@@ -112,18 +112,19 @@ rules:
     severity: critical
     phase: all
     description: 日志中不应打印密码、token、密钥等敏感信息
-    check_type: content_not_contains
+    check_type: python_sensitive_logging
     check_config:
       file_pattern: "**/*.py"
-      patterns:
-        - "log.*password"
-        - "log.*secret"
-        - "log.*token"
-        - "logger.*password"
-        - "logger.*secret"
-        - "print.*password"
-        - "print.*secret"
-        - "print.*api_key"
+      sensitive_names:
+        - "password"
+        - "passwd"
+        - "secret"
+        - "secrets"
+        - "token"
+        - "credential"
+        - "credentials"
+        - "api_key"
+        - "private_key"
     tags:
       - security
       - logging

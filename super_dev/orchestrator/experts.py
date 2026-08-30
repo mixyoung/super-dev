@@ -465,7 +465,7 @@ class ExpertOutput:
     role: ExpertRole
     document_type: str  # prd | architecture | uiux | redteam | quality-gate | ...
     content: str
-    quality_score: int = 85  # 0-100
+    quality_score: float = 85.0  # 0-100
     metadata: dict = field(default_factory=dict)
 
 
@@ -680,10 +680,12 @@ class ExpertDispatcher:
                 ),
             )
 
-            (prd_content, prd_score), (arch_content, arch_score), (uiux_content, uiux_score) = await asyncio.gather(
-                prd_future,
-                arch_future,
-                uiux_future,
+            (prd_content, prd_score), (arch_content, arch_score), (uiux_content, uiux_score) = (
+                await asyncio.gather(
+                    prd_future,
+                    arch_future,
+                    uiux_future,
+                )
             )
             executor.shutdown(wait=False)
             logger.info("并行文档生成完成 (3 docs)")
@@ -856,11 +858,13 @@ class ExpertDispatcher:
             role=ExpertRole.QA,
             document_type="quality-gate",
             content=content,
-            quality_score=result.total_score,
+            quality_score=result.gate_score,
             metadata={
                 "passed": result.passed,
                 "scenario": result.scenario,
                 "weighted_score": result.weighted_score,
+                "unweighted_score": result.total_score,
+                "threshold": result.threshold,
                 "ui_review": ui_review_payload,
             },
         )

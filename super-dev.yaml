@@ -1,15 +1,12 @@
-author: ''
 adaptive_ledger:
   auto_create: true
   enabled: true
   scope_advisory: true
-extensions:
-  allowed_builtin_methods: []
-  enabled: false
-backend: node
+author: ''
+backend: python
 cli: {}
-database: postgresql
-description: think 做一个龙虾抓取小游戏 --mode competition
+database: none
+description: 宿主内 AI Coding 流程治理与商业级软件交付的 Python CLI 工具
 domain: ''
 experts:
 - PM
@@ -18,7 +15,26 @@ experts:
 - UX
 - SECURITY
 - CODE
-frontend: react
+extensions:
+  allowed_builtin_methods:
+  - fresh-verification
+  enabled: true
+  fresh_verification:
+    args:
+    - -q
+    - tests/extensions
+    - tests/unit/test_release_readiness.py
+    - tests/unit/test_release_readiness_enhanced.py
+    - tests/unit/test_safe_baseline_runner.py
+    - tests/unit/test_super_dev_skill_contracts.py
+    - tests/unit/test_quality_gate.py
+    - tests/unit/test_proof_pack_enhanced.py
+    - tests/unit/test_delivery_packager.py
+    - tests/unit/test_analyzer.py
+    plan_id: completion-verification-candidate-006
+    profile: pytest-current-python
+    timeout_seconds: 900
+frontend: none
 host_compatibility_min_ready_hosts: 1
 host_compatibility_min_score: 80
 host_profile_enforce_selected: true
@@ -44,7 +60,8 @@ knowledge_allowed_domains:
 - docs.anthropic.com
 - docs.vllm.ai
 knowledge_cache_ttl_seconds: 1800
-language_preferences: []
+language_preferences:
+- python
 license: MIT
 name: super-dev
 output_dir: output
@@ -56,8 +73,9 @@ phases:
 - qa
 - delivery
 - deployment
-platform: web
+platform: cli
 quality_gate: 90
 state_management: []
-testing_frameworks: []
-version: 2.3.8
+testing_frameworks:
+- pytest
+version: 2.4.0

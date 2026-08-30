@@ -6,13 +6,89 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from super_dev.extensions.builtins.fresh_verification import parse_junit_summary
 from super_dev.review_state import save_host_runtime_validation, save_workflow_state
 from super_dev.reviewers.quality_gate import (
     CheckStatus,
     QualityCheck,
     QualityGateChecker,
     QualityGateResult,
+    inspect_current_fresh_verification,
 )
+from super_dev.workflow_guard import save_bound_docs_confirmation
+
+
+def _write_quality_config(
+    project_dir: Path,
+    *,
+    frontend: str,
+    fresh_verification: bool = False,
+) -> None:
+    extensions = ""
+    if fresh_verification:
+        extensions = (
+            "extensions:\n"
+            "  enabled: true\n"
+            "  allowed_builtin_methods:\n"
+            "    - fresh-verification\n"
+            "  fresh_verification:\n"
+            "    profile: pytest-current-python\n"
+            "    plan_id: test-plan\n"
+            "    args:\n"
+            "      - -q\n"
+            "      - tests\n"
+            "    timeout_seconds: 120\n"
+        )
+    (project_dir / "super-dev.yaml").write_text(
+        f"name: demo\nplatform: cli\nfrontend: {frontend}\nbackend: python\n{extensions}",
+        encoding="utf-8",
+    )
+
+
+def _activate_quality_change(project_dir: Path, change_id: str = "current-change") -> None:
+    (project_dir / ".super-dev" / "changes" / change_id).mkdir(parents=True)
+    state_path = project_dir / ".super-dev" / "workflow-state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps({"active_change_id": change_id}),
+        encoding="utf-8",
+    )
+
+
+def _write_fresh_run_files(
+    project_dir: Path,
+    *,
+    run_id: str,
+    tests: int = 12,
+    failures: int = 0,
+    errors: int = 0,
+    skipped: int = 1,
+    duration: float = 0.25,
+) -> tuple[Path, Path]:
+    run_dir = project_dir / ".super-dev" / "extensions" / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    junit_path = run_dir / "pytest.xml"
+    junit_path.write_text(
+        (
+            f'<testsuite tests="{tests}" failures="{failures}" errors="{errors}" '
+            f'skipped="{skipped}" time="{duration}"></testsuite>'
+        ),
+        encoding="utf-8",
+    )
+    summary_path = run_dir / "pytest-summary.json"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": "PASS",
+                "pytest_summary": parse_junit_summary(junit_path).to_dict(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    return summary_path, junit_path
 
 
 class TestQualityGateChecker:
@@ -38,11 +114,12 @@ class TestQualityGateChecker:
         assert checker.is_zero_to_one is False
 
     def test_threshold_override(self, temp_project_dir: Path, monkeypatch):
+        _write_quality_config(temp_project_dir, frontend="none")
         checker = QualityGateChecker(
             project_dir=temp_project_dir,
             name="demo",
-            tech_stack={"frontend": "react", "backend": "node"},
-            scenario_override="0-1",
+            tech_stack={"frontend": "none", "backend": "python"},
+            scenario_override="1-N+1",
             threshold_override=95,
         )
 
@@ -51,25 +128,54 @@ class TestQualityGateChecker:
         monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
         monkeypatch.setattr(checker, "_check_testing", lambda: [])
         monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
-        monkeypatch.setattr(
-            checker,
-            "_check_ui_contract_execution",
-            lambda: QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约执行",
-                status=CheckStatus.PASSED,
-                score=100,
-            ),
-        )
-        monkeypatch.setattr(checker, "_calculate_total_score", lambda _c: 90)
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        monkeypatch.setattr(checker, "_calculate_total_score", lambda _c: 100)
         monkeypatch.setattr(checker, "_calculate_weighted_score", lambda _c: 90.0)
         monkeypatch.setattr(checker, "_generate_recommendations", lambda _c: [])
+        checker._rule_engine = None
 
         result = checker.check(None)
+
+        assert result.total_score == 100
+        assert result.weighted_score == 90.0
+        assert result.critical_failures == []
         assert result.passed is False
 
-    def test_required_failed_check_blocks_gate_even_with_high_score(self, temp_project_dir: Path, monkeypatch):
+    def test_threshold_override_uses_weighted_score(self, temp_project_dir: Path, monkeypatch):
+        _write_quality_config(temp_project_dir, frontend="none")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+            scenario_override="1-N+1",
+            threshold_override=90,
+        )
+
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        monkeypatch.setattr(checker, "_calculate_total_score", lambda _c: 89)
+        monkeypatch.setattr(checker, "_calculate_weighted_score", lambda _c: 90.93)
+        monkeypatch.setattr(checker, "_generate_recommendations", lambda _c: [])
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        assert result.total_score == 89
+        assert result.weighted_score == 90.93
+        assert result.gate_score == 90.93
+        assert result.threshold == 90.0
+        assert result.critical_failures == []
+        assert result.passed is True
+        assert result.to_dict()["gate_score"] == 90.93
+        assert result.to_dict()["threshold"] == 90.0
+
+    def test_required_failed_check_blocks_gate_even_with_high_score(
+        self, temp_project_dir: Path, monkeypatch
+    ):
         checker = QualityGateChecker(
             project_dir=temp_project_dir,
             name="demo",
@@ -132,7 +238,9 @@ class TestQualityGateChecker:
             tech_stack={"frontend": "react", "backend": "python"},
         )
 
-        monkeypatch.setattr("super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest")
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest"
+        )
         monkeypatch.setattr(
             checker,
             "_run_command",
@@ -161,7 +269,9 @@ class TestQualityGateChecker:
             tech_stack={"frontend": "react", "backend": "python"},
         )
 
-        monkeypatch.setattr("super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest")
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest"
+        )
         monkeypatch.setattr(
             checker,
             "_run_command",
@@ -179,6 +289,148 @@ class TestQualityGateChecker:
         assert names["测试执行"].status.value == "failed"
         assert names["测试覆盖率"].status.value == "failed"
 
+    def test_testing_uses_current_fresh_pass_without_running_ambient_pytest(
+        self,
+        temp_project_dir: Path,
+        monkeypatch,
+    ):
+        _write_quality_config(
+            temp_project_dir,
+            frontend="none",
+            fresh_verification=True,
+        )
+        _write_fresh_run_files(temp_project_dir, run_id="run-current")
+        payload = {
+            "extension_id": "fresh-verification",
+            "run_id": "run-current",
+            "status": "PASS",
+            "candidate": {"candidate_digest": "candidate-current"},
+        }
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            lambda self, *, extension_id: payload,
+        )
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+        )
+        monkeypatch.setattr(
+            checker,
+            "_run_command",
+            lambda *args, **kwargs: pytest.fail("ambient pytest must not run"),
+        )
+        monkeypatch.setattr(checker, "_append_testing_evidence_checks", lambda checks: None)
+
+        checks = checker._check_testing()
+        execution = next(item for item in checks if item.name == "测试执行")
+
+        assert execution.status == CheckStatus.PASSED
+        assert "executed=11" in execution.details
+        assert "failures=0" in execution.details
+        assert "errors=0" in execution.details
+
+    @pytest.mark.parametrize("mutation", ["delete-junit", "tamper-summary"])
+    def test_fresh_pass_requires_junit_and_matching_summary(
+        self,
+        temp_project_dir: Path,
+        monkeypatch,
+        mutation: str,
+    ) -> None:
+        summary_path, junit_path = _write_fresh_run_files(
+            temp_project_dir,
+            run_id="run-current",
+        )
+        payload = {
+            "extension_id": "fresh-verification",
+            "run_id": "run-current",
+            "status": "PASS",
+            "candidate": {"candidate_digest": "candidate-current"},
+        }
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            lambda self, *, extension_id: payload,
+        )
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
+        )
+        if mutation == "delete-junit":
+            junit_path.unlink()
+        else:
+            summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary_payload["pytest_summary"]["tests"] += 1
+            summary_path.write_text(json.dumps(summary_payload), encoding="utf-8")
+
+        evidence = inspect_current_fresh_verification(temp_project_dir)
+
+        assert evidence.passed is False
+        assert "JUnit" in evidence.detail
+
+    @pytest.mark.parametrize(
+        ("payload", "expected_detail"),
+        [
+            (None, "缺少证据"),
+            (
+                {
+                    "extension_id": "fresh-verification",
+                    "run_id": "run-stale",
+                    "status": "PASS",
+                    "candidate": {"candidate_digest": "candidate-old"},
+                    "pytest_summary": {
+                        "tests": 1,
+                        "executed": 1,
+                        "skipped": 0,
+                        "failures": 0,
+                        "errors": 0,
+                    },
+                },
+                "已过期",
+            ),
+        ],
+    )
+    def test_testing_does_not_run_ambient_when_fresh_evidence_is_missing_or_stale(
+        self,
+        temp_project_dir: Path,
+        monkeypatch,
+        payload,
+        expected_detail: str,
+    ):
+        _write_quality_config(
+            temp_project_dir,
+            frontend="none",
+            fresh_verification=True,
+        )
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            lambda self, *, extension_id: payload,
+        )
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+        )
+        monkeypatch.setattr(
+            checker,
+            "_run_command",
+            lambda *args, **kwargs: pytest.fail("ambient pytest must not run"),
+        )
+        monkeypatch.setattr(checker, "_append_testing_evidence_checks", lambda checks: None)
+
+        checks = checker._check_testing()
+        execution = next(item for item in checks if item.name == "测试执行")
+
+        assert execution.status == CheckStatus.FAILED
+        assert expected_detail in execution.details
+
     def test_read_coverage_percent(self, temp_project_dir: Path):
         coverage = temp_project_dir / "coverage.xml"
         coverage.write_text(
@@ -193,7 +445,184 @@ class TestQualityGateChecker:
         )
         assert checker._read_coverage_percent() == 76
 
-    def test_quality_gate_runs_compliance_checks_proactively(self, temp_project_dir: Path, monkeypatch):
+    def test_frontend_none_quality_skips_all_ui_checks(
+        self,
+        temp_project_dir: Path,
+        monkeypatch,
+    ):
+        _write_quality_config(temp_project_dir, frontend="none")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+        )
+        checker._rule_engine = None
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda report: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda report: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(
+            checker,
+            "_check_accessibility",
+            lambda: pytest.fail("accessibility is not applicable"),
+        )
+        monkeypatch.setattr(
+            checker,
+            "_check_performance_budget",
+            lambda: pytest.fail("frontend performance budget is not applicable"),
+        )
+        monkeypatch.setattr(
+            checker,
+            "_check_ui_contract_execution",
+            lambda: pytest.fail("UI contract is not applicable"),
+        )
+        monkeypatch.setattr(
+            checker,
+            "_check_ui_review",
+            lambda: pytest.fail("UI review is not applicable"),
+        )
+
+        result = checker.check()
+
+        assert checker.frontend_required is False
+        assert checker.latest_ui_review_report is None
+        assert not any(
+            item.category in {"accessibility", "ui_quality", "uiux_compliance"}
+            for item in result.checks
+        )
+
+    def test_frontend_project_quality_keeps_ui_checks(
+        self,
+        temp_project_dir: Path,
+        monkeypatch,
+    ):
+        _write_quality_config(temp_project_dir, frontend="react")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "react", "backend": "python"},
+        )
+        checker._rule_engine = None
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda report: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda report: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(
+            checker,
+            "_check_accessibility",
+            lambda: [
+                QualityCheck(
+                    name="Accessibility",
+                    category="accessibility",
+                    description="frontend accessibility",
+                    status=CheckStatus.PASSED,
+                    score=100,
+                )
+            ],
+        )
+        monkeypatch.setattr(checker, "_check_performance_budget", lambda: [])
+        monkeypatch.setattr(
+            checker,
+            "_check_ui_contract_execution",
+            lambda: QualityCheck(
+                name="UI Contract",
+                category="ui_quality",
+                description="frontend UI contract",
+                status=CheckStatus.PASSED,
+                score=100,
+            ),
+        )
+        monkeypatch.setattr(
+            checker,
+            "_check_ui_review",
+            lambda: QualityCheck(
+                name="UI Review",
+                category="ui_quality",
+                description="frontend UI review",
+                status=CheckStatus.PASSED,
+                score=100,
+            ),
+        )
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+
+        result = checker.check()
+
+        assert checker.frontend_required is True
+        assert {item.name for item in result.checks} >= {
+            "Accessibility",
+            "UI Contract",
+            "UI Review",
+        }
+
+    def test_frontend_none_document_consistency_uses_current_confirmation_binding(
+        self,
+        temp_project_dir: Path,
+    ):
+        _write_quality_config(temp_project_dir, frontend="none")
+        _activate_quality_change(temp_project_dir)
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True)
+        prd_lines = ["# PRD", "", "## 产品愿景", "", "## 功能需求", "", "## 验收标准"]
+        prd_lines.extend(f"1. 当前需求说明 {index} 可追踪。" for index in range(100))
+        architecture_lines = [
+            "# Architecture",
+            "",
+            "## 技术栈",
+            "",
+            "## 数据库",
+            "",
+            "## API",
+            "",
+            "## 运行约束",
+            "",
+            "```",
+            "config=true",
+            "```",
+        ]
+        architecture_lines.extend(f"架构说明 {index}" for index in range(80))
+        experience_lines = [
+            "# 使用体验",
+            "",
+            "## 命令入口",
+            "",
+            "## 输出层级",
+            "",
+            "## 错误恢复",
+            "",
+            "## 验收反馈",
+        ]
+        experience_lines.extend(f"使用体验说明 {index}" for index in range(80))
+        (output_dir / "current-change-prd.md").write_text("\n".join(prd_lines), encoding="utf-8")
+        (output_dir / "current-change-architecture.md").write_text(
+            "\n".join(architecture_lines), encoding="utf-8"
+        )
+        (output_dir / "current-change-uiux.md").write_text(
+            "\n".join(experience_lines), encoding="utf-8"
+        )
+        save_bound_docs_confirmation(
+            temp_project_dir,
+            {"status": "confirmed", "actor": "pytest", "run_id": "docs-current"},
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+        )
+
+        checks = checker._check_documentation()
+        by_name = {item.name: item for item in checks}
+
+        assert by_name["使用体验文档"].status == CheckStatus.PASSED
+        assert "Token" not in by_name["使用体验文档"].details
+        assert by_name["三文档一致性"].status == CheckStatus.PASSED
+        assert "binding_matches_current=True" in by_name["三文档一致性"].details
+        assert "UI 五端覆盖" not in by_name["三文档一致性"].details
+
+    def test_quality_gate_runs_compliance_checks_proactively(
+        self, temp_project_dir: Path, monkeypatch
+    ):
         checker = QualityGateChecker(
             project_dir=temp_project_dir,
             name="demo",
@@ -363,10 +792,35 @@ class TestQualityGateChecker:
             critical_failures=[],
             recommendations=[],
             scenario="1-N+1",
-            summary_context={"compliance_signal_summary": " 合规链当前优先卡在证据状态：Spec Compliance (Requirement Traceability)=missing。"},
+            summary_context={
+                "compliance_signal_summary": " 合规链当前优先卡在证据状态：Spec Compliance (Requirement Traceability)=missing。"
+            },
         )
         assert "合规链当前优先卡在证据状态" in result.executive_summary
         assert "Requirement Traceability)=missing" in result.executive_summary
+
+    def test_quality_gate_executive_summary_names_warning_when_score_is_below_threshold(self):
+        result = QualityGateResult(
+            passed=False,
+            total_score=89,
+            weighted_score=89.4,
+            checks=[
+                QualityCheck(
+                    name="Coverage Report",
+                    category="testing",
+                    description="覆盖率报告尚未生成",
+                    status=CheckStatus.WARNING,
+                    score=50,
+                )
+            ],
+            critical_failures=[],
+            recommendations=[],
+            scenario="1-N+1",
+            threshold=90,
+        )
+
+        assert "优先修复：Coverage Report" in result.executive_summary
+        assert "关键检查" not in result.executive_summary
 
     def test_quality_gate_executive_summary_exposes_workflow_and_baseline_context(self):
         result = QualityGateResult(
@@ -424,7 +878,10 @@ class TestQualityGateChecker:
             scenario_override="1-N+1",
         )
 
-        monkeypatch.setattr("super_dev.reviewers.quality_gate.shutil.which", lambda cmd: "/usr/bin/npm" if cmd == "npm" else None)
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.shutil.which",
+            lambda cmd: "/usr/bin/npm" if cmd == "npm" else None,
+        )
         monkeypatch.setattr(
             checker,
             "_run_command",
@@ -535,7 +992,9 @@ class TestQualityGateChecker:
         assert check.status.value == "passed"
         assert check.score == 100
 
-    def test_document_consistency_failed_when_platform_coverage_missing(self, temp_project_dir: Path):
+    def test_document_consistency_failed_when_platform_coverage_missing(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "demo-prd.md").write_text(
@@ -564,7 +1023,9 @@ class TestQualityGateChecker:
         assert check.status.value == "failed"
         assert "UI 五端覆盖" in check.details
 
-    def test_document_consistency_warns_when_ui_system_decisions_missing(self, temp_project_dir: Path):
+    def test_document_consistency_warns_when_ui_system_decisions_missing(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "demo-prd.md").write_text(
@@ -837,7 +1298,9 @@ class TestQualityGateChecker:
         rehearsal_dir = temp_project_dir / "output" / "rehearsal"
         rehearsal_dir.mkdir(parents=True, exist_ok=True)
         (rehearsal_dir / "demo-rehearsal-report.md").write_text("# report", encoding="utf-8")
-        (rehearsal_dir / "demo-rehearsal-report.json").write_text('{"passed": true}', encoding="utf-8")
+        (rehearsal_dir / "demo-rehearsal-report.json").write_text(
+            '{"passed": true}', encoding="utf-8"
+        )
 
         checker = QualityGateChecker(
             project_dir=temp_project_dir,
@@ -857,6 +1320,47 @@ class TestQualityGateChecker:
         )
         check = checker._check_rehearsal_verification_report()
         assert check.status.value == "warning"
+
+    def test_cli_project_skips_service_deployment_rehearsal(self, temp_project_dir: Path):
+        (temp_project_dir / "super-dev.yaml").write_text(
+            "name: demo\nplatform: cli\nfrontend: none\nbackend: python\ndatabase: none\n",
+            encoding="utf-8",
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"platform": "cli", "frontend": "none", "backend": "python"},
+            scenario_override="1-N+1",
+        )
+
+        preparation = checker._check_launch_rehearsal()
+        verification = checker._check_rehearsal_verification_report()
+
+        assert preparation.status.value == "passed"
+        assert preparation.score == 100
+        assert "不适用服务部署演练" in preparation.details
+        assert verification.status.value == "passed"
+        assert verification.score == 100
+
+    def test_schema_drift_is_not_applicable_without_database(self, temp_project_dir: Path):
+        (temp_project_dir / "super-dev.yaml").write_text(
+            "name: demo\nplatform: cli\nfrontend: none\nbackend: python\ndatabase: none\n",
+            encoding="utf-8",
+        )
+        source_dir = temp_project_dir / "src"
+        source_dir.mkdir()
+        (source_dir / "models.py").write_text("class Report: pass\n", encoding="utf-8")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"platform": "cli", "frontend": "none", "backend": "python"},
+        )
+
+        check = checker._check_schema_drift()
+
+        assert check.status.value == "passed"
+        assert check.score == 100
+        assert "不适用" in check.details
 
     def test_task_execution_review_trace_passed(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
@@ -885,7 +1389,9 @@ class TestQualityGateChecker:
     def test_task_execution_review_trace_warning_when_missing_markers(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-task-execution.md").write_text("# Spec 任务执行报告\n", encoding="utf-8")
+        (output_dir / "demo-task-execution.md").write_text(
+            "# Spec 任务执行报告\n", encoding="utf-8"
+        )
         checker = QualityGateChecker(
             project_dir=temp_project_dir,
             name="demo",
@@ -894,6 +1400,46 @@ class TestQualityGateChecker:
         )
         check = checker._check_task_execution_review_trace()
         assert check.status.value == "warning"
+
+    def test_active_change_does_not_borrow_task_evidence(self, temp_project_dir: Path) -> None:
+        _activate_quality_change(temp_project_dir)
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "current-change-prd.md").write_text("# Current PRD\n", encoding="utf-8")
+        complete_trace = (
+            "# Spec 任务执行报告\n\n"
+            "## 执行期验证摘要\n\n"
+            "## 宿主补充自检（交付前必做）\n\n"
+            "build / compile / type-check / test / runtime smoke\n"
+            "新增函数、方法、字段、模块都已接入真实调用链\n"
+            "新增 warning\n"
+            "对本次 diff 做最小自审\n"
+        )
+        (output_dir / "historical-task-execution.md").write_text(
+            complete_trace,
+            encoding="utf-8",
+        )
+        historical_dir = temp_project_dir / ".super-dev" / "changes" / "historical"
+        historical_dir.mkdir(parents=True)
+        (historical_dir / "tasks.md").write_text("# Tasks\n\n- [x] complete\n", encoding="utf-8")
+        current_tasks = temp_project_dir / ".super-dev" / "changes" / "current-change" / "tasks.md"
+        current_tasks.write_text("# Tasks\n\n- [ ] pending\n", encoding="utf-8")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python"},
+        )
+
+        assert checker._check_task_execution_review_trace().status.value == "warning"
+        completion = checker._check_spec_task_completion()
+        assert completion.status.value == "failed"
+        assert "0/1" in completion.details
+
+        (output_dir / "current-change-task-execution.md").write_text(
+            complete_trace,
+            encoding="utf-8",
+        )
+        assert checker._check_task_execution_review_trace().status.value == "passed"
 
     def test_knowledge_governance_passed(self, temp_project_dir: Path):
         (temp_project_dir / "super-dev.yaml").write_text(
@@ -935,12 +1481,7 @@ class TestQualityGateChecker:
         cache_dir = temp_project_dir / "output" / "knowledge-cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
         (cache_dir / "demo-knowledge-bundle.json").write_text(
-            (
-                "{\n"
-                '  "cache_ttl_seconds": 120,\n'
-                '  "metadata": {"web_enabled": false}\n'
-                "}\n"
-            ),
+            ("{\n" '  "cache_ttl_seconds": 120,\n' '  "metadata": {"web_enabled": false}\n' "}\n"),
             encoding="utf-8",
         )
 
@@ -976,7 +1517,9 @@ class TestQualityGateChecker:
         check = checker._check_knowledge_governance()
         assert check.status.value == "warning"
 
-    def test_ui_contract_execution_passed_when_contract_tokens_and_runtime_align(self, temp_project_dir: Path):
+    def test_ui_contract_execution_passed_when_contract_tokens_and_runtime_align(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         frontend_dir = output_dir / "frontend"
         frontend_dir.mkdir(parents=True, exist_ok=True)
@@ -997,7 +1540,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-ui-contract-alignment.json").write_text(
             (
                 "{\n"
@@ -1049,7 +1594,9 @@ class TestQualityGateChecker:
         assert check.status.value == "passed"
         assert "library=shadcn/ui + Radix + Tailwind" in check.details
 
-    def test_ui_contract_execution_failed_when_runtime_missing_contract_alignment(self, temp_project_dir: Path):
+    def test_ui_contract_execution_failed_when_runtime_missing_contract_alignment(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         frontend_dir = output_dir / "frontend"
         frontend_dir.mkdir(parents=True, exist_ok=True)
@@ -1070,7 +1617,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-ui-contract-alignment.json").write_text(
             (
                 "{\n"
@@ -1108,7 +1657,9 @@ class TestQualityGateChecker:
         assert check.status.value == "failed"
         assert "frontend runtime 未证明 UI 契约文件" in check.details
 
-    def test_ui_contract_execution_failed_when_contract_missing_emoji_policy(self, temp_project_dir: Path):
+    def test_ui_contract_execution_failed_when_contract_missing_emoji_policy(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         frontend_dir = output_dir / "frontend"
         frontend_dir.mkdir(parents=True, exist_ok=True)
@@ -1128,7 +1679,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-frontend-runtime.json").write_text(
             (
                 "{\n"
@@ -1173,7 +1726,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-frontend-runtime.json").write_text(
             (
                 "{\n"
@@ -1225,7 +1780,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-ui-contract-alignment.json").write_text(
             json.dumps({"theme_entry": {"passed": True}}, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -1304,7 +1861,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-ui-contract-alignment.json").write_text(
             json.dumps({"theme_entry": {"passed": True}}, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -1469,7 +2028,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-frontend-runtime.json").write_text(
             (
                 "{\n"
@@ -1528,7 +2089,9 @@ class TestQualityGateChecker:
             ),
             encoding="utf-8",
         )
-        (frontend_dir / "design-tokens.css").write_text(":root { --color-primary: #0f172a; }\n", encoding="utf-8")
+        (frontend_dir / "design-tokens.css").write_text(
+            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
+        )
         (output_dir / "demo-ui-contract-alignment.json").write_text(
             '{"framework_execution":{"label":"框架 Playbook 执行","passed":false,"expected":"uni., #ifdef, provider","observed":"uni."}}',
             encoding="utf-8",

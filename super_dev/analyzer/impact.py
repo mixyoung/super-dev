@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..artifact_utils import resolve_current_artifact_prefix
 from .repo_map import RepoMapBuilder, RepoMapItem
 
 
@@ -108,7 +109,10 @@ class ImpactAnalyzer:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = self.project_dir.name
+        self.project_name = resolve_current_artifact_prefix(
+            self.project_dir,
+            fallback_name=self.project_dir.name,
+        )
         self.repo_map_builder = RepoMapBuilder(self.project_dir)
 
     def build(self, description: str = "", files: list[str] | None = None) -> ImpactAnalysisReport:

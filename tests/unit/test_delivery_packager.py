@@ -164,7 +164,9 @@ def test_delivery_packager_uses_named_change_tasks_only(temp_project_dir: Path) 
     assert manifest["spec_tasks"]["target_change"] == "demo"
 
 
-def test_delivery_packager_incomplete_without_frontend_runtime_report(temp_project_dir: Path) -> None:
+def test_delivery_packager_incomplete_without_frontend_runtime_report(
+    temp_project_dir: Path,
+) -> None:
     name = "demo"
     _seed_required_files(temp_project_dir, name)
     (temp_project_dir / "output" / f"{name}-frontend-runtime.md").unlink()
@@ -181,7 +183,9 @@ def test_delivery_packager_incomplete_without_frontend_runtime_report(temp_proje
     assert f"output/{name}-frontend-runtime.json" in reasons
 
 
-def test_delivery_packager_incomplete_without_ui_contract_and_design_tokens(temp_project_dir: Path) -> None:
+def test_delivery_packager_incomplete_without_ui_contract_and_design_tokens(
+    temp_project_dir: Path,
+) -> None:
     name = "demo"
     _seed_required_files(temp_project_dir, name)
     (temp_project_dir / "output" / f"{name}-ui-contract.json").unlink()
@@ -196,3 +200,61 @@ def test_delivery_packager_incomplete_without_ui_contract_and_design_tokens(temp
     reasons = {item["path"] for item in missing_items if isinstance(item, dict)}
     assert f"output/{name}-ui-contract.json" in reasons
     assert "output/frontend/design-tokens.css" in reasons
+
+
+def test_cli_delivery_skips_web_deployment_and_database_artifacts(
+    temp_project_dir: Path,
+) -> None:
+    name = "demo"
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "\n".join(
+            [
+                f"name: {name}",
+                "platform: cli",
+                "frontend: none",
+                "backend: python",
+                "database: none",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_dir = temp_project_dir / "output"
+    for suffix in (
+        "research.md",
+        "prd.md",
+        "architecture.md",
+        "uiux.md",
+        "redteam.md",
+        "quality-gate.md",
+        "task-execution.md",
+    ):
+        _write(output_dir / f"{name}-{suffix}")
+    task_path = temp_project_dir / ".super-dev" / "changes" / name / "tasks.md"
+    _write(task_path, "# Tasks\n\n- [x] **1.1: done**\n")
+
+    result = DeliveryPackager(
+        project_dir=temp_project_dir,
+        name=name,
+        version="2.1.1",
+    ).package(cicd_platform="all")
+
+    assert result["status"] == "ready"
+    assert result["missing_required_count"] == 0
+    manifest_path = Path(str(result["manifest_file"]))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["applicability"] == {
+        "platform": "cli",
+        "frontend_required": False,
+        "backend_contract_required": False,
+        "database_migration_required": False,
+        "deployment_assets_required": False,
+    }
+    assert ".super-dev/changes/demo/tasks.md" in {
+        item.replace("\\", "/") for item in manifest["included_files"]
+    }
+    missing_paths = {item["path"].replace("\\", "/") for item in manifest["missing_required"]}
+    assert "migrations/*" not in missing_paths
+    assert "preview.html" not in missing_paths
+    assert "backend/API_CONTRACT.md" not in missing_paths
+    assert ".env.deploy.example" not in missing_paths

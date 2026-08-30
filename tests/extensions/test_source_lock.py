@@ -77,6 +77,40 @@ def test_directory_digest_is_stable_by_relative_path(tmp_path) -> None:
     assert before == after
 
 
+def test_text_digest_is_stable_across_lf_and_crlf(tmp_path) -> None:
+    source = tmp_path / "probe.py"
+    source.write_bytes(b"VALUE = 1\nprint(VALUE)\n")
+    lf_digest = stable_content_digest(source)
+
+    source.write_bytes(b"VALUE = 1\r\nprint(VALUE)\r\n")
+
+    assert stable_content_digest(source) == lf_digest
+
+
+def test_directory_digest_is_stable_across_text_line_endings(tmp_path) -> None:
+    source = tmp_path / "tree"
+    source.mkdir()
+    first = source / "first.py"
+    second = source / "second.yaml"
+    first.write_bytes(b"VALUE = 1\n")
+    second.write_bytes(b"enabled: true\n")
+    lf_digest = stable_content_digest(source)
+
+    first.write_bytes(b"VALUE = 1\r\n")
+    second.write_bytes(b"enabled: true\r\n")
+
+    assert stable_content_digest(source) == lf_digest
+
+
+def test_binary_digest_keeps_exact_bytes(tmp_path) -> None:
+    source = tmp_path / "payload.bin"
+    source.write_bytes(b"\xff\x00line\r\n")
+    first = stable_content_digest(source)
+    source.write_bytes(b"\xff\x00line\n")
+
+    assert stable_content_digest(source) != first
+
+
 def test_manifest_content_is_also_locked(tmp_path) -> None:
     source_root = tmp_path / "source"
     source = source_root / "builtins" / "probe.py"

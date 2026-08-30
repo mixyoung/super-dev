@@ -7,6 +7,7 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.proof_pack import ProofPackArtifact, ProofPackBuilder, ProofPackReport
@@ -18,14 +19,16 @@ from super_dev.review_state import (
 )
 from super_dev.workflow_guard import record_stage_progress, save_bound_docs_confirmation
 
-
 # ---------------------------------------------------------------------------
 # ProofPackArtifact
 # ---------------------------------------------------------------------------
 
+
 class TestProofPackArtifact:
     def test_basic_creation(self):
-        artifact = ProofPackArtifact(name="PRD", status="ready", summary="Product requirements document")
+        artifact = ProofPackArtifact(
+            name="PRD", status="ready", summary="Product requirements document"
+        )
         assert artifact.name == "PRD"
         assert artifact.status == "ready"
         assert artifact.summary == "Product requirements document"
@@ -34,16 +37,22 @@ class TestProofPackArtifact:
 
     def test_with_path_and_details(self):
         artifact = ProofPackArtifact(
-            name="Architecture", status="ready", summary="Architecture doc",
-            path="/output/arch.md", details={"pages": 15, "diagrams": 3},
+            name="Architecture",
+            status="ready",
+            summary="Architecture doc",
+            path="/output/arch.md",
+            details={"pages": 15, "diagrams": 3},
         )
         assert artifact.path == "/output/arch.md"
         assert artifact.details["pages"] == 15
 
     def test_to_dict(self):
         artifact = ProofPackArtifact(
-            name="Redteam", status="incomplete", summary="Missing report",
-            path="/output/redteam.md", details={"score": 65},
+            name="Redteam",
+            status="incomplete",
+            summary="Missing report",
+            path="/output/redteam.md",
+            details={"score": 65},
         )
         d = artifact.to_dict()
         assert d["name"] == "Redteam"
@@ -58,7 +67,11 @@ class TestProofPackArtifact:
 
     def test_to_dict_preserves_all_fields(self):
         artifact = ProofPackArtifact(
-            name="N", status="S", summary="Sum", path="P", details={"k": "v"},
+            name="N",
+            status="S",
+            summary="Sum",
+            path="P",
+            details={"k": "v"},
         )
         d = artifact.to_dict()
         assert set(d.keys()) == {"name", "status", "summary", "path", "details"}
@@ -67,6 +80,7 @@ class TestProofPackArtifact:
 # ---------------------------------------------------------------------------
 # ProofPackReport
 # ---------------------------------------------------------------------------
+
 
 class TestProofPackReport:
     def test_empty_report(self):
@@ -155,7 +169,9 @@ class TestProofPackReport:
         report = ProofPackReport(
             project_name="test",
             artifacts=[
-                ProofPackArtifact(name=f"A{i}", status="ready" if i < 1 else "incomplete", summary="x")
+                ProofPackArtifact(
+                    name=f"A{i}", status="ready" if i < 1 else "incomplete", summary="x"
+                )
                 for i in range(3)
             ],
         )
@@ -179,6 +195,7 @@ class TestProofPackReport:
 # ProofPackReport - key_artifacts
 # ---------------------------------------------------------------------------
 
+
 class TestProofPackKeyArtifacts:
     def test_key_artifacts_prefers_known_names(self):
         report = ProofPackReport(
@@ -198,6 +215,7 @@ class TestProofPackKeyArtifacts:
 # ---------------------------------------------------------------------------
 # ProofPackReport - 多种状态组合
 # ---------------------------------------------------------------------------
+
 
 class TestProofPackReportStatusCombinations:
     def test_mixed_statuses(self):
@@ -233,9 +251,9 @@ class TestProofPackReportStatusCombinations:
         report = ProofPackReport(
             project_name="almost",
             artifacts=[
-                ProofPackArtifact(name=f"ok-{i}", status="ready", summary="ok")
-                for i in range(9)
-            ] + [ProofPackArtifact(name="blocker", status="incomplete", summary="blocking")],
+                ProofPackArtifact(name=f"ok-{i}", status="ready", summary="ok") for i in range(9)
+            ]
+            + [ProofPackArtifact(name="blocker", status="incomplete", summary="blocking")],
         )
         assert report.ready_count == 9
         assert report.completion_percent == 90
@@ -245,7 +263,9 @@ class TestProofPackReportStatusCombinations:
     def test_large_number_of_artifacts(self):
         n = 100
         artifacts = [
-            ProofPackArtifact(name=f"a-{i}", status="ready" if i < 90 else "incomplete", summary=f"A{i}")
+            ProofPackArtifact(
+                name=f"a-{i}", status="ready" if i < 90 else "incomplete", summary=f"A{i}"
+            )
             for i in range(n)
         ]
         report = ProofPackReport(project_name="large", artifacts=artifacts)
@@ -270,8 +290,12 @@ class TestProofPackReportStatusCombinations:
         report = ProofPackReport(
             project_name="ops",
             artifacts=[
-                ProofPackArtifact(name="Operational Harness", status="ready", summary="operational ok"),
-                ProofPackArtifact(name="Workflow Continuity", status="ready", summary="workflow ok"),
+                ProofPackArtifact(
+                    name="Operational Harness", status="ready", summary="operational ok"
+                ),
+                ProofPackArtifact(
+                    name="Workflow Continuity", status="ready", summary="workflow ok"
+                ),
                 ProofPackArtifact(name="Framework Harness", status="ready", summary="framework ok"),
                 ProofPackArtifact(name="Hook Audit Trail", status="ready", summary="hooks ok"),
             ],
@@ -404,7 +428,9 @@ class TestProofPackReportStatusCombinations:
 
     def test_details_with_nested_structure(self):
         artifact = ProofPackArtifact(
-            name="nested", status="ready", summary="ok",
+            name="nested",
+            status="ready",
+            summary="ok",
             details={"level1": {"level2": {"level3": "deep"}}},
         )
         d = artifact.to_dict()
@@ -412,7 +438,9 @@ class TestProofPackReportStatusCombinations:
 
     def test_details_with_list_values(self):
         artifact = ProofPackArtifact(
-            name="list-details", status="ready", summary="ok",
+            name="list-details",
+            status="ready",
+            summary="ok",
             details={"items": [1, 2, 3], "tags": ["a", "b"]},
         )
         d = artifact.to_dict()
@@ -423,7 +451,9 @@ class TestProofPackReportStatusCombinations:
         report = ProofPackReport(
             project_name="round",
             artifacts=[
-                ProofPackArtifact(name=f"a{i}", status="ready" if i == 0 else "incomplete", summary="x")
+                ProofPackArtifact(
+                    name=f"a{i}", status="ready" if i == 0 else "incomplete", summary="x"
+                )
                 for i in range(7)
             ],
         )
@@ -433,7 +463,9 @@ class TestProofPackReportStatusCombinations:
         report = ProofPackReport(
             project_name="twothirds",
             artifacts=[
-                ProofPackArtifact(name=f"a{i}", status="ready" if i < 2 else "incomplete", summary="x")
+                ProofPackArtifact(
+                    name=f"a{i}", status="ready" if i < 2 else "incomplete", summary="x"
+                )
                 for i in range(3)
             ],
         )
@@ -610,7 +642,7 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
                         },
                         "focus": {
                             "recommended_action": "先补 framework harness 再重新生成 proof-pack。",
-                        }
+                        },
                     },
                 )
             ],
@@ -633,11 +665,15 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
                         "focus": {
                             "summary": "当前 workflow / framework / hooks harness 已全部通过。",
                             "recommended_action": "当前 workflow / framework / hooks harness 已形成统一运行时证据。",
-                        }
+                        },
                     },
                 ),
-                ProofPackArtifact(name="Workflow Continuity", status="ready", summary="workflow ok"),
-                ProofPackArtifact(name="Framework Harness", status="pending", summary="framework gaps"),
+                ProofPackArtifact(
+                    name="Workflow Continuity", status="ready", summary="workflow ok"
+                ),
+                ProofPackArtifact(
+                    name="Framework Harness", status="pending", summary="framework gaps"
+                ),
                 ProofPackArtifact(name="Hook Audit Trail", status="ready", summary="hook clean"),
             ],
         )
@@ -743,7 +779,9 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
         project_dir = tmp_path / "demo"
         output_dir = project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-quality-gate.md").write_text("# 质量门禁报告\n\n通过\n", encoding="utf-8")
+        (output_dir / "demo-quality-gate.md").write_text(
+            "# 质量门禁报告\n\n通过\n", encoding="utf-8"
+        )
         (output_dir / "demo-uiux.md").write_text("# uiux", encoding="utf-8")
         (output_dir / "demo-ui-review.json").write_text(
             json.dumps({"passed": True}, ensure_ascii=False),
@@ -781,7 +819,9 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
         assert artifact.status == "pending"
         assert "evidence identity" in artifact.summary
 
-    def test_builder_marks_frontend_runtime_pending_when_evidence_identity_mismatches(self, tmp_path):
+    def test_builder_marks_frontend_runtime_pending_when_evidence_identity_mismatches(
+        self, tmp_path
+    ):
         project_dir = tmp_path / "demo"
         output_dir = project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1250,11 +1290,15 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
         assert artifact.status == "pending"
         assert artifact.summary == "spec compliance artifact missing"
 
-    def test_builder_marks_uiux_compliance_pending_when_artifact_identity_mismatches(self, tmp_path):
+    def test_builder_marks_uiux_compliance_pending_when_artifact_identity_mismatches(
+        self, tmp_path
+    ):
         project_dir = tmp_path / "demo"
         output_dir = project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-uiux.md").write_text("# UIUX\n\nicon_library: lucide\n", encoding="utf-8")
+        (output_dir / "demo-uiux.md").write_text(
+            "# UIUX\n\nicon_library: lucide\n", encoding="utf-8"
+        )
         frontend_file = project_dir / "frontend" / "src" / "page.tsx"
         frontend_file.parent.mkdir(parents=True, exist_ok=True)
         frontend_file.write_text(
@@ -1322,3 +1366,333 @@ def test_builder_marks_expert_stage_governance_ready_when_stage_evidence_recorde
         assert artifact.name == "Hook Audit Trail"
         assert artifact.status == "ready"
         assert artifact.details["total_events"] == 1
+
+
+def test_frontend_none_proof_pack_marks_ui_artifacts_not_applicable_and_has_no_ui_action(
+    tmp_path: Path,
+) -> None:
+    project_dir = tmp_path / "demo"
+    output_dir = project_dir / "output"
+    output_dir.mkdir(parents=True)
+    (project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: cli\nfrontend: none\nbackend: python\n",
+        encoding="utf-8",
+    )
+    change_dir = project_dir / ".super-dev" / "changes" / "current-change"
+    change_dir.mkdir(parents=True)
+    (project_dir / ".super-dev" / "workflow-state.json").write_text(
+        json.dumps({"active_change_id": "current-change"}),
+        encoding="utf-8",
+    )
+    (output_dir / "current-change-uiux.md").write_text(
+        "# 使用体验\n",
+        encoding="utf-8",
+    )
+    for suffix in (
+        "uiux-compliance.json",
+        "ui-contract.json",
+        "ui-contract-alignment.json",
+        "frontend-runtime.json",
+        "ui-review.json",
+    ):
+        (output_dir / f"current-change-{suffix}").write_text(
+            "this stale UI evidence must not be read",
+            encoding="utf-8",
+        )
+    review_state = project_dir / ".super-dev" / "review-state"
+    review_state.mkdir(parents=True, exist_ok=True)
+    (review_state / "ui-revision.json").write_text(
+        json.dumps({"status": "revision_requested"}),
+        encoding="utf-8",
+    )
+
+    builder = ProofPackBuilder(project_dir)
+    report = builder.build()
+    ui_names = {
+        "UI Revision State",
+        "UIUX Compliance",
+        "UI Contract",
+        "UI Contract Alignment",
+        "Frontend Runtime",
+        "UI Review",
+    }
+    ui_artifacts = [item for item in report.artifacts if item.name in ui_names]
+
+    assert {item.name for item in ui_artifacts} == ui_names
+    assert all(item.status == "ready" for item in ui_artifacts)
+    assert all("not applicable" in item.summary for item in ui_artifacts)
+    assert all(item.path == "" for item in ui_artifacts)
+    assert not any(
+        any(term in action.lower() for term in ("ui ", "uiux", "frontend", "前端"))
+        for action in report.next_actions
+    )
+    identity = builder._build_report_evidence_identity()
+    dependencies = [item.replace("\\", "/") for item in identity["dependencies"]]
+    assert not any("ui-contract" in item for item in dependencies)
+    assert not any("frontend-runtime" in item for item in dependencies)
+    assert not any("ui-review" in item for item in dependencies)
+    assert not any("uiux-compliance" in item for item in dependencies)
+
+
+def test_frontend_project_proof_pack_keeps_ui_artifact_requirements(tmp_path: Path) -> None:
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    (project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: web\nfrontend: react\nbackend: node\n",
+        encoding="utf-8",
+    )
+    builder = ProofPackBuilder(project_dir)
+
+    ui_contract = builder._ui_contract_artifact()
+    frontend_runtime = builder._frontend_runtime_artifact()
+
+    assert builder.frontend_required is True
+    assert ui_contract.status == "missing"
+    assert frontend_runtime.status == "missing"
+    assert "not applicable" not in ui_contract.summary
+    assert "not applicable" not in frontend_runtime.summary
+
+
+def test_cli_proof_pack_marks_service_rehearsal_not_applicable(tmp_path: Path) -> None:
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    (project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: cli\nfrontend: none\nbackend: python\ndatabase: none\n",
+        encoding="utf-8",
+    )
+
+    artifact = ProofPackBuilder(project_dir)._rehearsal_artifact()
+
+    assert artifact.status == "ready"
+    assert artifact.path == ""
+    assert artifact.details == {
+        "applicable": False,
+        "reason": "platform is cli; release closure uses readiness and proof-pack evidence",
+    }
+    assert artifact.summary.startswith("not applicable: platform is cli")
+
+
+def test_delivery_manifest_rejects_wrong_project_applicability(tmp_path: Path) -> None:
+    project_dir = tmp_path / "demo"
+    delivery_dir = project_dir / "output" / "delivery"
+    delivery_dir.mkdir(parents=True)
+    (project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: cli\nfrontend: none\nbackend: python\ndatabase: none\n",
+        encoding="utf-8",
+    )
+    (delivery_dir / "demo-delivery-manifest.json").write_text(
+        json.dumps(
+            {
+                "status": "ready",
+                "applicability": {
+                    "platform": "web",
+                    "frontend_required": True,
+                    "backend_contract_required": True,
+                    "database_migration_required": True,
+                    "deployment_assets_required": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    artifact = ProofPackBuilder(project_dir)._delivery_manifest_artifact()
+
+    assert artifact.status == "pending"
+    assert artifact.summary == (
+        "delivery manifest applicability does not match the current project"
+    )
+
+
+def test_quality_gate_json_uses_structured_passed_field(tmp_path: Path) -> None:
+    project_dir = tmp_path / "demo"
+    output_dir = project_dir / "output"
+    output_dir.mkdir(parents=True)
+    (project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: cli\nfrontend: none\nbackend: python\n",
+        encoding="utf-8",
+    )
+    uiux_path = output_dir / "demo-uiux.md"
+    uiux_path.write_text("# 使用体验\n", encoding="utf-8")
+    identity = build_evidence_identity(
+        project_dir,
+        artifact_name="quality-gate",
+        dependencies=[uiux_path],
+    )
+    (output_dir / "demo-quality-gate.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "critical_failures": [],
+                "evidence_identity": identity,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    artifact = ProofPackBuilder(project_dir)._quality_gate_artifact()
+
+    assert artifact.status == "ready"
+    assert artifact.summary == "quality gate report generated"
+
+
+def _write_fresh_quality_gate(
+    project_dir: Path,
+    *,
+    candidate_digest: str,
+    run_id: str = "quality-run",
+) -> Path:
+    output_dir = project_dir / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    uiux_path = output_dir / "demo-uiux.md"
+    uiux_path.write_text("# 使用体验\n", encoding="utf-8")
+    run_dir = project_dir / ".super-dev" / "extensions" / "runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    result_path = run_dir / "result.json"
+    result_path.write_text(
+        json.dumps(
+            {
+                "extension_id": "fresh-verification",
+                "run_id": run_id,
+                "status": "PASS",
+                "candidate": {"candidate_digest": candidate_digest},
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary_path = run_dir / "pytest-summary.json"
+    summary_path.write_text(json.dumps({"tests": 1, "executed": 1}), encoding="utf-8")
+    junit_path = run_dir / "pytest.xml"
+    junit_path.write_text(
+        '<testsuite tests="1" failures="0" errors="0" skipped="0"/>',
+        encoding="utf-8",
+    )
+    quality_path = output_dir / "demo-quality-gate.json"
+    identity = build_evidence_identity(
+        project_dir,
+        artifact_name="quality-gate",
+        dependencies=[uiux_path, result_path, summary_path, junit_path],
+        run_id=run_id,
+    )
+    quality_path.write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "critical_failures": [],
+                "evidence_identity": identity,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return quality_path
+
+
+def _write_fresh_proof_pack_config(project_dir: Path) -> None:
+    (project_dir / "super-dev.yaml").write_text(
+        "\n".join(
+            [
+                "name: demo",
+                "platform: cli",
+                "frontend: none",
+                "backend: python",
+                "extensions:",
+                "  enabled: true",
+                "  allowed_builtin_methods:",
+                "    - fresh-verification",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_quality_gate_accepts_different_fresh_run_for_same_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    _write_fresh_proof_pack_config(project_dir)
+    _write_fresh_quality_gate(
+        project_dir,
+        candidate_digest="candidate-current",
+        run_id="quality-run",
+    )
+    monkeypatch.setattr(
+        "super_dev.proof_pack.inspect_current_fresh_verification",
+        lambda project_dir: SimpleNamespace(
+            passed=True,
+            candidate_digest="candidate-current",
+            run_id="release-run",
+            detail="通过",
+        ),
+    )
+
+    artifact = ProofPackBuilder(project_dir)._quality_gate_artifact()
+
+    assert artifact.status == "ready"
+    assert artifact.summary == "quality gate report generated"
+    assert artifact.details["evidence_identity"]["run_id"] == "quality-run"
+
+
+def test_quality_gate_rejects_fresh_run_for_different_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    _write_fresh_proof_pack_config(project_dir)
+    _write_fresh_quality_gate(
+        project_dir,
+        candidate_digest="candidate-previous",
+        run_id="quality-run",
+    )
+    monkeypatch.setattr(
+        "super_dev.proof_pack.inspect_current_fresh_verification",
+        lambda project_dir: SimpleNamespace(
+            passed=True,
+            candidate_digest="candidate-current",
+            run_id="release-run",
+            detail="通过",
+        ),
+    )
+
+    artifact = ProofPackBuilder(project_dir)._quality_gate_artifact()
+
+    assert artifact.status == "pending"
+    assert artifact.summary == (
+        "quality gate fresh verification does not match the current code version"
+    )
+
+
+def test_quality_gate_rejects_tampered_stored_identity(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_dir = tmp_path / "demo"
+    project_dir.mkdir()
+    _write_fresh_proof_pack_config(project_dir)
+    quality_path = _write_fresh_quality_gate(
+        project_dir,
+        candidate_digest="candidate-current",
+        run_id="quality-run",
+    )
+    payload = json.loads(quality_path.read_text(encoding="utf-8"))
+    payload["evidence_identity"]["inputs_digest"] = "tampered"
+    quality_path.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setattr(
+        "super_dev.proof_pack.inspect_current_fresh_verification",
+        lambda project_dir: SimpleNamespace(
+            passed=True,
+            candidate_digest="candidate-current",
+            run_id="release-run",
+            detail="通过",
+        ),
+    )
+
+    artifact = ProofPackBuilder(project_dir)._quality_gate_artifact()
+
+    assert artifact.status == "pending"
+    assert "evidence identity mismatches" in artifact.summary

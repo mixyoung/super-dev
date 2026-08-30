@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import ast
 import glob
 import re
 from collections.abc import Callable
@@ -50,6 +51,7 @@ VALID_CHECK_TYPES = frozenset(
         "file_exists",
         "content_contains",
         "content_not_contains",
+        "python_sensitive_logging",
         "regex_match",
         "metric_threshold",
         "custom",
@@ -63,6 +65,25 @@ SEVERITY_WEIGHTS: dict[str, float] = {
     "medium": 2.0,
     "low": 1.0,
 }
+
+_CONTENT_SCAN_IGNORED_DIRS = frozenset(
+    {
+        ".git",
+        ".super-dev",
+        ".venv",
+        "venv",
+        "env",
+        "node_modules",
+        "build",
+        "dist",
+        "output",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        "super_dev.egg-info",
+    }
+)
 
 
 @dataclass
@@ -265,6 +286,161 @@ def _parse_rule_dict(data: dict[str, Any]) -> ValidationRule:
     )
 
 
+def _is_path_ignored_for_scan(
+    path: Path,
+    project_dir: Path,
+    excluded_paths: set[Path] | None = None,
+) -> bool:
+    candidate_path = Path(path).resolve(strict=False)
+    if excluded_paths and candidate_path in excluded_paths:
+        return True
+    try:
+        relative_parts = candidate_path.relative_to(project_dir.resolve(strict=False)).parts[:-1]
+    except ValueError:
+        return True
+    return any(
+        part.lower() in _CONTENT_SCAN_IGNORED_DIRS or part.lower().endswith(".egg-info")
+        for part in relative_parts
+    )
+
+
+_PYTHON_LOG_METHODS = frozenset(
+    {"debug", "info", "warning", "warn", "error", "critical", "exception", "log"}
+)
+_DEFAULT_SENSITIVE_NAMES = frozenset(
+    {
+        "api_key",
+        "credential",
+        "credentials",
+        "password",
+        "passwd",
+        "private_key",
+        "secret",
+        "secrets",
+        "token",
+    }
+)
+_TOKEN_METRIC_SEGMENTS = frozenset(
+    {
+        "budget",
+        "count",
+        "default",
+        "estimated",
+        "estimate",
+        "limit",
+        "maximum",
+        "minimum",
+        "remaining",
+        "total",
+        "used",
+        "usage",
+    }
+)
+
+
+def _dotted_ast_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = _dotted_ast_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""
+
+
+def _is_sensitive_identifier(value: str, sensitive_names: frozenset[str]) -> bool:
+    normalized = value.strip().lower()
+    if not normalized:
+        return False
+    segments = {segment for segment in normalized.split("_") if segment}
+    non_token_segments = segments - {"token", "tokens"}
+    if (
+        segments & {"token", "tokens"}
+        and non_token_segments
+        and non_token_segments <= _TOKEN_METRIC_SEGMENTS
+    ):
+        return False
+    return any(
+        name == normalized
+        or name in segments
+        or normalized.startswith(f"{name}_")
+        or normalized.endswith(f"_{name}")
+        for name in sensitive_names
+    )
+
+
+def _contains_sensitive_reference(node: ast.AST, sensitive_names: frozenset[str]) -> bool:
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and _is_sensitive_identifier(child.id, sensitive_names):
+            return True
+        if isinstance(child, ast.Attribute) and _is_sensitive_identifier(
+            child.attr, sensitive_names
+        ):
+            return True
+        if isinstance(child, ast.Subscript):
+            slice_value = child.slice
+            if isinstance(slice_value, ast.Constant) and isinstance(slice_value.value, str):
+                if _is_sensitive_identifier(slice_value.value, sensitive_names):
+                    return True
+        if isinstance(child, ast.Dict):
+            for key in child.keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    if _is_sensitive_identifier(key.value, sensitive_names):
+                        return True
+        if isinstance(child, ast.Call) and _dotted_ast_name(child.func) in {
+            "getattr",
+            "builtins.getattr",
+        }:
+            if len(child.args) >= 2:
+                attr_name = child.args[1]
+                if isinstance(attr_name, ast.Constant) and isinstance(attr_name.value, str):
+                    if _is_sensitive_identifier(attr_name.value, sensitive_names):
+                        return True
+    return False
+
+
+def _is_python_output_call(node: ast.Call) -> bool:
+    call_name = _dotted_ast_name(node.func)
+    if call_name in {"print", "builtins.print"} or call_name.endswith(".print"):
+        return True
+    if isinstance(node.func, ast.Name):
+        return node.func.id.lower() == "log"
+    if not isinstance(node.func, ast.Attribute):
+        return False
+    method = node.func.attr.lower()
+    if method not in _PYTHON_LOG_METHODS:
+        return False
+    receiver = _dotted_ast_name(node.func.value).lower()
+    return any("log" in segment for segment in receiver.split(".") if segment)
+
+
+def _find_python_sensitive_logging(
+    content: str,
+    *,
+    sensitive_names: frozenset[str],
+) -> tuple[list[tuple[int, str]], str]:
+    try:
+        tree = ast.parse(content)
+    except SyntaxError as exc:
+        line = exc.lineno or 0
+        return [], f"Python 语法无法解析（line {line}: {exc.msg}）"
+
+    violations: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not _is_python_output_call(node):
+            continue
+        keyword_violation = any(
+            keyword.arg is not None and _is_sensitive_identifier(keyword.arg, sensitive_names)
+            for keyword in node.keywords
+        )
+        value_violation = any(
+            _contains_sensitive_reference(argument, sensitive_names)
+            for argument in [*node.args, *(keyword.value for keyword in node.keywords)]
+        )
+        if keyword_violation or value_violation:
+            violations.append((node.lineno, _dotted_ast_name(node.func)))
+    return violations, ""
+
+
 def _load_rules_from_yaml(path: Path) -> list[ValidationRule]:
     """从 YAML 文件加载规则列表。
 
@@ -434,6 +610,10 @@ class ValidationRuleEngine:
         results: list[ValidationResult] = []
 
         for rule in applicable_rules:
+            if context.get("frontend_required") is False and any(
+                str(tag).strip().lower() == "frontend" for tag in rule.tags
+            ):
+                continue
             result = self._execute_rule(rule, context)
             results.append(result)
 
@@ -494,6 +674,8 @@ class ValidationRuleEngine:
                 result = self._check_content_contains_single(rule, content, str(file_path))
             elif rule.check_type == "content_not_contains":
                 result = self._check_content_not_contains_single(rule, content, str(file_path))
+            elif rule.check_type == "python_sensitive_logging":
+                result = self._check_python_sensitive_logging_single(rule, content, str(file_path))
             elif rule.check_type == "regex_match":
                 result = self._check_regex_match_single(rule, content, str(file_path))
             else:
@@ -514,6 +696,7 @@ class ValidationRuleEngine:
                 "file_exists": self._check_file_exists,
                 "content_contains": self._check_content_contains,
                 "content_not_contains": self._check_content_not_contains,
+                "python_sensitive_logging": self._check_python_sensitive_logging,
                 "regex_match": self._check_regex_match,
                 "metric_threshold": self._check_metric_threshold,
                 "custom": self._check_custom,
@@ -539,7 +722,7 @@ class ValidationRuleEngine:
 
     def _check_file_exists(self, rule: ValidationRule, context: dict[str, Any]) -> ValidationResult:
         """检查是否存在匹配的文件。"""
-        project_dir = Path(context.get("project_dir", self.project_dir))
+        project_dir = Path(context.get("project_dir", self.project_dir)).resolve(strict=False)
         pattern = rule.check_config.get("file_pattern", "")
         min_count = rule.check_config.get("min_count", 1)
 
@@ -565,7 +748,7 @@ class ValidationRuleEngine:
         self, rule: ValidationRule, context: dict[str, Any]
     ) -> ValidationResult:
         """检查文件内容是否包含必需段落/关键词。"""
-        project_dir = Path(context.get("project_dir", self.project_dir))
+        project_dir = Path(context.get("project_dir", self.project_dir)).resolve(strict=False)
         pattern = rule.check_config.get("file_pattern", "")
         required = rule.check_config.get("required_sections", [])
 
@@ -580,9 +763,14 @@ class ValidationRuleEngine:
             )
 
         missing_all: list[str] = []
+        valid_matches = 0
         for filepath in matches:
+            candidate_path = Path(filepath)
+            if _is_path_ignored_for_scan(candidate_path, project_dir):
+                continue
+            valid_matches += 1
             try:
-                content = Path(filepath).read_text(encoding="utf-8", errors="replace")
+                content = candidate_path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
             missing = [s for s in required if s not in content]
@@ -594,6 +782,15 @@ class ValidationRuleEngine:
                     severity=rule.severity,
                 )
             missing_all = missing
+
+        if valid_matches == 0:
+            return ValidationResult(
+                rule_id=rule.id,
+                passed=False,
+                message=f"{rule.name}: 未找到有效匹配文件 '{pattern}'",
+                severity=rule.severity,
+                fix_suggestion=f"创建匹配 '{pattern}' 的文件",
+            )
 
         return ValidationResult(
             rule_id=rule.id,
@@ -628,7 +825,7 @@ class ValidationRuleEngine:
         self, rule: ValidationRule, context: dict[str, Any]
     ) -> ValidationResult:
         """检查文件内容不应包含特定模式。"""
-        project_dir = Path(context.get("project_dir", self.project_dir))
+        project_dir = Path(context.get("project_dir", self.project_dir)).resolve(strict=False)
         pattern = rule.check_config.get("file_pattern", "")
         bad_patterns = rule.check_config.get("patterns", [])
         exclude_patterns = rule.check_config.get("exclude_patterns", [])
@@ -638,11 +835,11 @@ class ValidationRuleEngine:
         excluded_paths: set[Path] = set()
         for exclude_pattern in exclude_patterns:
             for filepath in glob.glob(str(project_dir / str(exclude_pattern)), recursive=True):
-                excluded_paths.add(Path(filepath))
+                excluded_paths.add(Path(filepath).resolve(strict=False))
 
         for filepath in matches:
             candidate_path = Path(filepath)
-            if candidate_path in excluded_paths:
+            if _is_path_ignored_for_scan(candidate_path, project_dir, excluded_paths):
                 continue
             try:
                 content = candidate_path.read_text(encoding="utf-8", errors="replace")
@@ -650,7 +847,7 @@ class ValidationRuleEngine:
                 continue
             for pat in bad_patterns:
                 if re.search(pat, content):
-                    rel = str(candidate_path.relative_to(project_dir))
+                    rel = str(candidate_path.resolve(strict=False).relative_to(project_dir))
                     violations.append(f"{rel} 匹配 '{pat}'")
 
         if not violations:
@@ -695,9 +892,117 @@ class ValidationRuleEngine:
             fix_suggestion=f"移除匹配: {', '.join(found)}",
         )
 
+    def _sensitive_names_for_rule(self, rule: ValidationRule) -> frozenset[str]:
+        configured = rule.check_config.get("sensitive_names", [])
+        if not isinstance(configured, list):
+            return _DEFAULT_SENSITIVE_NAMES
+        names = {
+            str(item).strip().lower()
+            for item in configured
+            if isinstance(item, str) and item.strip()
+        }
+        return frozenset(names) if names else _DEFAULT_SENSITIVE_NAMES
+
+    def _check_python_sensitive_logging(
+        self, rule: ValidationRule, context: dict[str, Any]
+    ) -> ValidationResult:
+        """Use Python syntax trees to detect output calls that reference secret-bearing values."""
+        project_dir = Path(context.get("project_dir", self.project_dir)).resolve(strict=False)
+        file_pattern = str(rule.check_config.get("file_pattern", "**/*.py"))
+        exclude_patterns = rule.check_config.get("exclude_patterns", [])
+        sensitive_names = self._sensitive_names_for_rule(rule)
+        excluded_paths: set[Path] = set()
+        if isinstance(exclude_patterns, list):
+            for exclude_pattern in exclude_patterns:
+                for filepath in glob.glob(str(project_dir / str(exclude_pattern)), recursive=True):
+                    excluded_paths.add(Path(filepath).resolve(strict=False))
+
+        violations: list[str] = []
+        parse_errors: list[str] = []
+        for filepath in glob.glob(str(project_dir / file_pattern), recursive=True):
+            candidate_path = Path(filepath)
+            if _is_path_ignored_for_scan(candidate_path, project_dir, excluded_paths):
+                continue
+            try:
+                content = candidate_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            matches, parse_error = _find_python_sensitive_logging(
+                content,
+                sensitive_names=sensitive_names,
+            )
+            relative = str(candidate_path.resolve(strict=False).relative_to(project_dir))
+            if parse_error:
+                parse_errors.append(f"{relative}: {parse_error}")
+                continue
+            violations.extend(
+                f"{relative}:{line_number} 调用 {call_name} 输出敏感值"
+                for line_number, call_name in matches
+            )
+
+        if parse_errors:
+            display = parse_errors[:5]
+            extra = f"（共 {len(parse_errors)} 个文件）" if len(parse_errors) > 5 else ""
+            return ValidationResult(
+                rule_id=rule.id,
+                passed=False,
+                message=f"{rule.name}: 无法完成语法树检查{extra}: {'; '.join(display)}",
+                severity=rule.severity,
+                fix_suggestion="先修复 Python 语法错误，再重新执行敏感信息输出检查",
+            )
+        if not violations:
+            return ValidationResult(
+                rule_id=rule.id,
+                passed=True,
+                message=f"{rule.name}: 未发现敏感值输出",
+                severity=rule.severity,
+            )
+
+        display = violations[:5]
+        extra = f"（共 {len(violations)} 处）" if len(violations) > 5 else ""
+        return ValidationResult(
+            rule_id=rule.id,
+            passed=False,
+            message=f"{rule.name}: 发现违规{extra}: {'; '.join(display)}",
+            severity=rule.severity,
+            fix_suggestion="移除敏感值输出，或只记录不可逆脱敏后的标识",
+        )
+
+    def _check_python_sensitive_logging_single(
+        self, rule: ValidationRule, content: str, filepath: str
+    ) -> ValidationResult:
+        sensitive_names = self._sensitive_names_for_rule(rule)
+        violations, parse_error = _find_python_sensitive_logging(
+            content,
+            sensitive_names=sensitive_names,
+        )
+        if parse_error:
+            return ValidationResult(
+                rule_id=rule.id,
+                passed=False,
+                message=f"{rule.name}: 无法完成语法树检查 ({filepath}): {parse_error}",
+                severity=rule.severity,
+                fix_suggestion="先修复 Python 语法错误，再重新执行敏感信息输出检查",
+            )
+        if not violations:
+            return ValidationResult(
+                rule_id=rule.id,
+                passed=True,
+                message=f"{rule.name}: 未发现敏感值输出 ({filepath})",
+                severity=rule.severity,
+            )
+        lines = ", ".join(str(line_number) for line_number, _ in violations[:5])
+        return ValidationResult(
+            rule_id=rule.id,
+            passed=False,
+            message=f"{rule.name}: 发现敏感值输出 ({filepath}, lines {lines})",
+            severity=rule.severity,
+            fix_suggestion="移除敏感值输出，或只记录不可逆脱敏后的标识",
+        )
+
     def _check_regex_match(self, rule: ValidationRule, context: dict[str, Any]) -> ValidationResult:
         """检查文件中是否存在匹配的正则模式。"""
-        project_dir = Path(context.get("project_dir", self.project_dir))
+        project_dir = Path(context.get("project_dir", self.project_dir)).resolve(strict=False)
         file_pattern = rule.check_config.get("file_pattern", "")
         regex = rule.check_config.get("pattern", "")
         desc = rule.check_config.get("description", rule.description)
@@ -713,12 +1018,15 @@ class ValidationRuleEngine:
 
         found_in: list[str] = []
         for filepath in matches:
+            candidate_path = Path(filepath)
+            if _is_path_ignored_for_scan(candidate_path, project_dir):
+                continue
             try:
-                content = Path(filepath).read_text(encoding="utf-8", errors="replace")
+                content = candidate_path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
             if re.search(regex, content):
-                found_in.append(str(Path(filepath).relative_to(project_dir)))
+                found_in.append(str(candidate_path.resolve(strict=False).relative_to(project_dir)))
 
         if found_in:
             return ValidationResult(

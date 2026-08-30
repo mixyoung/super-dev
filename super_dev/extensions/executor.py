@@ -200,9 +200,7 @@ class StructuredExecutor:
             raise ValueError("executable 必须是已经解析的绝对路径")
         resolved_executable = executable.resolve()
         if resolved_executable.suffix.lower() in _BLOCKED_SUFFIXES:
-            raise ValueError(
-                f"禁止直接执行脚本类型: {resolved_executable.suffix.lower()}"
-            )
+            raise ValueError(f"禁止直接执行脚本类型: {resolved_executable.suffix.lower()}")
         if not resolved_executable.exists() or not resolved_executable.is_file():
             raise FileNotFoundError(f"可执行程序不存在: {resolved_executable}")
         if resolved_executable not in self.allowed_executables:

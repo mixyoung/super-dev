@@ -191,7 +191,11 @@ class QualityAdvisor:
 
         score = 0
         if quality_result is not None:
-            score = getattr(quality_result, "total_score", 0)
+            score = getattr(
+                quality_result,
+                "gate_score",
+                getattr(quality_result, "total_score", 0),
+            )
 
         return QualityAdvisorReport(
             project_name=self.project_dir.name,
@@ -209,7 +213,9 @@ class QualityAdvisor:
         next_actions = governance_gap.get("next_actions", []) if governance_gap else []
         primary_action = ""
         if isinstance(next_actions, list):
-            primary_action = next((str(item).strip() for item in next_actions if str(item).strip()), "")
+            primary_action = next(
+                (str(item).strip() for item in next_actions if str(item).strip()), ""
+            )
         if not primary_action:
             primary_action = (
                 "先补齐 workflow continuity / framework harness / frontend runtime 闭环，"

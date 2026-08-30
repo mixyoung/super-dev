@@ -361,7 +361,9 @@ class SpecConsistencyChecker:
                                 "redis": ["redis"],
                                 "sqlite": [],  # SQLite 不需要容器
                             }
-                            images = cast(list[str], db_images.get(db_type.lower(), [db_type.lower()]))
+                            images = cast(
+                                list[str], db_images.get(db_type.lower(), [db_type.lower()])
+                            )
                             if not images or any(img in content for img in images):
                                 found_db = True
                                 break
@@ -487,6 +489,8 @@ class SpecConsistencyChecker:
             if not match:
                 continue
             task_text = match.group(1).strip()
+            if not self._task_requires_code_evidence(task_text):
+                continue
 
             # 从任务文本中提取关键词
             keywords = self._extract_keywords(task_text)
@@ -706,8 +710,43 @@ class SpecConsistencyChecker:
         return sorted(results)
 
     @staticmethod
-    def _extract_keywords(text: str) -> list[str]:
+    def _strip_task_prefix(text: str) -> str:
+        return re.sub(r"^\s*[A-Za-z]+\d+(?:\.\d+)*[.)：:]?\s*", "", text).strip()
+
+    @classmethod
+    def _task_requires_code_evidence(cls, text: str) -> bool:
+        normalized = cls._strip_task_prefix(text)
+        if not normalized or re.match(r"^(?:未|不|无需|不再|仅确认|确认无需)", normalized):
+            return False
+        if any(
+            marker in normalized
+            for marker in (
+                "修复",
+                "实现",
+                "新增",
+                "添加",
+                "删除",
+                "修改",
+                "重构",
+                "接入",
+                "支持",
+                "调整",
+                "替换",
+            )
+        ):
+            return True
+        return bool(
+            re.search(
+                r"\b(?:implement|fix|add|remove|delete|update|refactor|wire|support|replace)\b",
+                normalized,
+                re.IGNORECASE,
+            )
+        )
+
+    @classmethod
+    def _extract_keywords(cls, text: str) -> list[str]:
         """从文本中提取搜索关键词"""
+        text = cls._strip_task_prefix(text)
         stop_words = {
             "the",
             "a",

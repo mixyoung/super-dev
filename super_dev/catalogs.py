@@ -18,6 +18,7 @@ PLATFORM_CATALOG: list[dict[str, str]] = [
     {"id": "mobile", "name": "H5 / APP"},
     {"id": "wechat", "name": "微信小程序（MiniApp）"},
     {"id": "desktop", "name": "桌面应用"},
+    {"id": "cli", "name": "命令行工具"},
 ]
 
 PIPELINE_FRONTEND_TEMPLATE_CATALOG: list[dict[str, str]] = [
@@ -309,7 +310,7 @@ HOST_RUNTIME_VALIDATION_OVERRIDES: dict[str, dict[str, list[str]]] = {
             "确认当前 Droid CLI 会话就在目标项目目录中，并且项目根 `AGENTS.md` 已被当前会话读取。",
             "确认 `.factory/rules/`、`.factory/commands/` 与 `.factory/skills/` 已存在并在当前会话中可见。",
             "确认 `/super-dev` 或 `/super-dev-seeai` 能在当前 Droid 会话中直接触发，而不是退回普通聊天。",
-            "若使用续跑，确认 `droid exec --session-id <id> \"continue with next steps\"` 能继续当前 session。",
+            '若使用续跑，确认 `droid exec --session-id <id> "continue with next steps"` 能继续当前 session。',
         ],
         "pass_criteria": [
             "Droid CLI 在当前项目会话中真实读取 `AGENTS.md + .factory/rules + .factory/commands + .factory/skills`，并稳定进入 Super Dev 流程。",

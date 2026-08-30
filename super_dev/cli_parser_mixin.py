@@ -623,7 +623,9 @@ class CliParserMixin:
             choices=["pending_review", "revision_requested", "confirmed"],
             help="要写入的 baseline 确认状态；不传则仅查看当前状态",
         )
-        review_baseline_parser.add_argument("--comment", default="", help="baseline 确认意见或修改要求")
+        review_baseline_parser.add_argument(
+            "--comment", default="", help="baseline 确认意见或修改要求"
+        )
         review_baseline_parser.add_argument("--run-id", default="", help="关联的运行 ID（可选）")
         review_baseline_parser.add_argument(
             "--actor", default="user", help="记录操作者（默认: user）"
@@ -708,7 +710,7 @@ class CliParserMixin:
         release_readiness_parser.add_argument(
             "--verify-tests",
             action="store_true",
-            help="执行 pytest -q，并把测试结果纳入发布就绪度评分",
+            help="完成前验证试点未启用时，兼容执行旧的 pytest -q 检查",
         )
         release_readiness_parser.add_argument(
             "--json", action="store_true", help="以 JSON 输出结果"
@@ -954,7 +956,9 @@ class CliParserMixin:
             description="结合当前项目配置或需求描述，推荐最合适的设计灵感方向",
         )
         design_recommend_parser.add_argument(
-            "--idea", default="", help="显式需求描述；未提供时优先读取 super-dev.yaml 中的 description"
+            "--idea",
+            default="",
+            help="显式需求描述；未提供时优先读取 super-dev.yaml 中的 description",
         )
         design_recommend_parser.add_argument("--product-type", help="显式指定产品类型")
         design_recommend_parser.add_argument("--industry", help="显式指定行业")
@@ -969,7 +973,9 @@ class CliParserMixin:
             help="应用设计灵感锚点",
             description="将指定设计灵感写入项目配置，并可同步重生成 uiux/ui-contract",
         )
-        design_apply_parser.add_argument("slug", help="设计灵感 slug，例如 linear.app / vercel / stripe")
+        design_apply_parser.add_argument(
+            "slug", help="设计灵感 slug，例如 linear.app / vercel / stripe"
+        )
         design_apply_parser.add_argument(
             "--idea", default="", help="可选需求描述；仅在当前项目 description 为空时作为补充上下文"
         )
@@ -1285,8 +1291,6 @@ class CliParserMixin:
             help="检查类型 (默认: all)",
         )
         compliance_parser.add_argument("--json", action="store_true", help="以 JSON 格式输出")
-        compliance_parser.add_argument(
-            "--save", action="store_true", help="保存报告到 output/"
-        )
+        compliance_parser.add_argument("--save", action="store_true", help="保存报告到 output/")
 
         return parser

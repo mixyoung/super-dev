@@ -135,8 +135,7 @@ def load_users(users, db):
         report = reviewer.review()
 
         assert any(
-            i.category == "API" and "perf.py:" in i.description
-            for i in report.performance_issues
+            i.category == "API" and "perf.py:" in i.description for i in report.performance_issues
         )
         assert any(
             i.category == "数据库" and "perf.py:" in i.description
@@ -202,7 +201,10 @@ def load_users(users, db):
             tech_stack={"backend": "python", "frontend": "none"},
         )
 
-        monkeypatch.setattr("super_dev.reviewers.redteam.shutil.which", lambda cmd: "/usr/bin/bandit" if cmd == "bandit" else None)
+        monkeypatch.setattr(
+            "super_dev.reviewers.redteam.shutil.which",
+            lambda cmd: "/usr/bin/bandit" if cmd == "bandit" else None,
+        )
         monkeypatch.setattr(
             reviewer,
             "_run_command",
@@ -234,7 +236,10 @@ def load_users(users, db):
             tech_stack={"backend": "node", "frontend": "react"},
         )
 
-        monkeypatch.setattr("super_dev.reviewers.redteam.shutil.which", lambda cmd: "/usr/bin/npm" if cmd == "npm" else None)
+        monkeypatch.setattr(
+            "super_dev.reviewers.redteam.shutil.which",
+            lambda cmd: "/usr/bin/npm" if cmd == "npm" else None,
+        )
         monkeypatch.setattr(
             reviewer,
             "_run_command",
@@ -248,3 +253,45 @@ def load_users(users, db):
 
         issues = reviewer._scan_with_npm_audit()
         assert any(i.category == "依赖漏洞" and i.severity == "high" for i in issues)
+
+    def test_inactive_node_scaffolds_are_outside_python_cli_release_surface(
+        self, temp_project_dir: Path, monkeypatch
+    ):
+        frontend = temp_project_dir / "frontend"
+        backend = temp_project_dir / "backend"
+        frontend.mkdir(parents=True, exist_ok=True)
+        (backend / "src").mkdir(parents=True, exist_ok=True)
+        (frontend / "package.json").write_text('{"name":"legacy-frontend"}', encoding="utf-8")
+        (frontend / "app.tsx").write_text('const token = "legacy-secret";\n', encoding="utf-8")
+        (backend / "package.json").write_text('{"name":"legacy-backend"}', encoding="utf-8")
+        (backend / "src" / "app.js").write_text(
+            "res.header('Access-Control-Allow-Origin', '*');\n",
+            encoding="utf-8",
+        )
+
+        reviewer = RedTeamReviewer(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"platform": "cli", "backend": "python", "frontend": "none"},
+        )
+        reviewer.enable_tool_scans = False
+        monkeypatch.setattr(
+            "super_dev.reviewers.redteam.shutil.which",
+            lambda cmd: "/usr/bin/npm" if cmd == "npm" else None,
+        )
+
+        def fail_if_npm_runs(cmd, timeout=120):
+            raise AssertionError("inactive npm project must not be audited")
+
+        monkeypatch.setattr(reviewer, "_run_command", fail_if_npm_runs)
+
+        assert reviewer._find_package_json_files() == []
+        assert reviewer._scan_with_npm_audit() == []
+        report = reviewer.review()
+
+        assert report.scanned_files_count == 0
+        assert not any(
+            issue.category == "CORS 配置" and issue.severity == "high"
+            for issue in report.security_issues
+        )
+        assert not any(issue.category == "硬编码凭据" for issue in report.security_issues)

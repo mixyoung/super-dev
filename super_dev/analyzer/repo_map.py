@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..artifact_utils import resolve_current_artifact_prefix
 from .analyzer import ProjectAnalyzer
 
 ENTRYPOINT_CANDIDATES = [
@@ -142,7 +143,10 @@ class RepoMapBuilder:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.project_name = self.project_dir.name
+        self.project_name = resolve_current_artifact_prefix(
+            self.project_dir,
+            fallback_name=self.project_dir.name,
+        )
         self.analyzer = ProjectAnalyzer(self.project_dir)
 
     def build(self) -> RepoMapReport:

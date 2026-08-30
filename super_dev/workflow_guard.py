@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .artifact_utils import resolve_active_change_id, sanitize_artifact_name
 from .review_state import (
     load_docs_confirmation,
     load_preview_confirmation,
@@ -21,6 +22,7 @@ from .workflow_stage_truth import (
 )
 
 _DOC_PATTERNS = ("*-prd.md", "*-architecture.md", "*-uiux.md")
+_ACTIVE_DOC_PATTERNS = ("*-research.md", *_DOC_PATTERNS)
 _PREVIEW_PATTERNS = (
     "*-frontend-runtime.json",
     "*-ui-review.md",
@@ -28,6 +30,7 @@ _PREVIEW_PATTERNS = (
     "*-ui-contract.json",
     "*-ui-contract-alignment.json",
 )
+
 
 class WorkflowGateError(RuntimeError):
     """Raised when a workflow gate is bypassed."""
@@ -59,7 +62,7 @@ def _utc_now() -> str:
 
 
 def stage_ledger_file(project_dir: Path) -> Path:
-    return review_state_dir(project_dir) / "stage-ledger.json"
+    return Path(review_state_dir(project_dir)) / "stage-ledger.json"
 
 
 def load_stage_ledger(project_dir: Path) -> dict[str, Any]:
@@ -81,13 +84,23 @@ def save_stage_ledger(project_dir: Path, payload: dict[str, Any]) -> Path:
     return file_path
 
 
-def _artifact_files(project_dir: Path, patterns: tuple[str, ...]) -> list[Path]:
+def _artifact_files(
+    project_dir: Path,
+    patterns: tuple[str, ...],
+    *,
+    artifact_prefix: str = "",
+) -> list[Path]:
     output_dir = Path(project_dir).resolve() / "output"
     if not output_dir.exists():
         return []
     files: list[Path] = []
     for pattern in patterns:
-        files.extend(output_dir.glob(pattern))
+        if artifact_prefix and pattern.startswith("*"):
+            candidate = output_dir / f"{artifact_prefix}{pattern[1:]}"
+            if candidate.is_file():
+                files.append(candidate)
+        else:
+            files.extend(output_dir.glob(pattern))
     return sorted({path.resolve() for path in files if path.is_file()})
 
 
@@ -105,23 +118,63 @@ def _binding_digest(files: list[Path]) -> str:
     return hasher.hexdigest()
 
 
-def _artifact_binding(project_dir: Path, *, stage: str, patterns: tuple[str, ...]) -> dict[str, Any]:
-    files = _artifact_files(project_dir, patterns)
+def _artifact_binding(
+    project_dir: Path,
+    *,
+    stage: str,
+    patterns: tuple[str, ...],
+    active_change_id: str = "",
+) -> dict[str, Any]:
+    artifact_prefix = sanitize_artifact_name(active_change_id)
+    files = _artifact_files(project_dir, patterns, artifact_prefix=artifact_prefix)
     return {
         "stage": stage,
         "file_count": len(files),
         "files": [str(path) for path in files],
         "digest": _binding_digest(files) if files else "",
         "generated_at": _utc_now(),
+        **(
+            {
+                "active_change_id": active_change_id,
+                "artifact_prefix": artifact_prefix,
+            }
+            if active_change_id
+            else {}
+        ),
     }
 
 
 def collect_docs_artifact_binding(project_dir: Path) -> dict[str, Any]:
-    return _artifact_binding(project_dir, stage="docs", patterns=_DOC_PATTERNS)
+    active_change_id = resolve_active_change_id(project_dir)
+    binding = _artifact_binding(
+        project_dir,
+        stage="docs",
+        patterns=_ACTIVE_DOC_PATTERNS if active_change_id else _DOC_PATTERNS,
+        active_change_id=active_change_id,
+    )
+    if active_change_id:
+        artifact_prefix = str(binding.get("artifact_prefix", ""))
+        output_dir = Path(project_dir).resolve() / "output"
+        core_files = [output_dir / f"{artifact_prefix}{pattern[1:]}" for pattern in _DOC_PATTERNS]
+        core_file_count = sum(path.is_file() for path in core_files)
+        binding.update(
+            {
+                "core_file_count": core_file_count,
+                "required_core_file_count": len(_DOC_PATTERNS),
+                "core_complete": core_file_count == len(_DOC_PATTERNS),
+            }
+        )
+    return binding
 
 
 def collect_preview_artifact_binding(project_dir: Path) -> dict[str, Any]:
-    return _artifact_binding(project_dir, stage="preview", patterns=_PREVIEW_PATTERNS)
+    active_change_id = resolve_active_change_id(project_dir)
+    return _artifact_binding(
+        project_dir,
+        stage="preview",
+        patterns=_PREVIEW_PATTERNS,
+        active_change_id=active_change_id,
+    )
 
 
 def _update_stage_ledger(
@@ -148,7 +201,9 @@ def _update_stage_ledger(
         "comment": comment.strip(),
         "source": source.strip(),
         "artifact_binding": artifact_binding,
-        "active_experts": [str(item).strip() for item in (active_experts or []) if str(item).strip()],
+        "active_experts": [
+            str(item).strip() for item in (active_experts or []) if str(item).strip()
+        ],
         "details": details if isinstance(details, dict) else {},
         "updated_at": _utc_now(),
     }
@@ -158,7 +213,9 @@ def _update_stage_ledger(
     return entry
 
 
-def record_docs_generated(project_dir: Path, *, run_id: str = "", source: str = "drafting") -> dict[str, Any]:
+def record_docs_generated(
+    project_dir: Path, *, run_id: str = "", source: str = "drafting"
+) -> dict[str, Any]:
     binding = collect_docs_artifact_binding(project_dir)
     return _update_stage_ledger(
         project_dir,
@@ -205,7 +262,9 @@ def record_stage_progress(
     )
 
 
-def save_bound_docs_confirmation(project_dir: Path, payload: dict[str, Any]) -> tuple[Path, dict[str, Any]]:
+def save_bound_docs_confirmation(
+    project_dir: Path, payload: dict[str, Any]
+) -> tuple[Path, dict[str, Any]]:
     binding = collect_docs_artifact_binding(project_dir)
     normalized = dict(payload)
     normalized["artifact_binding"] = binding
@@ -224,7 +283,9 @@ def save_bound_docs_confirmation(project_dir: Path, payload: dict[str, Any]) -> 
     return file_path, ledger_entry
 
 
-def save_bound_preview_confirmation(project_dir: Path, payload: dict[str, Any]) -> tuple[Path, dict[str, Any]]:
+def save_bound_preview_confirmation(
+    project_dir: Path, payload: dict[str, Any]
+) -> tuple[Path, dict[str, Any]]:
     binding = collect_preview_artifact_binding(project_dir)
     normalized = dict(payload)
     normalized["artifact_binding"] = binding
@@ -244,11 +305,11 @@ def save_bound_preview_confirmation(project_dir: Path, payload: dict[str, Any]) 
 
 
 def requested_phases_require_docs_confirmation(requested_phases: list[str] | None) -> bool:
-    return stages_require_docs_confirmation(requested_phases)
+    return bool(stages_require_docs_confirmation(requested_phases))
 
 
 def requested_phases_require_preview_confirmation(requested_phases: list[str] | None) -> bool:
-    return stages_require_preview_confirmation(requested_phases)
+    return bool(stages_require_preview_confirmation(requested_phases))
 
 
 def docs_gate_status(project_dir: Path) -> dict[str, Any]:
@@ -271,7 +332,8 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
     stored_digest = str(confirmed_binding.get("digest", "")).strip()
     current_digest = str(binding.get("digest", "")).strip()
     binding_matches_current = bool(stored_digest) and stored_digest == current_digest
-    confirmed = status == "confirmed" and binding_matches_current
+    core_complete = bool(binding.get("core_complete", True))
+    confirmed = status == "confirmed" and binding_matches_current and core_complete
     return {
         "has_context": has_context,
         "confirmed": confirmed,
@@ -279,6 +341,7 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
         "artifact_binding": binding,
         "confirmed_artifact_binding": confirmed_binding,
         "binding_matches_current": binding_matches_current,
+        "core_complete": core_complete,
         "confirmation": confirmation,
         "ledger_entry": ledger_entry,
     }
@@ -323,7 +386,9 @@ def require_docs_confirmation(
     require_context: bool = True,
 ) -> dict[str, Any]:
     gate_state = docs_gate_status(project_dir)
-    if requested_phases is not None and not requested_phases_require_docs_confirmation(requested_phases):
+    if requested_phases is not None and not requested_phases_require_docs_confirmation(
+        requested_phases
+    ):
         return gate_state
     if require_context and not gate_state["has_context"]:
         return gate_state

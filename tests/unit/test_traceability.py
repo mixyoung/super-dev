@@ -30,8 +30,7 @@ def change_with_proposal(project_dir: Path) -> str:
     change_dir = project_dir / ".super-dev" / "changes" / change_id
     change_dir.mkdir(parents=True)
 
-    proposal = textwrap.dedent(
-        """\
+    proposal = textwrap.dedent("""\
         # Proposal
 
         ## Add User Authentication
@@ -44,8 +43,7 @@ def change_with_proposal(project_dir: Path) -> str:
 
         ## Motivation
         Security requirement for production deployment.
-    """
-    )
+    """)
     (change_dir / "proposal.md").write_text(proposal, encoding="utf-8")
     return change_id
 
@@ -58,8 +56,7 @@ def change_with_spec(project_dir: Path, change_with_proposal: str) -> str:
     specs_dir = change_dir / "specs" / "auth"
     specs_dir.mkdir(parents=True)
 
-    spec = textwrap.dedent(
-        """\
+    spec = textwrap.dedent("""\
         # Auth Spec
 
         ## ADDED Requirements
@@ -74,8 +71,7 @@ def change_with_spec(project_dir: Path, change_with_proposal: str) -> str:
 
         ### Requirement: Refresh Token
         SHOULD implement refresh token rotation with configurable TTL.
-    """
-    )
+    """)
     (specs_dir / "spec.md").write_text(spec, encoding="utf-8")
     return change_id
 

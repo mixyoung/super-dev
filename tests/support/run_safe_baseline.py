@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import platform
 import signal
 import subprocess
 import sys
+import sysconfig
 import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -95,6 +97,16 @@ class PytestRun:
 
 def _utc_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _isolated_pytest_pythonpath() -> str:
+    spec = importlib.util.find_spec("pytest")
+    origin = Path(spec.origin).resolve() if spec and spec.origin else None
+    package_root = origin.parent.parent if origin is not None else None
+    if package_root is None or not package_root.is_dir():
+        raise RuntimeError("当前 Python 环境没有可用的 pytest")
+    stdlib = Path(sysconfig.get_path("stdlib")).resolve()
+    return os.pathsep.join([str(stdlib), str(package_root)])
 
 
 def _git_value(*args: str) -> str:
@@ -235,7 +247,9 @@ def _write_snapshot(path: Path, states: Mapping[str, SurfaceState]) -> None:
 def _validate_output_dir(output_dir: Path) -> Path:
     resolved = Path(output_dir).resolve(strict=False)
     if resolved == PROJECT_ROOT or not path_is_within(resolved, PROJECT_ROOT):
-        raise ValueError(f"output directory must be a dedicated path inside the project: {resolved}")
+        raise ValueError(
+            f"output directory must be a dedicated path inside the project: {resolved}"
+        )
     return resolved
 
 
@@ -332,6 +346,8 @@ def run_baseline(
             isolated_directories = UserDirectoryContext.from_home(isolated_home)
             isolated_environment = isolated_directories.environment(os.environ)
             isolated_environment["SUPER_DEV_BASELINE_RUN"] = "1"
+            isolated_environment["PYTHONNOUSERSITE"] = "1"
+            isolated_environment["PYTHONPATH"] = _isolated_pytest_pythonpath()
             for index, stage_mode in enumerate(execution_modes, start=1):
                 run = _run_pytest(
                     mode=stage_mode,
@@ -347,10 +363,15 @@ def run_baseline(
                 if has_surface_changes(interim_diff):
                     runner_error = f"real user surfaces changed after {stage_mode}"
                     break
-                if stage_mode != mode and stage_mode in {
-                    "isolation-smoke",
-                    "user-surfaces",
-                } and run.returncode != 0:
+                if (
+                    stage_mode != mode
+                    and stage_mode
+                    in {
+                        "isolation-smoke",
+                        "user-surfaces",
+                    }
+                    and run.returncode != 0
+                ):
                     runner_error = f"preflight failed: {stage_mode}"
                     break
     except Exception as error:  # pragma: no cover - defensive evidence path
@@ -365,9 +386,7 @@ def run_baseline(
     target_runs = [run for run in runs if run.mode == mode]
     test_result = (
         "pass"
-        if runner_error is None
-        and target_runs
-        and all(run.returncode == 0 for run in target_runs)
+        if runner_error is None and target_runs and all(run.returncode == 0 for run in target_runs)
         else "fail"
     )
     required_files = [

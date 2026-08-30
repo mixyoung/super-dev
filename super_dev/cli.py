@@ -31,6 +31,7 @@ except ImportError:  # pragma: no cover - optional dependency seam for tests/run
     requests = None
 
 from . import __description__, __version__
+from .artifact_utils import resolve_active_change_id, resolve_current_artifact_prefix
 from .baseline_governance import inspect_baseline_governance
 from .catalogs import (
     CICD_PLATFORM_IDS,
@@ -1680,6 +1681,8 @@ class SuperDevCLI(
         architecture_state = self._get_architecture_revision_state(project_dir)
         quality_state = self._get_quality_revision_state(project_dir)
         workflow_payload = {
+            "active_change_id": str(payload.get("active_change_id", "")).strip(),
+            "artifact_prefix": str(payload.get("artifact_prefix", "")).strip(),
             "status": str(payload.get("status", "")).strip(),
             "current_step_label": str(payload.get("current_step_label", "")).strip(),
             "user_next_action": str(payload.get("user_next_action", "")).strip(),
@@ -1974,9 +1977,7 @@ class SuperDevCLI(
         continue_prompt = self._build_host_continue_prompt(
             project_dir=project_dir, target=target, next_payload=next_payload
         )
-        recommended_workflow_command = str(
-            next_payload.get("recommended_command", "")
-        ).strip()
+        recommended_workflow_command = str(next_payload.get("recommended_command", "")).strip()
         return {
             "session_mode": "continue_super_dev",
             "continue_instruction": self._build_host_continue_instruction(
@@ -2043,7 +2044,9 @@ class SuperDevCLI(
         config = get_config_manager(project_dir).config
         available_targets = [item.name for item in IntegrationManager(project_dir).list_targets()]
         preferred_order = list(
-            dict.fromkeys(("codex", "codex-cli", "claude-code", "claude", "opencode", *PRIMARY_HOST_TOOL_IDS))
+            dict.fromkeys(
+                ("codex", "codex-cli", "claude-code", "claude", "opencode", *PRIMARY_HOST_TOOL_IDS)
+            )
         )
 
         def _pick_best(candidates: list[str]) -> str | None:
@@ -2200,6 +2203,12 @@ class SuperDevCLI(
             supports_slash=self._supports_slash_for_prompt(preferred_host),
         )
         enriched = dict(payload)
+        active_change_id = str(payload.get("active_change_id", "")).strip() or (
+            resolve_active_change_id(project_dir)
+        )
+        artifact_prefix = str(payload.get("artifact_prefix", "")).strip() or (
+            resolve_current_artifact_prefix(project_dir, fallback_name=project_dir.name)
+        )
         shadow_ledger = (
             payload.get("shadow_ledger")
             if isinstance(payload.get("shadow_ledger"), dict)
@@ -2207,6 +2216,8 @@ class SuperDevCLI(
         )
         enriched.update(
             {
+                "active_change_id": active_change_id,
+                "artifact_prefix": artifact_prefix,
                 "current_step_label": current_step_label,
                 "user_next_action": user_next_action,
                 "preferred_host": preferred_host,
@@ -2455,15 +2466,13 @@ class SuperDevCLI(
                 str(item).strip().lower()
                 for item in (
                     declared_changed_surfaces
-                    if isinstance(declared_changed_surfaces, (list, tuple, set, frozenset))
+                    if isinstance(declared_changed_surfaces, list | tuple | set | frozenset)
                     else ()
                 )
                 if str(item).strip()
             }
         )
-        declared_governance_depth = str(
-            getattr(args, "governance_depth", "") or ""
-        ).strip()
+        declared_governance_depth = str(getattr(args, "governance_depth", "") or "").strip()
 
         project_dir = Path.cwd()
         output_dir = project_dir / "output"
@@ -2481,7 +2490,9 @@ class SuperDevCLI(
             for item in policy_violations:
                 self.console.print(f"  - {item}")
             self.console.print(f"[dim]策略文件: {policy_manager.policy_path}[/dim]")
-            self.console.print("[dim]请检查 .super-dev/policy.yaml 或 super-dev.yaml 中的当前治理配置[/dim]")
+            self.console.print(
+                "[dim]请检查 .super-dev/policy.yaml 或 super-dev.yaml 中的当前治理配置[/dim]"
+            )
             return 1
 
         pipeline_args_snapshot: dict[str, Any] = {
@@ -3147,7 +3158,9 @@ class SuperDevCLI(
                     self.console.print(f"  [dim]备注: {quality_revision['comment']}[/dim]")
                 self.console.print("[cyan]继续方式:[/cyan]")
                 self.console.print("  1. 先修复质量门禁或安全问题")
-                self.console.print("  2. 重新执行 quality gate，并刷新 proof-pack / readiness 等交付证据")
+                self.console.print(
+                    "  2. 重新执行 quality gate，并刷新 proof-pack / readiness 等交付证据"
+                )
                 self.console.print("  3. 在宿主中明确回复：“质量整改已完成，继续当前流程”")
                 self.console.print("  4. 继续留在当前 Super Dev 流程内，不要重新开题")
                 metric_files = _finalize_metrics(success=False, reason="waiting_quality_revision")
@@ -3205,9 +3218,7 @@ class SuperDevCLI(
                     if scope_declaration.scope_complete
                     else None
                 )
-                pipeline_args_snapshot["governance_depth"] = (
-                    scope_declaration.governance_depth
-                )
+                pipeline_args_snapshot["governance_depth"] = scope_declaration.governance_depth
                 _update_run_context(
                     changed_surfaces=list(scope_declaration.changed_surfaces),
                     scope_complete=scope_declaration.scope_complete,
@@ -3261,7 +3272,9 @@ class SuperDevCLI(
             # ========== 第 3 阶段: 生成前端实施蓝图 ==========
             _start_stage("3", "前端实施蓝图与预览")
             if _should_skip_for_resume(3):
-                self.console.print("[yellow]第 3 阶段: 生成前端实施蓝图与预览 (resume 跳过)[/yellow]")
+                self.console.print(
+                    "[yellow]第 3 阶段: 生成前端实施蓝图与预览 (resume 跳过)[/yellow]"
+                )
                 self.console.print("")
                 _record_stage(True, details={"skipped": True, "reason": "resume"})
             else:
@@ -3320,7 +3333,9 @@ class SuperDevCLI(
                     if preview_confirmation["status"] == "revision_requested"
                     else "pending_review"
                 )
-                self.console.print("[yellow]已完成前端实施蓝图与预览，当前进入前端预览确认门[/yellow]")
+                self.console.print(
+                    "[yellow]已完成前端实施蓝图与预览，当前进入前端预览确认门[/yellow]"
+                )
                 self.console.print(
                     f"  [dim]前端运行验证: {output_dir / f'{project_name}-frontend-runtime.md'}[/dim]"
                 )
@@ -3645,7 +3660,10 @@ class SuperDevCLI(
                 )
 
                 status = "[green]通过[/green]" if gate_result.passed else "[red]未通过[/red]"
-                self.console.print(f"  {status} 总分: {gate_result.total_score}/100")
+                self.console.print(
+                    f"  {status} 门禁分（加权）: {gate_result.gate_score:.1f}/100 "
+                    f"(阈值 {gate_result.threshold:g}/100)"
+                )
                 self.console.print(f"  [dim]{gate_result.executive_summary}[/dim]")
                 self.console.print(f"  [green]✓[/green] 报告: {gate_file}")
                 if gate_checker.latest_ui_review_report is not None:
@@ -3659,7 +3677,8 @@ class SuperDevCLI(
                     _record_stage(
                         False,
                         details={
-                            "score": gate_result.total_score,
+                            "score": gate_result.gate_score,
+                            "unweighted_score": gate_result.total_score,
                             "critical_failures": gate_result.critical_failures,
                         },
                     )
@@ -3690,7 +3709,8 @@ class SuperDevCLI(
                 _record_stage(
                     True,
                     details={
-                        "score": gate_result.total_score,
+                        "score": gate_result.gate_score,
+                        "unweighted_score": gate_result.total_score,
                         "scenario": gate_result.scenario,
                     },
                 )
@@ -5282,6 +5302,7 @@ class SuperDevCLI(
         "completion",
         "feedback",
         "migrate",
+        "compliance",
     }
 
     _SUGGESTIBLE_COMMANDS = {
@@ -5624,9 +5645,7 @@ class SuperDevCLI(
         )
         if current["comment"]:
             self.console.print(f"[dim]备注: {current['comment']}[/dim]")
-        self.console.print(
-            "[dim]先修复质量/安全问题，重新执行 quality gate，并刷新交付证据[/dim]"
-        )
+        self.console.print("[dim]先修复质量/安全问题，重新执行 quality gate，并刷新交付证据[/dim]")
         self.console.print("[dim]完成后回到宿主里明确回复：“质量整改已完成，继续当前流程”[/dim]")
         return False
 

@@ -162,7 +162,7 @@ class DesignPattern:
         """转换为字典"""
         return {
             "name": self.name.value,
-            "location": str(self.location),
+            "location": self.location.as_posix(),
             "description": self.description,
             "confidence": self.confidence,
         }
@@ -185,7 +185,7 @@ class ArchitectureReport:
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
-            "project_path": str(self.project_path),
+            "project_path": self.project_path.as_posix(),
             "category": self.category.value,
             "tech_stack": self.tech_stack.to_dict(),
             "architecture_pattern": (

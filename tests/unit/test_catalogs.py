@@ -34,6 +34,7 @@ from super_dev.catalogs import (
     normalize_host_tool_id,
 )
 from super_dev.config import ConfigManager
+from super_dev.config.schema_validator import VALID_PLATFORMS
 from super_dev.integrations import IntegrationManager
 from super_dev.skills import SkillManager
 
@@ -55,6 +56,8 @@ def test_platform_catalog_ids_unique():
     ids = [item["id"] for item in PLATFORM_CATALOG]
     assert ids == list(PLATFORM_IDS)
     assert len(ids) == len(set(ids))
+    assert {"id": "cli", "name": "命令行工具"} in PLATFORM_CATALOG
+    assert VALID_PLATFORMS == set(PLATFORM_IDS)
 
 
 def test_frontend_catalog_ids_unique():
