@@ -16,6 +16,8 @@ from super_dev import __version__ as _super_dev_version
 from super_dev.analyzer import BaselineAuditBuilder
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.cli import SuperDevCLI
+from super_dev.config import ConfigManager
+from super_dev.deployers.delivery import derive_delivery_applicability
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.integrations import IntegrationManager
 from super_dev.orchestrator import Phase, PhaseResult
@@ -917,8 +919,16 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
+    delivery_applicability = derive_delivery_applicability(ConfigManager(project_dir).load())
     (output_dir / "delivery" / f"{project_dir.name}-delivery-manifest.json").write_text(
-        json.dumps({"status": "ready"}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "status": "ready",
+                "applicability": delivery_applicability,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     (output_dir / "rehearsal" / f"{project_dir.name}-rehearsal-report.json").write_text(
