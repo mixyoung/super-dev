@@ -431,6 +431,9 @@ class DocumentGenerator(DocumentGeneratorContentMixin):
 
 ## 7. 验收标准
 
+本节是待项目化的验收结构，不是已经通过的证据。功能、性能和安全项均按已确认范围选用；
+示例数字、技术选择和未执行检查不得直接写成项目要求或完成结果。
+
 ### 7.1 功能验收
 
 {self._generate_acceptance_criteria()}

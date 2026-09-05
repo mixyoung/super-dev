@@ -171,6 +171,8 @@ class SuperDevSkillContent:
             self._section_first_response_contract(),
             self._section_changed_surface_contract(),
             self._section_knowledge_contract(),
+            self._section_product_method_guidance(),
+            self._section_evidence_and_handoff_guidance(),
             self._section_pre_code_gate(),
             self._section_session_continuity(),
             self._section_implementation_closure(),
@@ -369,6 +371,8 @@ class SuperDevSkillContent:
             self._section_first_response_contract(),
             self._section_changed_surface_contract(),
             self._section_knowledge_contract(),
+            self._section_product_method_guidance(),
+            self._section_evidence_and_handoff_guidance(),
             self._section_pre_code_gate(),
             self._section_session_continuity(),
             self._section_implementation_closure(),
@@ -712,6 +716,73 @@ class SuperDevSkillContent:
             "必须继承到 PRD、架构、UIUX、Spec 和实现阶段。\n"
             "- 未经用户确认禁止创建 `.super-dev/changes/*` 或开始编码。\n"
             "- 产物必须真实写入项目文件，不能只在聊天中口头描述。"
+        )
+
+    def _section_product_method_guidance(self) -> str:
+        return (
+            "## 方法吸纳：Forge、需求审查与 Grill with Docs\n"
+            "\n"
+            "- 先读已有需求、决定和相关代码，复用已回答内容；这些方法没有固定先后，"
+            "不增加阶段、用户命令或独立流程。\n"
+            "- 价值不清时，比较问题证据、替代方案、收益与维护成本，提出关键假设和"
+            "可观察的低成本验证。商业、内部效率和学习目标分别评价；不编造证据，"
+            "是否继续由用户决定。目标已明确时不重复立项论证。\n"
+            "- 需求审查只追问影响本轮的角色、主流程、异常、权限、范围和验收缺口，"
+            "给出建议与依据。能从资料回答的先读取；关键歧义解决后即结束，"
+            "其他未决事项记录影响和重启条件，不无限追问。\n"
+            "- 业务词义冲突时，对照文档和代码，用具体场景明确含义、作用域、别名与"
+            "边界；不默认旧代码正确，不机械改名。优先复用项目权威词表，"
+            "否则写入 PRD 术语表；不臆造定义或用通用技术缩写填充业务词表。\n"
+            "- 价值结论留在调研，需求和验收留在 PRD，词义只维护一个来源，"
+            "技术取舍留在架构。只有难逆、需背景解释且有真实取舍的决定才写 ADR。"
+            "方法切换不复制文档；变更已确认需求时仍遵守原确认合同。\n"
+            "\n"
+            "### 在当前阶段完成方法闭环\n"
+            "\n"
+            "- **Forge**：从用户目标判断是澄清、检验还是改进想法；归纳中心主张与"
+            "事实/假设，先查资料，再针对最影响决定的问题给出建议与反方理由。"
+            "每轮依据回答更新判断、备选方案和理由；信息推翻原假设时修正方案，"
+            "不要重复已解决问题。结尾保留采用/放弃选项、依据、待验证项和下一步。\n"
+            "- **需求审查**：引用原需求编号或章节，逐项对照意图、角色、行为、边界、"
+            "验收及已存在的设计/任务。发现项说明来源、影响与建议，区分关键缺口"
+            "和可选优化。收到决定后定向更新原文，保留编号与无关内容；回读并逐项"
+            "复核矛盾、验收与引用，不为补追溯而提前创建 Spec。\n"
+            "- **Grill with Docs**：先读词表、需求、架构和相关代码，只列本轮未决"
+            "设计分支与依赖，先解决影响下游的决定。用具体场景讨论词义、业务规则、"
+            "接口或重要取舍，给建议与代价；收到回答后更新相关分支与原权威文档，"
+            "再用场景检查一致性。未修复的代码差异须留作待实现。\n"
+            "- **写入与交接**：只要求审查时给发现与拟修改内容；已有修改授权时"
+            "定向写回并回读，不重复索要同一授权。暂停时记录已决定、未决影响与"
+            "继续动作，恢复先读后接续。方法结论不能代替用户文档/预览确认，"
+            "不重置当前阶段、不跳过质量与交付，不自动修改确认状态或扩大实施范围。\n"
+            "- 需要详细方法且项目中存在 "
+            "`knowledge/product/product-discovery-and-prd-deep-dive.md` 时按需读取。"
+            "文件不存在时使用以上自包含步骤，不要求用户安装第三方方法。"
+        )
+
+    def _section_evidence_and_handoff_guidance(self) -> str:
+        return (
+            "## 需求、验证与交接：吸收 UmaDev 的适用方法\n"
+            "\n"
+            "- 需求写清前提/触发、主体与可观察结果，沿用原编号关联验收和已有设计。"
+            "数值目标须有项目依据；表格与模板示例不是已确认需求或已通过证据。"
+            "未进入 Spec 时不为填追溯表提前创建任务。\n"
+            "- 测试按风险选择层次、环境和范围，使用项目现有工具；验证可对应需求、"
+            "缺陷、不变量或兼容合同。先确认环境可执行，区分计划、实际执行、跳过"
+            "与失败，不因局部测试通过就宣称整个项目可发布。\n"
+            "- 单独核对测试与门禁差异：删除断言、新增跳过、修改快照或阈值须解释"
+            "原因和保护范围。正式预期变化可以更新测试；不能把真实缺陷静音换绿，"
+            "也不能见到测试变更就一概判为作弊。\n"
+            "- 评审发现附位置、触发条件、影响和证据；正确性、需求、契约、安全或"
+            "数据问题可阻断，风格与额外功能归可选。缺资料说明未验证，独立性不足"
+            "如实标为自检；报告生成成功不等于检查通过。既有质量阈值与确认门不变。\n"
+            "- 未决事项留在原文档，注明来源、影响、阻碍与重新处理条件。交接保留"
+            "已定理由、改动文件、验证命令/环境/结果和下一步，引用原始证据；"
+            "恢复先核对文件与状态，不复制第二套计划或记忆系统。\n"
+            "- 需要细节且文件存在时，按问题读取 "
+            "`knowledge/testing/testing-strategy-deep-dive.md`、"
+            "`knowledge/development/code-review-quality-complete.md` 或 "
+            "`knowledge/architecture/adr-template-and-examples.md`；不存在则使用以上指导。"
         )
 
     def _section_session_continuity(self) -> str:

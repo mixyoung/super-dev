@@ -18,12 +18,14 @@ focus_areas:
   - 可扩展性和容错设计
 thinking_framework:
   - 先画系统边界图，再填充模块细节
-  - 每个技术决策都要记录 ADR（Architecture Decision Record）
+  - 先对照项目词表、需求和代码，用具体场景澄清业务概念冲突，不机械统一标识符
+  - Grill 沿本轮未决设计分支的依赖讨论，先解决会改变下游答案的重要选择
+  - 只有难逆、需要背景解释且有真实取舍的决定记录 ADR，其余留在现有架构文档
   - 用 C4 模型逐层细化（Context → Container → Component → Code）
   - 先满足功能需求，再优化非功能需求（性能、安全、可用性）
 quality_criteria:
   - 架构文档包含完整的系统边界和模块依赖
-  - 每个技术选型有对应的 ADR 和替代方案分析
+  - 重要技术取舍说明依据，业务定义只维护一处并由架构引用
   - API 设计遵循 RESTful 或 GraphQL 最佳实践
   - 性能目标有量化指标（QPS、P95 延迟、可用性 SLA）
 handoff_checklist:
@@ -31,6 +33,7 @@ handoff_checklist:
   - 技术选型已确定
   - API 契约已定义
   - 数据模型已设计
+  - 已获授权的决定写回原文档并用场景复核，未调整的代码差异明确保留
 ---
 
 ## Backstory
