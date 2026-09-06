@@ -1,9 +1,15 @@
 """Published runtime/version surfaces must agree with the package metadata."""
 
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from super_dev import __version__
 from super_dev.branding import VERSION
@@ -34,3 +40,22 @@ def test_generated_skill_versions_match_runtime():
         text = (root / ".agents" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
         frontmatter = yaml.safe_load(text.split("---", 2)[1])
         assert frontmatter["metadata"]["version"] == __version__
+
+
+def test_package_data_declarations_cover_static_runtime_assets():
+    root = Path(__file__).resolve().parents[2]
+    metadata = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    expected = {
+        path.relative_to(root).as_posix()
+        for path in (root / "super_dev").rglob("*")
+        if path.is_file() and path.suffix in {".csv", ".yaml", ".yml", ".md", ".html"}
+    }
+    declared = {
+        path.relative_to(root).as_posix()
+        for package, patterns in metadata["tool"]["setuptools"]["package-data"].items()
+        for pattern in patterns
+        for path in (root / package.replace(".", "/")).glob(pattern)
+        if path.is_file()
+    }
+    assert expected
+    assert not expected - declared, sorted(expected - declared)
