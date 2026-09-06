@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +139,10 @@ def _load_threshold_defaults(project_dir: Path) -> tuple[float, int, list[str], 
 
 
 def main() -> int:
+    # Match the UTF-8 report protocol independently of the caller's locale.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Super Dev 宿主兼容性门禁检查")
     parser.add_argument(
         "--project-dir",

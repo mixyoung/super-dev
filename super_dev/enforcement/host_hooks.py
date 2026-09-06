@@ -351,6 +351,7 @@ PY
                         {
                             "type": "command",
                             "command": secret_read_guard_cmd,
+                            "shell": "bash",
                             "timeout": 5,
                         }
                     ],
@@ -361,6 +362,7 @@ PY
                         {
                             "type": "command",
                             "command": bash_secret_guard_cmd,
+                            "shell": "bash",
                             "timeout": 5,
                         }
                     ],

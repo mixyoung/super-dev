@@ -34,6 +34,7 @@ def test_delivery_gate_script_passes_with_ready_manifest(temp_project_dir: Path)
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
@@ -67,6 +68,7 @@ def test_delivery_gate_script_fails_with_incomplete_manifest(temp_project_dir: P
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 

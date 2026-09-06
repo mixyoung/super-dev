@@ -21,6 +21,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from ..utils.shell import resolve_bash
+
 LOGGER = logging.getLogger(__name__)
 SUPPORTED_EXECUTORS = {"claude-code", "codex", "auto"}
 
@@ -301,7 +303,7 @@ class PlanExecutor:
             started = time.monotonic()
             try:
                 completed = subprocess.run(
-                    ["bash", "-lc", gate.command],
+                    [resolve_bash(), "-lc", gate.command],
                     cwd=str(cwd),
                     capture_output=True,
                     text=True,

@@ -12,8 +12,10 @@ import ast
 import glob
 import re
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -448,8 +450,14 @@ def _load_rules_from_yaml(path: Path) -> list[ValidationRule]:
     """
     if not path.is_file():
         return []
-    with open(path, encoding="utf-8") as f:
-        content = yaml.safe_load(f)
+    # Key by actual content, not mtime: edits with a restored timestamp must reload.
+    # Each engine gets independent mutable rule/config objects.
+    return deepcopy(_parse_rules_yaml(path.read_text(encoding="utf-8")))
+
+
+@lru_cache(maxsize=128)
+def _parse_rules_yaml(text: str) -> list[ValidationRule]:
+    content = yaml.safe_load(text)
     if not content:
         return []
 

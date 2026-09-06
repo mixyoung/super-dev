@@ -801,7 +801,7 @@ class TestRedTeamEvidence:
             - **High 问题**: 1
             **状态**: 有条件通过 - 建议修复 High 级别问题
         """)
-        (output / "test-redteam.md").write_text(md)
+        (output / "test-redteam.md").write_text(md, encoding="utf-8")
         evidence = load_redteam_evidence(tmp_path, "test")
         assert evidence is not None
         assert evidence.total_score == 85

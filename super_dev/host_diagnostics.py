@@ -51,6 +51,7 @@ def build_host_injection_closure(
         scope_label = "用户级 Skill 默认接入"
     optional_user_paths = _dedupe_paths(
         [
+            *(surface_sets.get("official_user", []) if project_default_paths else []),
             *surface_sets.get("optional_user", []),
             *surface_sets.get("optional_slash", []),
         ]
@@ -63,7 +64,7 @@ def build_host_injection_closure(
         str(path) for path in competition_project_paths if not path.exists()
     ]
     missing_competition_user = [str(path) for path in competition_user_paths if not path.exists()]
-    default_ready = not missing_default
+    default_ready = not missing_default and host_ready
     optional_user_available = bool(optional_user_paths)
     explicit_user_surfaces_ready = optional_user_available and not missing_optional_user
     competition_project_available = bool(competition_project_paths)
@@ -209,6 +210,8 @@ def collect_host_diagnostics(
                 "required": bool(surface_meta.get("required", False)),
                 "missing_markers": [],
             }
+            if surface_groups["official_project"] and surface_meta.get("group") == "official_user":
+                audit_entry["required"] = False
             if exists:
                 try:
                     content = surface_path.read_text(encoding="utf-8")
@@ -326,7 +329,7 @@ def collect_host_diagnostics(
                 host_report["ready"] = False
                 host_report["missing"].append("skill")
                 host_report["suggestions"].append(
-                    "重新运行 super-dev，确保当前宿主需要的 Super Dev Skill 已同步到用户目录。"
+                    "重新运行 super-dev，补齐当前宿主的必需 Skill 接入面。"
                 )
 
         if target == "codex-cli":

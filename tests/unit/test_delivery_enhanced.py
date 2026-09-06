@@ -307,7 +307,7 @@ class TestPackageIntegration:
         result = packager.package()
         report_file = Path(result["report_file"])
         assert report_file.exists()
-        content = report_file.read_text()
+        content = report_file.read_text(encoding="utf-8")
         assert "交付报告" in content
 
     def test_package_creates_zip_archive(self, ready_project):

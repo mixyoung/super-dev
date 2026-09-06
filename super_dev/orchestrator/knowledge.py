@@ -667,10 +667,10 @@ class KnowledgeAugmenter:
 
     def _format_source_path(self, file_path: Path) -> str:
         try:
-            return str(file_path.relative_to(self.project_dir))
+            return file_path.relative_to(self.project_dir).as_posix()
         except ValueError:
             try:
-                return f"builtin/{file_path.relative_to(self.builtin_data_dir)}"
+                return f"builtin/{file_path.relative_to(self.builtin_data_dir).as_posix()}"
             except ValueError:
                 return str(file_path)
 

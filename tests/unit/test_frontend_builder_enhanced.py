@@ -102,7 +102,7 @@ class TestGenerate:
         builder.generate(sample_requirements, sample_phases, sample_docs)
         index = builder.project_dir / "output" / "frontend" / "index.html"
         assert index.exists()
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         assert "<html" in content.lower()
 
     def test_creates_styles_css(self, builder, sample_requirements, sample_phases, sample_docs):
@@ -123,7 +123,7 @@ class TestGenerate:
     def test_html_contains_project_name(self, builder, sample_requirements, sample_phases, sample_docs):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         index = builder.project_dir / "output" / "frontend" / "index.html"
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         assert "test-app" in content
 
     def test_returns_file_paths(self, builder, sample_requirements, sample_phases, sample_docs):
@@ -231,7 +231,7 @@ class TestFrontendBuilderEdgeCases:
         assert isinstance(result, dict)
         # Check that special chars are escaped in HTML
         index = tmp_path / "output" / "frontend" / "index.html"
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         assert "<script>" not in content or "&lt;script&gt;" in content
 
     def test_unicode_in_description(self, tmp_path, sample_requirements, sample_phases, sample_docs):

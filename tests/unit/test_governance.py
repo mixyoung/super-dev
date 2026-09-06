@@ -81,7 +81,7 @@ class TestPipelineGovernance:
         report = governance.finish_governance()
         path = report.save(str(governance.project_dir / "output"))
         assert Path(path).exists()
-        content = Path(path).read_text()
+        content = Path(path).read_text(encoding="utf-8")
         assert "治理报告" in content
 
     def test_full_lifecycle(self, governance):
