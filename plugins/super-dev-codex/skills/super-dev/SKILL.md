@@ -2,7 +2,7 @@
 name: super-dev
 description: Use when the user explicitly enters or resumes the Super Dev pipeline in Codex for research-first, commercial-grade delivery.
 metadata:
-  version: "2.4.0"
+  version: "2.5.0"
 ---
 # super-dev for Codex CLI
 

@@ -37,7 +37,7 @@ class TestSkillTemplate:
         lines = fm.to_yaml_lines("codex-cli")
         text = "\n".join(lines)
         assert "metadata:" in text
-        assert 'version: "2.4.0"' in text
+        assert f'version: "{fm.version}"' in text
         assert "when_to_use:" not in text
         # codex-cli should NOT have allowed-tools
         assert "allowed-tools:" not in text

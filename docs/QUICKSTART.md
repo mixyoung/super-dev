@@ -1,6 +1,6 @@
 # Super Dev 快速开始
 
-> 面向 `2.4.0` 版本，5 分钟完成从安装到首次流水线运行。
+> 面向本 fork 的 `2.5.0` 版本。只在 GitHub 发布，安装/升级使用下方标签命令，不使用 PyPI 版本号。
 
 ## 1. 一句话理解
 
@@ -23,7 +23,7 @@ python3 --version
 ### 方式 A：uv 安装（推荐）
 
 ```bash
-uv tool install super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 源码安装、指定版本回滚等方式保留在 [INSTALL_OPTIONS.md](/Users/weiyou/Documents/kaifa/super-dev/docs/INSTALL_OPTIONS.md)。
@@ -31,7 +31,7 @@ uv tool install super-dev
 ### 方式 B：安装指定版本（复现/回滚）
 
 ```bash
-uv tool install super-dev==2.4.0
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 ## 4. 5 分钟路径
