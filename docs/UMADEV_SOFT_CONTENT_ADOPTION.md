@@ -40,3 +40,41 @@
 Forge、需求审查和 Grill 已完成的交互过程继续保留。本批补充其中“怎样表达可验收结果、怎样记录未决项”，并完善实现/质量/交接指导，不把它们重新命名或替换为 UmaDev 流程。
 
 本批实现与验证分别记录在 `.super-dev/changes/umadev-soft-content/`。整体发布状态仍由原 Super Dev 门禁与当前证据决定，来源自身的评分不算本项目验收。
+
+## 最新基线复核与第二批落实（2026-09-06）
+
+最新正式发布为 [v1.1.1](https://github.com/umacloud/umadev/releases/tag/v1.1.1)，官方 npm 包 `@umatech/umadev` 亦为 `1.1.1`。实时核对主线仍为本文件原先固定的 `5852627`，相对正式发布领先 3 个提交，但没有知识库或 Rust 源码差异。第一批不是依据旧快照；尚未完成的是适用内容的继续筛选与落实。
+
+第二批已查阅 14 份候选知识/模板及 2 份代码的相关段落，用户确认三文档后完成以下增量。200 项定向回归、4 个独立只读场景和 3 份实际隔离文档修订完成，详见 [本批验证记录](../.super-dev/changes/umadev-latest-soft-content/validation.md)。本表不是新的运行状态台账。
+
+| 编号 | 已补强内容 | 取舍边界 |
+| --- | --- | --- |
+| U7 | 证据驱动调试与无进展时改变调查方式 | 保留现有系统化调试，不移植自动分类/重试状态 |
+| U8 | 规格的实际文件、接口、版本与验证上下文 | 复用原 Spec 模板，不提前创建 Spec 或新任务引擎 |
+| U9 | 受影响旧行为回归与有辨别力的断言 | 保留 TDD，不强制每次独立团队或全量变异测试 |
+| U10 | 方法行为评测与经证实失败的案例复用 | 不新增评分体系、自动记忆或全局写入 |
+| U11 | 消费者视角的完整接口兼容检查 | 不强制新协议，也不把新增字段一概当兼容 |
+| U12 | 产品运行时模型与开发宿主分离 | 只对 AI 产品适用，不复制凭据或默认厂商 |
+| U13 | 异步 UI 状态与模板适配 | 沿用现有设计，拒绝假数据、固定布局和占位完成 |
+| U14 | 测试资源归属、平台证据和可验证恢复 | 不自动创建云环境、生产回滚或扩大权限 |
+
+详细来源、不采纳项和验证方案在本地 `output/umadev-latest-soft-content-{research,prd,architecture,uiux}.md`；逐文件索引为 `output/umadev-latest-source-inventory.json`。`output/` 按仓库规则不纳入版本控制，本节保留可追踪摘要。
+
+知识树盘点共 468 份 Markdown，其中 306 份在本仓库有同路径、162 份无同路径；这只是文件索引，不等同语义新增或吸纳覆盖率。未逐项评估的行业/框架知识保持未评估，不声称全知识库完成。上一批 U1—U6 的完成与验证结论不变。
+
+### 第二批固定来源与实际落点
+
+固定提交仍为 `585262706174ad4a958cd054f0948509e84ad610`。以下源码仅用于理解原则，没有移植执行逻辑。
+
+| 编号 | 主要固定来源 | 实际落点 |
+| --- | --- | --- |
+| U7 | [blocker.rs](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/crates/umadev-agent/src/blocker.rs) | 原调试手册、CODE、标准 Skill 错误恢复段 |
+| U8 | [spec-as-contract](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/spec-as-contract.md) | `super_dev/specs/generator.py` 的规格/计划/检查表文字模板，标准 Skill |
+| U9 | [test-discipline-for-generated-code](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/test-discipline-for-generated-code.md) | 原测试策略、风险矩阵、CODE/QA、标准 Skill |
+| U10 | [eval-driven-delivery](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/eval-driven-delivery.md)、[经验与回归](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/self-improving-memory-and-regression-sets.md) | `knowledge/ai/agent-evaluation-benchmark.md`、QA、标准 Skill；无自动记忆 |
+| U11 | [contract-first-api-design](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/experts/architect/contract-first-api-design.md) | 原 API 契约指南、ARCHITECT、标准 Skill |
+| U12 | [app-runtime-model-configurable](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/ai/01-standards/app-runtime-model-configurable.md)、[app_runtime.rs](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/crates/umadev-agent/src/app_runtime.rs) | 原 AI 模型选型指南、ARCHITECT、标准 Skill |
+| U13 | [ui-states-and-resilient-data-fetching](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/frontend/01-standards/ui-states-and-resilient-data-fetching.md)、[dashboard 模板](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/seed-templates/dashboard.md) | 原跨平台 UI 手册、标准 Skill；不复制页面或示例数据 |
+| U14 | [测试环境](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/testing/01-standards/test-data-and-ephemeral-environments.md)、[恢复手册](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/release-engineering/02-playbooks/release-rollback-and-recovery-playbook.md) | 原测试策略、发布就绪清单、QA/DEVOPS、标准 Skill |
+
+本批同时把 4 份相关知识文件的主标题从作者署名改为实际主题，作者信息保留为署名，使其能经现有检索正确命中；没有改变检索算法。其他重合内容继续复用；不引入外部固定次数、质量档位、技术栈或新的用户操作方式。
