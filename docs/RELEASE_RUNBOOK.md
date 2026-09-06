@@ -4,6 +4,18 @@
 
 > 维护者专用。普通用户不需要进入这份文档。
 
+## 本 fork 的 GitHub-only 发布补充
+
+`mixyoung/super-dev` 自 2.5.0 起按维护者明确授权只发布 GitHub Release，不向原作者 PyPI 包上传。下面原发布检查仍适用，但不需要 PyPI Token，也不能执行默认 PyPI 上传步骤。
+
+- 从干净、已合并的版本提交构建 wheel/sdist；标签必须绑定该提交，附件附校验值与实际验证记录。
+- Windows 按已确认整改计划使用安全的原生命令执行同一检查清单；完整 pytest 取当前提交的干净 Linux CI，Windows 单元矩阵单列，不把本机超时或旧提交当通过。不能使用 skip 参数伪造预检成功。
+- 包发布记录不与仓库内旧开发任务的应用 quality/readiness/proof-pack 混用，不改写那些任务的确认状态。`scripts/preflight.sh` 列出的包检查及宿主兼容检查必须逐项有真实结果。
+- 正常 PR 经八项必过检查后合并；手动创建并推送 `v<version>` 标签，再用 `gh release create --verify-tag` 发布明确的附件和说明。不使用管理员绕过或覆盖已有标签/附件。
+- 安装验证使用该 Release 的 wheel 或本 fork 标签。回退到可信旧制品时保留漏洞与兼容风险提示；不对原作者 PyPI 执行上传、删除或 yank。
+
+下文 PyPI 命令保留为上游历史发布方式，不是本 fork 当前的执行目标。
+
 ## 发布标准
 
 一版只有在下面条件同时成立时，才算真正可发布：

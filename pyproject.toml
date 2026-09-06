@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "super-dev"
-version = "2.4.0"
+version = "2.5.0"
 description = "Super Dev - Pipeline AI Coding Assistant"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -93,10 +93,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/shangyankeji/super-dev"
-Documentation = "https://github.com/shangyankeji/super-dev#readme"
-Repository = "https://github.com/shangyankeji/super-dev"
-Issues = "https://github.com/shangyankeji/super-dev/issues"
+Homepage = "https://github.com/mixyoung/super-dev"
+Documentation = "https://github.com/mixyoung/super-dev#readme"
+Repository = "https://github.com/mixyoung/super-dev"
+Issues = "https://github.com/mixyoung/super-dev/issues"
 
 [project.scripts]
 super-dev = "super_dev.cli:main"
@@ -106,6 +106,9 @@ where = ["."]
 include = ["super_dev*"]
 
 [tool.setuptools.package-data]
+"super_dev" = ["data/design/*.csv", "templates/*.md", "templates/*.yaml", "web/frontend/dist/*"]
+"super_dev.experts" = ["builtin/*.md", "playbooks/*.md"]
+"super_dev.reviewers" = ["rules/*.yaml"]
 "super_dev.extensions" = ["*.yaml", "builtins/*.yaml"]
 
 [tool.black]

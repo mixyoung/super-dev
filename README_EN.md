@@ -19,17 +19,19 @@
 
 ## Version
 
-Current version: `2.4.0`
+Current version: `2.5.0` (mixyoung/super-dev fork release)
 
-- Release notes: [v2.4.0](docs/releases/2.4.0.md)
+- Release notes: [v2.5.0](docs/releases/2.5.0.md)
 - Website changelog: [superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## Install
 
 The homepage installation story is now intentionally uv-first:
 
+This fork is released on GitHub only, not PyPI. Use the tagged command below to install or upgrade this fork. `super-dev update` retains its existing update-source behavior and is not a guarantee of receiving this fork's latest release.
+
 ```bash
-uv tool install super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 Then run:
@@ -45,7 +47,7 @@ Cross-platform note:
 - Windows, macOS, and Linux all use the same entry: install the package, then run `super-dev`.
 - The repository `install.sh` is a macOS/Linux convenience script, not the only Windows path.
 
-## What's New in 2.4.0
+## Base capabilities inherited from 2.4.0
 
 ### Public Surface, Finally Host-First
 
@@ -151,7 +153,7 @@ In practice:
 Regular users should remember 1 install command and 3 terminal commands:
 
 ```bash
-uv tool install super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 ```bash
@@ -420,7 +422,7 @@ New features follow the full pipeline. Bug fixes follow a lightweight patch path
 ### 1. uv (recommended)
 
 ```bash
-uv tool install super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 Upgrade:
@@ -432,13 +434,13 @@ super-dev update
 ### 2. Pin a specific version
 
 ```bash
-uv tool install super-dev==2.4.0
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 Upgrade:
 
 ```bash
-uv tool upgrade super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 super-dev update
 ```
 
@@ -455,13 +457,13 @@ This generates `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` to lock down
 ### 3. Install from GitHub tag
 
 ```bash
-uv tool install --from git+https://github.com/shangyankeji/super-dev.git@v2.4.0 super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 ### 4. Source install for development
 
 ```bash
-git clone https://github.com/shangyankeji/super-dev.git
+git clone https://github.com/mixyoung/super-dev.git
 cd super-dev
 uv sync
 uv run super-dev --version

@@ -352,11 +352,11 @@ class CliGovernanceMixin:
     # ------------------------------------------------------------------
 
     def _cmd_migrate(self, _args: Any) -> int:
-        """执行项目迁移 (2.2.0+ -> 2.4.0)。"""
+        """执行项目迁移 (2.2.0+ -> 2.5.0)。"""
         from .migrate import migrate_project
 
         project_dir = Path.cwd()
-        self.console.print("[cyan]正在执行 2.2.0+ → 2.4.0 迁移...[/cyan]\n")
+        self.console.print("[cyan]正在执行 2.2.0+ → 2.5.0 迁移...[/cyan]\n")
 
         changes = migrate_project(project_dir)
 

@@ -1275,7 +1275,7 @@ class CliParserMixin:
         subparsers.add_parser(
             "migrate",
             help=argparse.SUPPRESS,
-            description="将 2.2.0+ 项目配置迁移到 2.4.0（更新配置、规则文件与 hooks）",
+            description="将 2.2.0+ 项目配置迁移到 2.5.0（更新配置、规则文件与 hooks）",
         )
 
         # compliance 命令 — 规格合规检查

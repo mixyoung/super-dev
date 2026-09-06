@@ -1,8 +1,10 @@
-# Super Dev 安装方式（2.4.0）
+# Super Dev 安装方式（2.5.0 fork）
+
+本分支只在 GitHub 发布。安装/升级到此版本使用本文的标签命令；原 `super-dev update` 仍保留原更新来源逻辑，不能据此认定已更新到本 fork。
 
 先说结论：
 
-- 首页和默认安装口径统一以 `uv tool install super-dev` 为主
+- 首页和默认安装口径统一以 `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev` 为主
 - `uv` 是默认安装方式
 - `super-dev` 是跨平台入口：Windows、macOS、Linux 都先装包再直接运行 `super-dev`
 - 仓库内的 `install.sh` 只是 macOS/Linux 便捷入口，不是 Windows 的唯一安装方式
@@ -15,7 +17,7 @@
 ## 方式 1：uv 安装（推荐）
 
 ```bash
-uv tool install super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 适用：本机命令行工具安装、独立环境、默认官网安装路径。
@@ -29,7 +31,7 @@ super-dev update
 ## 方式 2：安装指定版本（复现/回滚）
 
 ```bash
-uv tool install super-dev==2.4.0
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 适用：需要稳定复现、灰度回滚。
@@ -100,7 +102,7 @@ super-dev
 
 ## 安装后 5 分钟应该完成什么
 
-1. `uv tool install super-dev`
+1. `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev`
 2. 在项目目录运行 `super-dev`
 3. 让安装器写入项目级接入面
 4. 打开 `output/maintenance/host-onboard-smoke-*.md`
@@ -113,7 +115,7 @@ super-dev
 ## 方式 3：GitHub 直装（Tag）
 
 ```bash
-uv tool install --from git+https://github.com/shangyankeji/super-dev.git@v2.4.0 super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 适用：希望直接基于 GitHub Tag 安装。
@@ -121,7 +123,7 @@ uv tool install --from git+https://github.com/shangyankeji/super-dev.git@v2.4.0 
 ## 方式 4：源码开发安装
 
 ```bash
-git clone https://github.com/shangyankeji/super-dev.git
+git clone https://github.com/mixyoung/super-dev.git
 cd super-dev
 uv sync
 uv run super-dev --help
@@ -173,14 +175,14 @@ super-dev uninstall --dry-run
 
 宿主接入完成后，普通用户应直接回宿主做真实触发与恢复验证。只有维护者在补正式验收证据时，才进入 `integrate smoke` 这条维护链。
 
-## 升级到 2.4.0
+## 升级到本分支 2.5.0
 
 ```bash
 # uv 方式
-uv tool upgrade super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 
 # GitHub 方式
-uv tool install --reinstall --from git+https://github.com/shangyankeji/super-dev.git@v2.4.0 super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 升级后建议立刻做两件事：
