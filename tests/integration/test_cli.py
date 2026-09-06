@@ -2554,10 +2554,13 @@ class TestCLISkillAndIntegrate:
         temp_project_dir: Path,
         monkeypatch,
     ):
+        from super_dev.user_directories import UserDirectoryContext
+
         fake_home = temp_project_dir / "fake-home"
         fake_home.mkdir(parents=True, exist_ok=True)
         (fake_home / ".codex").mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HOME", str(fake_home))
+        for name, value in UserDirectoryContext.from_home(fake_home).environment({}).items():
+            monkeypatch.setenv(name, value)
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
@@ -2572,6 +2575,12 @@ class TestCLISkillAndIntegrate:
             assert not compatibility_skill.exists()
             official_skill.unlink()
 
+            # The user copy is optional when the project has its official Skill.
+            assert cli.run(["doctor", "--host", "codex-cli"]) == 0
+            project_skill = temp_project_dir / ".agents" / "skills" / "super-dev" / "SKILL.md"
+            assert project_skill.exists()
+            project_skill.unlink()
+            # Missing the required project Skill must still fail.
             result = cli.run(["doctor", "--host", "codex-cli"])
             assert result == 1
         finally:

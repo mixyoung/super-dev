@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from super_dev.utils.shell import resolve_bash
+
 
 @pytest.fixture()
 def project_dir(tmp_path: Path) -> Path:
@@ -118,17 +120,15 @@ class TestHostHooksConfigurator:
         )["hooks"][0]["command"]
 
         blocked = subprocess.run(
-            guard,
+            [resolve_bash(), "-lc", guard],
             input=json.dumps({"tool_input": {"file_path": "~/.ssh/id_rsa"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
         allowed = subprocess.run(
-            guard,
+            [resolve_bash(), "-lc", guard],
             input=json.dumps({"tool_input": {"file_path": "./.env.example"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
 
@@ -148,28 +148,25 @@ class TestHostHooksConfigurator:
         ]["command"]
 
         file_read = subprocess.run(
-            bash_guard,
+            [resolve_bash(), "-lc", bash_guard],
             input=json.dumps({"tool_input": {"command": "cat ~/.ssh/id_rsa"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
         file_transform = subprocess.run(
-            bash_guard,
+            [resolve_bash(), "-lc", bash_guard],
             input=json.dumps({"tool_input": {"command": "base64 ~/.aws/credentials"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
         env_print = subprocess.run(
-            bash_guard,
+            [resolve_bash(), "-lc", bash_guard],
             input=json.dumps({"tool_input": {"command": "echo $OPENAI_API_KEY"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
         env_script = subprocess.run(
-            bash_guard,
+            [resolve_bash(), "-lc", bash_guard],
             input=json.dumps(
                 {
                     "tool_input": {
@@ -178,14 +175,12 @@ class TestHostHooksConfigurator:
                 }
             ),
             text=True,
-            shell=True,
             capture_output=True,
         )
         safe = subprocess.run(
-            bash_guard,
+            [resolve_bash(), "-lc", bash_guard],
             input=json.dumps({"tool_input": {"command": "cat README.md"}}),
             text=True,
-            shell=True,
             capture_output=True,
         )
 

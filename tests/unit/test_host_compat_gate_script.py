@@ -40,6 +40,7 @@ def test_host_compat_gate_script_passes_with_score_over_threshold(temp_project_d
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
@@ -77,6 +78,7 @@ def test_host_compat_gate_script_fails_when_score_below_threshold(temp_project_d
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
@@ -120,6 +122,7 @@ def test_host_compat_gate_script_uses_thresholds_from_config(temp_project_dir: P
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 

@@ -139,7 +139,7 @@ class PipelineGovernance:
     def __init__(self, project_dir: Path | str = "."):
         self.project_dir = Path(project_dir).resolve()
         self.rule_engine = ValidationRuleEngine(self.project_dir)
-        self.knowledge_tracker = KnowledgeTracker()
+        self.knowledge_tracker = KnowledgeTracker(project_dir=self.project_dir)
         self.metrics_collector = PipelineMetricsCollector(
             metrics_dir=str(self.project_dir / "output" / "metrics-history")
         )

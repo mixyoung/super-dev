@@ -300,8 +300,9 @@ class KnowledgeTracker:
         tracker.save_report(report)
     """
 
-    def __init__(self, knowledge_dir: str = "knowledge") -> None:
+    def __init__(self, knowledge_dir: str = "knowledge", *, project_dir: Path | None = None) -> None:
         self.knowledge_dir = Path(knowledge_dir)
+        self._scan_dir = project_dir / self.knowledge_dir if project_dir else self.knowledge_dir
         self.references: list[KnowledgeReference] = []
         self._knowledge_index: dict[str, _KnowledgeIndexEntry] = self._build_index()
 
@@ -316,16 +317,17 @@ class KnowledgeTracker:
         提取领域、子类别、标题和标签。
         """
         index: dict[str, _KnowledgeIndexEntry] = {}
-        if not self.knowledge_dir.exists():
+        if not self._scan_dir.exists():
             return index
 
         suffixes = {".md", ".txt", ".yml", ".yaml"}
-        for filepath in sorted(self.knowledge_dir.rglob("*")):
+        for filepath in sorted(self._scan_dir.rglob("*")):
             if not filepath.is_file() or filepath.suffix.lower() not in suffixes:
                 continue
 
-            rel_path = str(filepath)
-            parts = filepath.relative_to(self.knowledge_dir).parts
+            relative = filepath.relative_to(self._scan_dir)
+            rel_path = str(self.knowledge_dir / relative)
+            parts = relative.parts
 
             domain = parts[0] if len(parts) > 1 else ""
             category = parts[1] if len(parts) > 2 else ""

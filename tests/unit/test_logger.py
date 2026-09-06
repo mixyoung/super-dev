@@ -8,6 +8,7 @@
 
 import logging
 import tempfile
+from contextlib import ExitStack
 from pathlib import Path
 
 from super_dev.utils import get_logger, log_with_extra
@@ -24,9 +25,12 @@ class TestLogger:
 
     def test_get_logger_with_file(self):
         """测试带文件输出的日志记录器"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, ExitStack() as cleanup:
             log_file = Path(tmpdir) / "test.log"
             logger = get_logger("test_file_logger", log_file=log_file, level="DEBUG")
+            for handler in list(logger.handlers):
+                cleanup.callback(handler.close)
+                cleanup.callback(logger.removeHandler, handler)
 
             logger.info("Test message")
             logger.debug("Debug message")
@@ -84,9 +88,12 @@ class TestLogger:
 
     def test_log_with_extra(self):
         """测试带额外数据的日志记录"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory() as tmpdir, ExitStack() as cleanup:
             log_file = Path(tmpdir) / "test_extra.log"
             logger = get_logger("test_extra", log_file=log_file)
+            for handler in list(logger.handlers):
+                cleanup.callback(handler.close)
+                cleanup.callback(logger.removeHandler, handler)
 
             log_with_extra(
                 logger, "info", "User login", user_id=123, ip="127.0.0.1", action="login"

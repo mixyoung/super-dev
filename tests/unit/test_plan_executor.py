@@ -770,7 +770,7 @@ class TestUtilityFunctions:
 
     def test_json_default_path(self) -> None:
         result = _json_default(Path("/tmp/test"))
-        assert result == "/tmp/test"
+        assert result == str(Path("/tmp/test"))
 
     def test_json_default_enum(self) -> None:
         result = _json_default(StepStatus.RUNNING)

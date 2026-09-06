@@ -243,7 +243,7 @@ class BenchmarkSuite:
 
 # ==================== 主函数 ====================
 
-def main():
+def main() -> int:
     """主函数"""
     import shutil
     import tempfile
@@ -263,10 +263,12 @@ def main():
             else:
                 suite.benchmark.console.print("\n[yellow]⚠[/yellow] 部分性能测试未达标")
 
+        return 0 if all_pass else 1
+
     finally:
         # 清理
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

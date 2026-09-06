@@ -132,6 +132,7 @@ jobs:
           python -m tests.support.run_safe_baseline unit
           --output-dir artifacts/windows-${{ matrix.python-version }}/unit
           --timeout-seconds 1200
+          --fail-on-test-failure
 
       - name: Publish readable summary
         if: ${{ always() }}

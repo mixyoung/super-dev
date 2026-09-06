@@ -428,7 +428,7 @@ def _collect_unindexed_files(project_dir: Path) -> list[str]:
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        rel = str(path.relative_to(project_dir))
+        rel = path.relative_to(project_dir).as_posix()
         if rel in indexed or rel in allowed_extra:
             continue
         unindexed.append(rel)

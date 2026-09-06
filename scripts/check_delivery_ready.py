@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -217,6 +218,10 @@ def _run_smoke(project_root: Path) -> Path:
 
 
 def main() -> int:
+    # These reports use UTF-8 even when stdout is a legacy Windows pipe.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Super Dev 交付包门禁检查")
     parser.add_argument(
         "--project-dir",

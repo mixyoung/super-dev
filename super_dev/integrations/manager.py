@@ -2367,13 +2367,13 @@ class IntegrationManager(IntegrationManagerContentMixin):
         official_skill_paths: list[Path] = []
         optional_skill_paths: list[Path] = []
         compatibility_skill_paths: list[Path] = []
+        project_paths = {str(item.resolve()) for item in groups["official_project"].values()}
+        user_paths = {str(item.resolve()) for item in groups["official_user"].values()}
         for path in skill_paths:
             resolved = str(path.resolve())
-            if resolved in {
-                str(item.resolve()) for item in groups["official_project"].values()
-            } or resolved in {str(item.resolve()) for item in groups["official_user"].values()}:
+            if resolved in project_paths or (not project_paths and resolved in user_paths):
                 official_skill_paths.append(path)
-            elif resolved in {
+            elif resolved in user_paths or resolved in {
                 str(item.resolve()) for item in groups["optional_project"].values()
             } or resolved in {str(item.resolve()) for item in groups["optional_user"].values()}:
                 optional_skill_paths.append(path)

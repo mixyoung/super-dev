@@ -321,7 +321,7 @@ def test_active_change_stale_quality_json_is_not_complete(temp_project_dir: Path
     assert summary["workflow_status"] == "missing_quality"
     assert summary["artifacts"]["quality"] is False
     assert summary["artifacts"]["quality_gate_state"]["stale"] is True
-    assert str(prd_file) in summary["artifacts"]["quality_gate_state"]["newer_dependencies"]
+    assert str(prd_file.resolve()) in summary["artifacts"]["quality_gate_state"]["newer_dependencies"]
 
 
 def test_active_change_passed_current_quality_json_enters_delivery(
@@ -335,7 +335,7 @@ def test_active_change_passed_current_quality_json_enters_delivery(
 
     assert summary["workflow_status"] == "missing_delivery"
     assert summary["artifacts"]["quality"] is True
-    assert summary["artifacts"]["quality_gate_report"] == str(quality_json)
+    assert summary["artifacts"]["quality_gate_report"] == str(quality_json.resolve())
 
 
 def test_frontend_none_quality_freshness_ignores_ui_and_other_change_artifacts(
