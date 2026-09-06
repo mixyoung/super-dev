@@ -717,7 +717,10 @@ const theme: ThemeConfig = {
 
     def _get_ui_library(self) -> str:
         """获取 UI 库"""
-        return self._get_ui_intelligence()["primary_library"]["name"]
+        name = self._get_ui_intelligence()["primary_library"]["name"]
+        if not isinstance(name, str):
+            raise ValueError("UI 库名称必须是文本")
+        return name
 
     def _get_build_tool(self) -> str:
         """获取构建工具"""

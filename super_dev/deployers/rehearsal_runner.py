@@ -173,9 +173,11 @@ class LaunchRehearsalRunner:
         if metrics_collector is not None:
             try:
                 metrics_collector.record_phase_end("rehearsal")
-                metrics_collector.current_run.quality_gate_score = result.score
-                metrics_collector.current_run.quality_gate_passed = result.passed
-                metrics_collector.finish_run()
+                current_run = metrics_collector.current_run
+                if current_run is not None:
+                    current_run.quality_gate_score = result.score
+                    current_run.quality_gate_passed = result.passed
+                    metrics_collector.finish_run()
             except Exception:
                 pass
 
@@ -437,7 +439,10 @@ class LaunchRehearsalRunner:
 
         try:
             addresses = socket.getaddrinfo(domain, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-            ip_list = list({addr[4][0] for addr in addresses})
+            hosts = (addr[4][0] for addr in addresses)
+            ip_list = list({host for host in hosts if isinstance(host, str) and host})
+            if not ip_list:
+                raise ValueError("DNS 未返回有效地址")
             return RehearsalCheck(
                 "DNS Reachability",
                 True,
@@ -481,6 +486,8 @@ class LaunchRehearsalRunner:
                         )
 
                     not_after_str = cert.get("notAfter", "")
+                    if not isinstance(not_after_str, str):
+                        raise ValueError("SSL 证书有效期必须是文本")
                     # 格式: 'Dec 31 23:59:59 2025 GMT'
                     not_after = datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
                     not_after = not_after.replace(tzinfo=timezone.utc)

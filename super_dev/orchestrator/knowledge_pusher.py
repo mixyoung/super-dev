@@ -429,6 +429,7 @@ class KnowledgePusher:
 
         # 缓存：phase -> KnowledgePush
         self._push_cache: dict[str, KnowledgePush] = {}
+        self._layered_push_cache: dict[tuple[str, int], LayeredKnowledgePush] = {}
 
         # 知识演化分析器（按历史有效性调整推送优先级）
         self._evolution_analyzer = None
@@ -573,8 +574,12 @@ class KnowledgePusher:
         """
         if phase is None:
             self._push_cache.clear()
+            self._layered_push_cache.clear()
         else:
             self._push_cache.pop(phase, None)
+            for key in tuple(self._layered_push_cache):
+                if key[0] == phase:
+                    self._layered_push_cache.pop(key)
 
     # ------------------------------------------------------------------
     # 三层渐进式加载 (Progressive Disclosure)
@@ -607,11 +612,9 @@ class KnowledgePusher:
         LayeredKnowledgePush
             包含 L1 索引、L2 详情、L3 引用的三层推送结果。
         """
-        cache_key = f"layered_{phase}_{token_budget}"
-        if cache_key in self._push_cache:
-            cached = self._push_cache[cache_key]
-            if isinstance(cached, LayeredKnowledgePush):
-                return cached
+        cache_key = (phase, token_budget)
+        if cache_key in self._layered_push_cache:
+            return self._layered_push_cache[cache_key]
 
         config = PHASE_KNOWLEDGE_MAP.get(phase)
         if config is None:
@@ -733,7 +736,7 @@ class KnowledgePusher:
             tech_stack_filter=tech_filter_desc,
         )
 
-        self._push_cache[cache_key] = result
+        self._layered_push_cache[cache_key] = result
 
         self.logger.info(
             f"分层知识推送完成: {phase}",

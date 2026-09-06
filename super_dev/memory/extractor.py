@@ -212,7 +212,11 @@ def _extract_redteam_memories(phase: str, context: dict[str, Any]) -> list[Memor
     findings: list[str] = []
     for _name, report in quality_reports.items():
         if isinstance(report, dict):
-            for issue in report.get("issues", report.get("findings", [])):
+            issues = report.get("issues", report.get("findings", []))
+            if not isinstance(issues, list):
+                _logger.warning("Invalid redteam issues container in report %s", _name)
+                continue
+            for issue in issues:
                 if isinstance(issue, dict):
                     severity = issue.get("severity", "")
                     msg = issue.get("message", issue.get("finding", ""))
