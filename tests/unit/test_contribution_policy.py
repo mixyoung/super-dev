@@ -1,6 +1,7 @@
 """Mechanical checks must reject missing evidence structure without judging its meaning."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -206,6 +207,79 @@ def test_cli_invalid_baseline_returns_failure(repo: Path) -> None:
         encoding="utf-8",
     )
     assert result.returncode == 1
+
+
+@pytest.mark.parametrize("encoding", ["cp1252", "ascii", "utf-8"])
+@pytest.mark.parametrize("scenario", ["pass", "fail", "argument_error"])
+def test_cli_outputs_utf8_with_legacy_pipe_encoding(
+    repo: Path, encoding: str, scenario: str
+) -> None:
+    git(repo, "init")
+    hooks = repo / ".git" / "fixture-hooks"
+    hooks.mkdir()
+    git(repo, "add", ".")
+    git(
+        repo,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "-c",
+        f"core.hooksPath={hooks}",
+        "commit",
+        "-m",
+        "encoding fixture",
+    )
+    env = {**os.environ, "PYTHONIOENCODING": f"{encoding}:strict", "PYTHONUTF8": "0"}
+    # A separate process proves the fixture really starts with the requested pipe codec.
+    probe = subprocess.run(
+        [sys.executable, "-c", "import sys; print(sys.stdout.encoding)"],
+        env=env,
+        capture_output=True,
+        check=True,
+    )
+    assert probe.stdout.decode("ascii").strip().lower() == encoding
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/check_contribution_policy.py"),
+        "--project-dir",
+        str(repo),
+        "--base",
+        "HEAD",
+    ]
+    if scenario == "fail":
+        write(repo, "knowledge/中文说明.md", "missing adoption record")
+    elif scenario == "argument_error":
+        command.append("--未知参数")
+    result = subprocess.run(command, env=env, capture_output=True)
+    stdout = result.stdout.decode("utf-8")
+    stderr = result.stderr.decode("utf-8")
+    assert "UnicodeEncodeError" not in stderr
+    assert result.returncode == {"pass": 0, "fail": 1, "argument_error": 2}[scenario]
+    if scenario == "pass":
+        assert "通过（PASS）" in stdout
+    elif scenario == "fail":
+        assert "失败（FAIL）" in stdout
+        assert "knowledge/中文说明.md" in stdout
+    else:
+        assert "--未知参数" in stderr
+
+
+def test_import_does_not_change_host_stream_encoding() -> None:
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252:strict", "PYTHONUTF8": "0"}
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import scripts.check_contribution_policy; "
+            "print(sys.stdout.encoding, sys.stderr.encoding)",
+        ],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        check=True,
+    )
+    assert result.stdout.decode("ascii").strip() == "cp1252 cp1252"
 
 
 def test_ci_uses_failing_checks_without_privileged_pr_context() -> None:
