@@ -7,6 +7,8 @@ import json
 import os
 import re
 import subprocess
+import sys
+from io import TextIOWrapper
 from pathlib import Path, PurePosixPath
 
 POLICY = "docs/CONTRIBUTION_POLICY.md"
@@ -182,6 +184,11 @@ def check(root: Path, changed: set[str]) -> list[str]:
 
 
 def main() -> int:
+    # Redirected Windows streams may start as cp1252 even when files use UTF-8.
+    # Configure only the CLI process; importing the checker must not alter host streams.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-dir", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--base", default=os.environ.get("CONTRIBUTION_BASE", "HEAD"))
