@@ -815,8 +815,11 @@ class KnowledgeEvolutionAnalyzer:
                     continue
                 fp = v.get("source_file", v.get("file_path", ""))
                 constraint = v.get("constraint", v.get("rule", ""))
-                followed = v.get("followed", v.get("passed", False))
+                followed = v.get("followed", v.get("passed"))
                 if fp and constraint:
+                    if not isinstance(followed, bool):
+                        _logger.warning("约束结果缺少明确布尔值，未计入统计: %s", fp)
+                        continue
                     self.db.record_constraint_result(fp, constraint, followed, run_id)
                     analysis["constraints_evaluated"] += 1
 

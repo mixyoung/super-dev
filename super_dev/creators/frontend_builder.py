@@ -1387,7 +1387,10 @@ function relativePath(path) {{
         contract_path = self.project_dir / "output" / f"{self.name}-ui-contract.json"
         if contract_path.exists():
             try:
-                return json.loads(contract_path.read_text(encoding="utf-8"))
+                payload = json.loads(contract_path.read_text(encoding="utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("UI 契约必须是 JSON 对象")
+                return payload
             except (json.JSONDecodeError, OSError):
                 pass
 
