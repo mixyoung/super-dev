@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, cast
 
+from super_dev.artifact_utils import ui_contract_filename
+
 try:
     import fcntl
 except ImportError:
@@ -1539,7 +1541,7 @@ class SuperDevCLI(
         file_path, factory = target_map[target]
         file_path.write_text(factory(), encoding="utf-8")
         if target == "uiux":
-            contract_path = output_dir / f"{project_name}-ui-contract.json"
+            contract_path = output_dir / ui_contract_filename(project_name)
             contract_path.write_text(
                 json.dumps(generator.generate_ui_contract(), ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -2973,7 +2975,7 @@ class SuperDevCLI(
                 prd_file.write_text(prd_content, encoding="utf-8")
                 arch_file.write_text(arch_content, encoding="utf-8")
                 uiux_file.write_text(uiux_content, encoding="utf-8")
-                (output_dir / f"{project_name}-ui-contract.json").write_text(
+                (output_dir / ui_contract_filename(project_name)).write_text(
                     json.dumps(doc_generator.generate_ui_contract(), ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
@@ -3600,7 +3602,7 @@ class SuperDevCLI(
                                 project_dir=project_dir,
                                 artifact_name="ui-review",
                                 dependencies=[
-                                    project_dir / "output" / f"{project_name}-ui-contract.json",
+                                    project_dir / "output" / ui_contract_filename(project_name),
                                     project_dir / "output" / f"{project_name}-uiux.md",
                                 ],
                             ),
@@ -3620,7 +3622,7 @@ class SuperDevCLI(
                                 project_dir=project_dir,
                                 artifact_name="ui-contract-alignment",
                                 dependencies=[
-                                    project_dir / "output" / f"{project_name}-ui-contract.json",
+                                    project_dir / "output" / ui_contract_filename(project_name),
                                     project_dir / "output" / f"{project_name}-uiux.md",
                                 ],
                             ),

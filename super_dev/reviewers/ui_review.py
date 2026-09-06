@@ -21,6 +21,8 @@ from typing import Any, cast
 
 from PIL import Image
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from ..design import UIIntelligenceAdvisor
 from ..ui_contract_governance import (
     CLAUDE_DESIGN_RUNTIME_CHECKS,
@@ -349,7 +351,7 @@ class UIReviewReviewer:
                 "passed": bool(ui_contract),
                 "expected": "output/*-ui-contract.json",
                 "observed": (
-                    str(self.project_dir / "output" / f"{self.name}-ui-contract.json")
+                    str(self.project_dir / "output" / ui_contract_filename(self.name))
                     if ui_contract
                     else ""
                 ),
@@ -2243,7 +2245,7 @@ class UIReviewReviewer:
         return None
 
     def _load_ui_contract(self) -> dict[str, Any]:
-        contract_path = self.project_dir / "output" / f"{self.name}-ui-contract.json"
+        contract_path = self.project_dir / "output" / ui_contract_filename(self.name)
         if not contract_path.exists():
             return {}
         try:

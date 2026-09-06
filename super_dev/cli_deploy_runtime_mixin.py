@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from .evidence_identity import attach_evidence_identity
 from .frameworks import framework_playbook_complete, is_cross_platform_frontend
 from .ui_contract_governance import required_claude_design_runtime_checks
@@ -430,7 +432,7 @@ class CliDeployRuntimeMixin:
         design_tokens_file = frontend_dir / "design-tokens.css"
         js_file = frontend_dir / "app.js"
         preview_file = project_dir / "preview.html"
-        ui_contract_file = output_dir / f"{project_name}-ui-contract.json"
+        ui_contract_file = output_dir / ui_contract_filename(project_name)
         ui_alignment_file = output_dir / f"{project_name}-ui-contract-alignment.json"
         package_json_file = project_dir / "package.json"
 

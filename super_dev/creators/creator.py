@@ -10,6 +10,8 @@
 import json
 from pathlib import Path
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from .document_generator import DocumentGenerator
 from .prompt_generator import AIPromptGenerator
 from .spec_builder import SpecBuilder
@@ -97,7 +99,7 @@ class ProjectCreator:
         uiux_path.write_text(uiux_content, encoding="utf-8")
         docs["uiux"] = str(uiux_path)
 
-        ui_contract_path = self.output_dir / f"{self.name}-ui-contract.json"
+        ui_contract_path = self.output_dir / ui_contract_filename(self.name)
         ui_contract_path.write_text(
             json.dumps(self.doc_generator.generate_ui_contract(), ensure_ascii=False, indent=2),
             encoding="utf-8",

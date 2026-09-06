@@ -66,6 +66,9 @@ jobs:
       - name: Lint
         run: ruff check super_dev/
 
+      - name: Release type gate
+        run: python scripts/check_type_gates.py --project-dir . --json
+
       - name: Format check
         run: black super_dev/ --check --quiet || true
 
@@ -87,7 +90,10 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Check for known vulnerabilities
-        run: pip audit || true
+        run: python -m pip_audit --local
+
+      - name: Security code scan
+        run: python -m bandit -ll -r super_dev
 
   windows-baseline:
     name: Windows baseline evidence (Python ${{ matrix.python-version }})
