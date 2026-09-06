@@ -1,0 +1,18 @@
+# Repository ownership, not proof that required reviews are enabled.
+# Confirmed repository owner: mixyoung/super-dev. No upstream-owner assignment.
+/AGENTS.md @mixyoung
+/CLAUDE.md @mixyoung
+/.claude/CLAUDE.md @mixyoung
+/CONTRIBUTING.md @mixyoung
+/docs/CONTRIBUTION_POLICY.md @mixyoung
+/docs/SUPER_DEV_EXTENSION_PLATFORM_PLAN.md @mixyoung
+/knowledge/ @mixyoung
+/super_dev/ @mixyoung
+/.agents/skills/ @mixyoung
+/.claude/skills/ @mixyoung
+/plugins/ @mixyoung
+/scripts/check_contribution_policy.py @mixyoung
+/scripts/sync_super_dev_skills.py @mixyoung
+/tests/ @mixyoung
+/.super-dev/changes/*/adoption.md @mixyoung
+/.github/ @mixyoung

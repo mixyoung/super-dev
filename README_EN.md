@@ -893,6 +893,8 @@ For interrupted work, prefer host-side recovery first:
 
 ## Documentation
 
+Contributing to Super Dev itself? Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [repository evolution policy](docs/CONTRIBUTION_POLICY.md) first. These govern repository maintenance, not end-user project workflows.
+
 - [Documentation overview](docs/README.md)
 - [Quick start](docs/QUICKSTART.md)
 - [Installation options](docs/INSTALL_OPTIONS.md)

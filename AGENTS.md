@@ -1,5 +1,11 @@
 # Repository Guidelines
 
+## 本项目贡献入口（Repository-only）
+
+维护 Super Dev 本身前，必须阅读并遵守 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md) 和 [贡献指南](CONTRIBUTING.md)。说明本轮目标、允许范围与实际验证；知识/方法/核心合同改动在已确认 change 的 `adoption.md` 留下来源、取舍、范围和证据。不因模型或上游变化自行改产品方向、确认权或验收标准。
+
+此段仅约束本仓库贡献，不是给普通用户增加流程；不得复制到发布用 Skill 模板。下方宿主生成区块保持原合同。
+
 ## Project Overview
 
 Super Dev is a Python CLI tool (v2.4.0) that orchestrates AI-driven development pipelines inside host environments (e.g., Claude Code). It provides governance, quality gates, and audit artifacts for commercial-grade software delivery. It is NOT an independent AI agent — it's a governance layer that runs inside a host's coding environment.

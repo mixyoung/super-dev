@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository contribution policy
+
+Before changing Super Dev itself, read and follow [the contribution policy](docs/CONTRIBUTION_POLICY.md) and [CONTRIBUTING.md](CONTRIBUTING.md). State the task scope; record knowledge/method/core changes in the confirmed change's `adoption.md`. Models cannot redefine product direction, approval gates, or acceptance criteria on their own. This is repository-only guidance; do not copy it into shipped Skills or generated host integration blocks.
+
 ## Project Overview
 
 Super Dev is a Python CLI tool (v2.4.0) that orchestrates AI-driven development pipelines inside host environments (e.g., Claude Code). It provides governance, quality gates, and audit artifacts for commercial-grade software delivery. It is NOT an independent AI agent — it's a governance layer that runs inside a host's coding environment.

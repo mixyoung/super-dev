@@ -1,3 +1,7 @@
+# Repository contribution entry
+
+维护 Super Dev 本身时，先读仓库根的 [项目演进与贡献准则](../docs/CONTRIBUTION_POLICY.md) 与 [贡献指南](../CONTRIBUTING.md)，遵守已确认范围和原验收标准。这是仓库维护入口，不注入普通用户 Skill，也不覆盖下方宿主生成区块。
+
 <!-- BEGIN SUPER DEV CLAUDE -->
 # Super Dev Claude Code Integration
 

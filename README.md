@@ -19,6 +19,8 @@
 
 ## 版本
 
+参与本项目开发或让模型修改仓库前，请先读 [贡献指南](CONTRIBUTING.md) 与 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md)。这两份规则只约束 Super Dev 本身的维护，不改变普通用户使用方式。
+
 当前版本：`2.4.0`
 
 - 发布说明：[v2.4.0 更新内容](docs/releases/2.4.0.md)
