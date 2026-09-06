@@ -20,6 +20,7 @@ KnowledgeTracker 增加可选项目目录绑定，但保留既有引用键/构�
 ## 改动范围
 
 - .github/workflows/ci.yml
+- tests/integration/test_cli.py
 - .super-dev/changes/release-windows-readiness/proposal.md
 - .super-dev/changes/release-windows-readiness/tasks.md
 - scripts/check_delivery_ready.py
@@ -62,3 +63,7 @@ KnowledgeTracker 增加可选项目目录绑定，但保留既有引用键/构�
 执行用户明确批准的最小整改；不修改未授权历史缺陷、正式验收标准或其他 change。通过正常 PR 验证合并，不强推、不管理员绕过。回退只撤本批差异；不把回退后的历史失败标成通过。版本发布与正式 quality/readiness/proof-pack 仍需各自真实证据，不借本批通过代替。
 
 沿用已确认的“Windows 稳定通过后变成真实阻断检查”要求：现有三个 Windows baseline job 保留名称、范围、隔离与证据上传，只让单元失败返回非零；三版本全部通过后再纳入远端必过检查。原五项检查及管理员/PR 保护保留，不扩矩阵或降低条件。
+
+首次 PR 全量 Linux CI 仅一条旧集成测试失败：删去可选用户级 Codex Skill 却仍期待 doctor 失败。按本次已批准项目优先合同，增加“仅缺用户副本应通过”的正例，再真正删除项目必需 Skill，保留原失败断言；没有把必需缺失改为通过。该测试变更是本次宿主判断的直接回归，不涉及新的业务功能。
+
+该集成测试原先只覆盖 HOME，Windows 的 USERPROFILE 等仍指向另一隔离目录；本次仅在这一测试改用现有 UserDirectoryContext 构造一致的假用户环境。本机正反两面已通过，未触及真实用户目录。最终原基准独立复测平均初始化 35.50ms，五项阈值通过；额外冷启动 464.88ms、首次校验 161.18ms、一次热启动 67.82ms、热实例首次校验 152.98ms 单列，不冒充原预热后三次/50次重复基准的同一指标。
