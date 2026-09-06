@@ -213,7 +213,7 @@ class EvidenceReference:
     expires_at: str = ""
     invalidation_triggers: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, str | list[str]]:
         return {
             "locator": self.locator,
             "owner": self.owner,

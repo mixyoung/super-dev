@@ -6,8 +6,12 @@ import json
 import logging
 from datetime import datetime
 
+from .requirement_parser import RequirementParser
+
 
 class DocumentGeneratorContentMixin:
+    requirement_parser: RequirementParser
+
     def _get_product_type_desc(self, product_type: str) -> str:
         """获取产品类型描述"""
         descs = {
@@ -393,25 +397,19 @@ const theme: ThemeConfig = {
         trust_modules = list(profile.get("trust_modules", []))
         state_requirements = list(profile.get("state_requirements", []))
         component_priorities = list(profile.get("component_priorities", []))
+        _direction_manifest_value = profile.get("design_direction_manifest")
         direction_manifest = (
-            profile.get("design_direction_manifest")
-            if isinstance(profile.get("design_direction_manifest"), dict)
-            else {}
+            _direction_manifest_value if isinstance(_direction_manifest_value, dict) else {}
         )
-        anti_guardrails = (
-            profile.get("anti_ai_slop_guardrails")
-            if isinstance(profile.get("anti_ai_slop_guardrails"), dict)
-            else {}
-        )
+        _anti_guardrails_value = profile.get("anti_ai_slop_guardrails")
+        anti_guardrails = _anti_guardrails_value if isinstance(_anti_guardrails_value, dict) else {}
+        _tweak_categories_value = profile.get("tweak_categories")
         tweak_categories = (
-            profile.get("tweak_categories")
-            if isinstance(profile.get("tweak_categories"), list)
-            else []
+            _tweak_categories_value if isinstance(_tweak_categories_value, list) else []
         )
+        _selected_reference_value = profile.get("selected_design_reference")
         selected_reference = (
-            profile.get("selected_design_reference")
-            if isinstance(profile.get("selected_design_reference"), dict)
-            else {}
+            _selected_reference_value if isinstance(_selected_reference_value, dict) else {}
         )
         reference_name = selected_reference.get("name") or "设计参考锚点"
         selected_direction = direction_manifest.get("selected_direction") or "Modern Commercial"
@@ -419,15 +417,11 @@ const theme: ThemeConfig = {
         visual_tension = direction_manifest.get("visual_tension") or "通过层级、留白和重点色建立张力"
         density_tempo = direction_manifest.get("density_tempo") or density
         anti_cliches = list(anti_guardrails.get("forbidden_motifs", []))[:3]
-        proof_rules = (
-            profile.get("proof_composition_rules")
-            if isinstance(profile.get("proof_composition_rules"), dict)
-            else {}
-        )
+        _proof_rules_value = profile.get("proof_composition_rules")
+        proof_rules = _proof_rules_value if isinstance(_proof_rules_value, dict) else {}
+        _layout_tension_rules_value = profile.get("layout_tension_rules")
         layout_tension_rules = (
-            profile.get("layout_tension_rules")
-            if isinstance(profile.get("layout_tension_rules"), list)
-            else []
+            _layout_tension_rules_value if isinstance(_layout_tension_rules_value, list) else []
         )
 
         def recipe(
@@ -588,10 +582,9 @@ const theme: ThemeConfig = {
     ) -> dict:
         frontend = str(analysis.get("frontend") or self.frontend or "web")
         design_references = profile.get("design_references", [])
+        _selected_reference_value = profile.get("selected_design_reference")
         selected_reference = (
-            profile.get("selected_design_reference")
-            if isinstance(profile.get("selected_design_reference"), dict)
-            else {}
+            _selected_reference_value if isinstance(_selected_reference_value, dict) else {}
         )
         reference_signal = (
             selected_reference.get("name")
@@ -645,10 +638,9 @@ const theme: ThemeConfig = {
             for axis in recipe.get("variation_axes", []):
                 if axis not in variation_axes:
                     variation_axes.append(axis)
+        _tweak_categories_value = profile.get("tweak_categories")
         tweak_categories = (
-            profile.get("tweak_categories")
-            if isinstance(profile.get("tweak_categories"), list)
-            else []
+            _tweak_categories_value if isinstance(_tweak_categories_value, list) else []
         )
         return {
             "mode": "single-source prototype with tweakable variations",
@@ -675,11 +667,8 @@ const theme: ThemeConfig = {
         screen_recipes: list[dict],
     ) -> dict:
         frontend = str(analysis.get("frontend") or self.frontend or "web")
-        critique_rubric = (
-            profile.get("critique_rubric")
-            if isinstance(profile.get("critique_rubric"), list)
-            else []
-        )
+        _critique_rubric_value = profile.get("critique_rubric")
+        critique_rubric = _critique_rubric_value if isinstance(_critique_rubric_value, list) else []
         return {
             "verification_order": [
                 "preview loads cleanly",
@@ -3718,10 +3707,9 @@ spec:
                     continue
                 lines.append(f"- **{item.get('name', 'N/A')}**: {item.get('rationale', 'N/A')}")
         references = profile.get("design_references", [])
+        _selected_reference_value = profile.get("selected_design_reference")
         selected_reference = (
-            profile.get("selected_design_reference")
-            if isinstance(profile.get("selected_design_reference"), dict)
-            else {}
+            _selected_reference_value if isinstance(_selected_reference_value, dict) else {}
         )
         selected_slug = str(selected_reference.get("slug", "")).strip()
         if references:
@@ -3748,10 +3736,9 @@ spec:
                     f"- **{item.get('name', 'N/A')}**: {item.get('philosophy', 'N/A')} | Hero: {item.get('hero_treatment', 'N/A')} | 避免：{'；'.join(item.get('anti_cliches', [])[:2]) or 'N/A'}"
                 )
 
+        _brand_signal_manifest_value = profile.get("brand_signal_manifest")
         brand_signal_manifest = (
-            profile.get("brand_signal_manifest")
-            if isinstance(profile.get("brand_signal_manifest"), dict)
-            else {}
+            _brand_signal_manifest_value if isinstance(_brand_signal_manifest_value, dict) else {}
         )
         if brand_signal_manifest:
             lines.extend(["", "**品牌信号与权威感**:"])
@@ -3762,9 +3749,10 @@ spec:
                 f"- {item}" for item in brand_signal_manifest.get("credibility_devices", [])[:3]
             )
 
+        _proof_composition_rules_value = profile.get("proof_composition_rules")
         proof_composition_rules = (
-            profile.get("proof_composition_rules")
-            if isinstance(profile.get("proof_composition_rules"), dict)
+            _proof_composition_rules_value
+            if isinstance(_proof_composition_rules_value, dict)
             else {}
         )
         if proof_composition_rules:
@@ -3792,11 +3780,8 @@ spec:
             lines.extend(["", "**布局张力纪律**:"])
             lines.extend(f"- {item}" for item in layout_tension_rules[:4])
 
-        anti_guardrails = (
-            profile.get("anti_ai_slop_guardrails")
-            if isinstance(profile.get("anti_ai_slop_guardrails"), dict)
-            else {}
-        )
+        _anti_guardrails_value = profile.get("anti_ai_slop_guardrails")
+        anti_guardrails = _anti_guardrails_value if isinstance(_anti_guardrails_value, dict) else {}
         if anti_guardrails:
             lines.extend(["", "**反 AI 味护栏**:"])
             lines.extend(
@@ -3893,25 +3878,19 @@ spec:
             profile=profile,
             screen_recipes=recipes,
         )
-        anti_guardrails = (
-            profile.get("anti_ai_slop_guardrails")
-            if isinstance(profile.get("anti_ai_slop_guardrails"), dict)
-            else {}
-        )
-        proof_rules = (
-            profile.get("proof_composition_rules")
-            if isinstance(profile.get("proof_composition_rules"), dict)
-            else {}
-        )
+        _anti_guardrails_value = profile.get("anti_ai_slop_guardrails")
+        anti_guardrails = _anti_guardrails_value if isinstance(_anti_guardrails_value, dict) else {}
+        _proof_rules_value = profile.get("proof_composition_rules")
+        proof_rules = _proof_rules_value if isinstance(_proof_rules_value, dict) else {}
+        _component_craft_requirements_value = profile.get("component_craft_requirements")
         component_craft_requirements = (
-            profile.get("component_craft_requirements")
-            if isinstance(profile.get("component_craft_requirements"), list)
+            _component_craft_requirements_value
+            if isinstance(_component_craft_requirements_value, list)
             else []
         )
+        _layout_tension_rules_value = profile.get("layout_tension_rules")
         layout_tension_rules = (
-            profile.get("layout_tension_rules")
-            if isinstance(profile.get("layout_tension_rules"), list)
-            else []
+            _layout_tension_rules_value if isinstance(_layout_tension_rules_value, list) else []
         )
         lines = [
             "#### Claude-Design 风格执行协议",

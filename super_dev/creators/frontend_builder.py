@@ -50,7 +50,7 @@ class FrontendScaffoldBuilder:
             self._build_js(requirements, phases, docs, ui_contract), encoding="utf-8"
         )
 
-        result = {
+        result: dict[str, str | dict] = {
             "html": str(html_path),
             "css": str(css_path),
             "tokens": str(tokens_path),
@@ -62,20 +62,21 @@ class FrontendScaffoldBuilder:
         return result
 
     def _resolve_direction_profile(self, ui_contract: dict) -> dict:
+        _art_direction_candidates_value = ui_contract.get("art_direction_candidates")
         art_direction_candidates = (
-            ui_contract.get("art_direction_candidates")
-            if isinstance(ui_contract.get("art_direction_candidates"), list)
+            _art_direction_candidates_value
+            if isinstance(_art_direction_candidates_value, list)
             else []
         )
+        _design_direction_manifest_value = ui_contract.get("design_direction_manifest")
         design_direction_manifest = (
-            ui_contract.get("design_direction_manifest")
-            if isinstance(ui_contract.get("design_direction_manifest"), dict)
+            _design_direction_manifest_value
+            if isinstance(_design_direction_manifest_value, dict)
             else {}
         )
+        _anti_slop_guardrails_value = ui_contract.get("anti_ai_slop_guardrails")
         anti_slop_guardrails = (
-            ui_contract.get("anti_ai_slop_guardrails")
-            if isinstance(ui_contract.get("anti_ai_slop_guardrails"), dict)
-            else {}
+            _anti_slop_guardrails_value if isinstance(_anti_slop_guardrails_value, dict) else {}
         )
         primary = art_direction_candidates[0] if art_direction_candidates else {}
         direction_id = (
@@ -171,7 +172,7 @@ class FrontendScaffoldBuilder:
         if frontend in {"next", "nextjs"}:
             from super_dev.creators.nextjs_scaffold import NextjsScaffoldGenerator
 
-            files = NextjsScaffoldGenerator().generate(
+            nextjs_files = NextjsScaffoldGenerator().generate(
                 self.project_dir,
                 self.name,
                 ui_profile=self._framework_ui_profile(ui_contract),
@@ -180,7 +181,7 @@ class FrontendScaffoldBuilder:
             return {
                 "kind": "nextjs-app-router",
                 "root": str(root),
-                "files": [str(path) for path in files],
+                "files": [str(path) for path in nextjs_files],
             }
         if frontend in {"vue", "vue3", "nuxt", "vue-vite"}:
             files = self.generate_vue3_project()
@@ -230,16 +231,12 @@ class FrontendScaffoldBuilder:
     def _build_html(self, ui_contract: dict) -> str:
         typography = ui_contract.get("typography_preset", {})
         style_direction = ui_contract.get("style_direction", {})
+        _framework_playbook_value = ui_contract.get("framework_playbook")
         framework_playbook = (
-            ui_contract.get("framework_playbook")
-            if isinstance(ui_contract.get("framework_playbook"), dict)
-            else {}
+            _framework_playbook_value if isinstance(_framework_playbook_value, dict) else {}
         )
-        component_stack = (
-            ui_contract.get("component_stack", {})
-            if isinstance(ui_contract.get("component_stack"), dict)
-            else {}
-        )
+        _component_stack_value = ui_contract.get("component_stack")
+        component_stack = _component_stack_value if isinstance(_component_stack_value, dict) else {}
         icon_system = (
             ui_contract.get("icon_system")
             or component_stack.get("icon")
@@ -253,22 +250,17 @@ class FrontendScaffoldBuilder:
             or preference.get("preferred")
             or "shadcn/ui + Radix UI + Tailwind CSS"
         )
-        screen_recipes = (
-            ui_contract.get("screen_recipes")
-            if isinstance(ui_contract.get("screen_recipes"), list)
-            else []
-        )
+        _screen_recipes_value = ui_contract.get("screen_recipes")
+        screen_recipes = _screen_recipes_value if isinstance(_screen_recipes_value, list) else []
         direction_profile = self._resolve_direction_profile(ui_contract)
         primary_recipe = screen_recipes[0] if screen_recipes else {}
+        _verification_handoff_value = ui_contract.get("verification_handoff")
         verification_handoff = (
-            ui_contract.get("verification_handoff")
-            if isinstance(ui_contract.get("verification_handoff"), dict)
-            else {}
+            _verification_handoff_value if isinstance(_verification_handoff_value, dict) else {}
         )
+        _selected_reference_value = ui_contract.get("selected_design_reference")
         selected_reference = (
-            ui_contract.get("selected_design_reference")
-            if isinstance(ui_contract.get("selected_design_reference"), dict)
-            else {}
+            _selected_reference_value if isinstance(_selected_reference_value, dict) else {}
         )
         reference_name = selected_reference.get("name") or "Frozen UI Contract"
         hero_panel_title = primary_recipe.get("label") or "Design Execution Blueprint"

@@ -197,7 +197,7 @@ class WorkflowEngine:
                 import yaml
 
                 config_path = self.project_dir / "super-dev.yaml"
-                yaml_config = {}
+                yaml_config: dict[str, Any] = {}
                 if config_path.exists():
                     with open(config_path, encoding="utf-8") as f:
                         yaml_config = yaml.safe_load(f) or {}
@@ -370,6 +370,7 @@ class WorkflowEngine:
                 if canonical_name not in canonical_remaining:
                     canonical_remaining.append(canonical_name)
 
+            stage_experts = list(active_experts_for_stage(canonical_current_phase))
             state = {
                 "current_phase": current_phase,
                 "canonical_phase": canonical_current_phase,
@@ -379,7 +380,7 @@ class WorkflowEngine:
                 "phases_remaining": remaining,
                 "canonical_phases_completed": canonical_completed,
                 "canonical_phases_remaining": canonical_remaining,
-                "active_experts": list(active_experts_for_stage(canonical_current_phase)),
+                "active_experts": stage_experts,
                 "started_at": self._pipeline_started_at,
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
@@ -397,7 +398,7 @@ class WorkflowEngine:
                 stage=canonical_current_phase,
                 status=current_stage_status,
                 run_id=str(self._pipeline_started_at or "").strip(),
-                active_experts=state["active_experts"],
+                active_experts=stage_experts,
                 source="pipeline_state",
                 details={
                     "engine_phase": current_phase,

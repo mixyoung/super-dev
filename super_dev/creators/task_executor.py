@@ -576,10 +576,9 @@ class SpecTaskExecutor:
             return "先锁定当前项目的框架专项 playbook，再让宿主进入实现。"
         if not isinstance(payload, dict):
             return "先锁定当前项目的框架专项 playbook，再让宿主进入实现。"
+        _framework_playbook_value = payload.get("framework_playbook")
         framework_playbook = (
-            payload.get("framework_playbook")
-            if isinstance(payload.get("framework_playbook"), dict)
-            else {}
+            _framework_playbook_value if isinstance(_framework_playbook_value, dict) else {}
         )
         focus = str(framework_playbook.get("focus") or "").strip()
         if focus:
