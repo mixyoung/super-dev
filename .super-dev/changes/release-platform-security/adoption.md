@@ -35,6 +35,8 @@ UI 契约文件名仅在显示名称含跨平台非法字符时转换，统一�
 - super_dev/deployers/delivery.py
 - super_dev/reviewers/quality_gate.py
 - super_dev/reviewers/ui_review.py
+- super_dev/extensions/executor.py
+- tests/extensions/test_executor.py
 - tests/unit/test_release_ui_contract_paths.py
 - pyproject.toml
 - uv.lock
@@ -56,3 +58,9 @@ Windows Python 3.13.12：修改前新增场景加原失败为 8 failed / 5 passe
 ## 决定与回退
 
 按用户明确批准的两个阻碍和原 D 批执行，不据此扩大到其他缺陷。仅通过正常 PR 和原五项必过检查合并；安全扫描也须真实通过。回退仅撤本批差异；依赖回退会重新带回已知公告，必须如实阻止发布。未改版本、标签或上传 PyPI。
+
+追加批准：PR #5 新接入的 Linux 类型门禁暴露 executor.py 中 WinDLL/get_last_error 的四处诊断后，用户明确回复“允许，仅修这 4 处平台声明”。因此只在 Windows Job 的构造与 assign 入口补可识别的 sys.platform 防护，Windows 分支内的 API、标志、调用顺序和进程清理逻辑不变；正常 POSIX 执行仍走原进程组分支。其他性能、宿主和全量失败不在追加批准内。
+
+同时声明原有 _kernel32: ctypes.CDLL 与 handle: int | None 字段，避免 Linux 分析时由于构造函数不可达而丢失字段类型，未引入 Any/ignore。Linux 目标检查从 4 项到 0 项，Windows 目标同样通过；执行器回归 7 passed / 1 skipped（仅既有 POSIX 专属场景在 Windows 跳过），覆盖真实超时/取消后进程树清理；Ruff 全范围与贡献检查通过。
+
+为避免一次全量报告混用修改前后代码，第一次 Windows 全范围 pytest 在约 13% 已有失败时中止，没有宣称完成或通过；其不完整输出不能当最终验证。平台补丁后重跑类型/执行器和 CI，以新提交绑定的结果为准。

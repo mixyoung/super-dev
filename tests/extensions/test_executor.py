@@ -5,11 +5,24 @@ import sys
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from super_dev.extensions.executor import StructuredExecutor
 from super_dev.extensions.models import CommandSpec, ExtensionStatus
+
+
+def test_windows_job_rejects_other_platforms_before_loading_native_api(monkeypatch) -> None:
+    from super_dev.extensions import executor
+
+    monkeypatch.setattr(executor, "sys", SimpleNamespace(platform="linux"))
+    with pytest.raises(OSError, match="仅适用于 Windows"):
+        executor._WindowsJob()
+    job = object.__new__(executor._WindowsJob)
+    with pytest.raises(OSError, match="仅适用于 Windows"):
+        job.assign(Mock())
 
 
 def test_shell_characters_remain_plain_arguments(tmp_path: Path) -> None:
