@@ -41,12 +41,20 @@ dependencies = [
     "fastapi>=0.110.0,<1.0.0",
     "uvicorn>=0.27.0",
     "tomli>=2.0.0; python_version<'3.11'",
+    # Security floors for existing transitive runtime dependencies (2026-09-06 audit).
+    "click>=8.3.3",
+    "idna>=3.15",
+    "starlette>=1.3.1",
+    "urllib3>=2.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "setuptools>=68.0",
-    "pillow>=10.0.0",
+    "pillow>=12.3.0",
+    # Security floors for pip-audit's existing transitive dependencies.
+    "pip>=26.2",
+    "msgpack>=1.2.1",
     "pip-audit>=2.7.0",
     "types-requests>=2.31.0",
     "bandit>=1.7.9",
@@ -65,7 +73,10 @@ dev = [
 [dependency-groups]
 dev = [
     "setuptools>=68.0",
-    "pillow>=10.0.0",
+    "pillow>=12.3.0",
+    # Keep the editable-install extra and uv development group aligned.
+    "pip>=26.2",
+    "msgpack>=1.2.1",
     "pip-audit>=2.7.0",
     "types-requests>=2.31.0",
     "bandit>=1.7.9",

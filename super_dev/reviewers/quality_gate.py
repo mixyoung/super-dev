@@ -20,6 +20,8 @@ from typing import Any, Optional, TypedDict
 import yaml  # type: ignore[import-untyped]
 from defusedxml import ElementTree
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from ..artifact_utils import (
     latest_artifact,
     resolve_active_change_id,
@@ -2040,7 +2042,7 @@ class QualityGateChecker:
     def _check_ui_contract_execution(self) -> QualityCheck:
         """检查 UI 契约、Design Token 与前端 runtime 是否闭环"""
         output_dir = self.project_dir / "output"
-        ui_contract_path = output_dir / f"{self.name}-ui-contract.json"
+        ui_contract_path = output_dir / ui_contract_filename(self.name)
         frontend_dir = output_dir / "frontend"
         design_tokens_path = frontend_dir / "design-tokens.css"
         runtime_path = output_dir / f"{self.name}-frontend-runtime.json"

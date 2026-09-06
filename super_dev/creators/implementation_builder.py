@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape as xml_escape
 
+from super_dev.artifact_utils import ui_contract_filename
+
 
 class ImplementationScaffoldBuilder:
     """项目宿主实现参考生成器"""
@@ -36,7 +38,7 @@ class ImplementationScaffoldBuilder:
         return cleaned or "super-dev-app"
 
     def _load_ui_contract(self) -> dict[str, Any]:
-        contract_path = self.project_dir / "output" / f"{self.name}-ui-contract.json"
+        contract_path = self.project_dir / "output" / ui_contract_filename(self.name)
         if contract_path.exists():
             try:
                 payload = json.loads(contract_path.read_text(encoding="utf-8"))

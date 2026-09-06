@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -55,6 +56,21 @@ _CHANGE_BRANCH_PREFIXES = {
 
 def sanitize_artifact_name(name: str) -> str:
     return str(name).strip().lower().replace(" ", "-").replace("_", "-")
+
+
+def ui_contract_filename(name: str) -> str:
+    """Keep valid legacy filenames; encode unsafe display names on every OS.
+
+    This is only the UI contract filename, not a project/change identifier or a
+    replacement for the display name. A digest distinguishes names whose unsafe
+    characters would otherwise collapse to the same replacement.
+    """
+    unsafe = r'[<>:"/\\|?*\x00-\x1f]'
+    if re.search(unsafe, name):
+        readable = re.sub(unsafe, "-", name).strip(" .-")[:64] or "project"
+        digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:16]
+        name = f"{readable}-{digest}"
+    return f"{name}-ui-contract.json"
 
 
 def _nested_values_for_key(payload: Any, key: str) -> Iterator[Any]:

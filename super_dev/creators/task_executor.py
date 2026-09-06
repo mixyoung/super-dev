@@ -12,6 +12,8 @@ import subprocess  # nosec B404
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from ..specs import ChangeManager
 from ..specs.models import ChangeStatus, Task, TaskStatus
 from ..workflow_guard import require_docs_confirmation, require_preview_confirmation
@@ -565,7 +567,7 @@ class SpecTaskExecutor:
         return report_path
 
     def _read_framework_focus(self) -> str:
-        contract_path = self.project_dir / "output" / f"{self.project_name}-ui-contract.json"
+        contract_path = self.project_dir / "output" / ui_contract_filename(self.project_name)
         if not contract_path.exists():
             return "先锁定当前项目的框架专项 playbook，再让宿主进入实现。"
         try:

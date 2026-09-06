@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from .artifact_utils import (
     resolve_active_change_id,
     resolve_current_artifact_prefix,
@@ -342,7 +344,7 @@ class CliReleaseQualityMixin:
                         project_dir=project_dir,
                         artifact_name="ui-review",
                         dependencies=[
-                            output_dir / f"{project_name}-ui-contract.json",
+                            output_dir / ui_contract_filename(project_name),
                             output_dir / f"{project_name}-uiux.md",
                         ],
                     ),
@@ -362,7 +364,7 @@ class CliReleaseQualityMixin:
                         project_dir=project_dir,
                         artifact_name="ui-contract-alignment",
                         dependencies=[
-                            output_dir / f"{project_name}-ui-contract.json",
+                            output_dir / ui_contract_filename(project_name),
                             output_dir / f"{project_name}-uiux.md",
                         ],
                     ),

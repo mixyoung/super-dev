@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from super_dev.artifact_utils import ui_contract_filename
+
 from ..config import ConfigManager
 
 
@@ -202,7 +204,7 @@ class DeliveryPackager:
             specs.extend(
                 [
                     ArtifactSpec(
-                        output_dir / f"{self.name}-ui-contract.json",
+                        output_dir / ui_contract_filename(self.name),
                         True,
                         "缺少 UI 系统契约",
                     ),

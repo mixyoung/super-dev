@@ -8,6 +8,8 @@ import html
 import json
 from pathlib import Path
 
+from super_dev.artifact_utils import ui_contract_filename
+
 
 class FrontendScaffoldBuilder:
     """生成宿主可直接评审和继续实现的前端实施参考页"""
@@ -1384,7 +1386,7 @@ function relativePath(path) {{
 """
 
     def _load_ui_contract(self) -> dict:
-        contract_path = self.project_dir / "output" / f"{self.name}-ui-contract.json"
+        contract_path = self.project_dir / "output" / ui_contract_filename(self.name)
         if contract_path.exists():
             try:
                 payload = json.loads(contract_path.read_text(encoding="utf-8"))

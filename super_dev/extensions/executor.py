@@ -131,10 +131,15 @@ class _JobExtendedLimitInformation(ctypes.Structure):
 
 
 class _WindowsJob:
+    _kernel32: ctypes.CDLL
+    handle: int | None
+
     JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 
     def __init__(self) -> None:
+        if sys.platform != "win32":
+            raise OSError("Windows Job Object 仅适用于 Windows")
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         self._kernel32 = kernel32
         kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
@@ -165,6 +170,8 @@ class _WindowsJob:
             raise OSError(error, "无法配置 Windows Job Object")
 
     def assign(self, process: subprocess.Popen[str]) -> None:
+        if sys.platform != "win32":
+            raise OSError("Windows Job Object 仅适用于 Windows")
         process_handle = ctypes.c_void_p(int(process._handle))  # type: ignore[attr-defined]
         if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
             raise OSError(ctypes.get_last_error(), "无法把进程加入 Windows Job Object")
