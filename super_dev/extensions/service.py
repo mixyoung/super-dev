@@ -9,6 +9,7 @@ import sys
 import sysconfig
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -32,6 +33,7 @@ from .models import (
     PytestSummary,
     PytestVerificationPlan,
     VerificationAdvisory,
+    WriteSpec,
 )
 from .ownership import evaluate_ownership
 from .path_guard import PathGuard
@@ -49,11 +51,22 @@ class ProbeOutcome:
     summary: PytestSummary | None = None
     advisories: tuple[VerificationAdvisory, ...] = ()
     run_id: str = ""
+    plan: PytestVerificationPlan | None = None
+    candidate_changed: bool | None = None
 
 
 class ExtensionService:
     BUILTIN_ID = "contract-probe"
     FRESH_VERIFICATION_ID = "fresh-verification"
+    # Core's receipt authority is independent of an untrusted extension manifest.
+    _RECEIPT_WRITES = WriteSpec(
+        allowed=(
+            ".super-dev/extensions/runs/**",
+            ".super-dev/extensions/metrics/**",
+            ".super-dev/extensions/history.jsonl",
+        ),
+        forbidden=("$USER_SURFACES/**",),
+    )
 
     def __init__(
         self,
@@ -371,15 +384,7 @@ class ExtensionService:
             "stdout_digest": execution.stdout_digest if execution is not None else "",
             "stderr_digest": execution.stderr_digest if execution is not None else "",
         }
-        written_summary = self.store.write_run_json(
-            run_id,
-            "pytest-summary.json",
-            summary_payload,
-        )
-        writes = [
-            self._relative(self.project_dir, result_path),
-            self._relative(self.project_dir, written_summary),
-        ]
+        writes = []
         if junit_path.exists():
             writes.append(self._relative(self.project_dir, junit_path))
         finished_at = utc_now()
@@ -401,24 +406,65 @@ class ExtensionService:
             duration_ms=(time.monotonic() - started) * 1000,
             process_tree_clean=(execution.process_tree_clean if execution is not None else True),
         )
-        written_result = self.store.write_result(result)
+        written_result = None
+        try:
+            self._guard_receipt(
+                result_path, run_dir / "pytest-summary.json", self.store.history_path
+            )
+            written_summary = self.store.write_run_json(
+                run_id, "pytest-summary.json", summary_payload
+            )
+            result.writes.extend(
+                [
+                    self._relative(self.project_dir, written_summary),
+                    self._relative(self.project_dir, result_path),
+                ]
+            )
+            written_result = self.store.write_result(result)
+        except (OSError, ValueError) as exc:
+            result.status = ExtensionStatus.BLOCKED
+            result.writes = [
+                item
+                for item in result.writes
+                if item != self._relative(self.project_dir, result_path)
+            ]
+            result.blocking_findings.append(f"验证已结束，但结果未落盘：{exc}")
+            return ProbeOutcome(
+                status=ExtensionStatus.BLOCKED,
+                message="; ".join(result.blocking_findings),
+                result=result,
+                summary=summary,
+                advisories=advisories,
+                run_id=run_id,
+                plan=plan,
+                candidate_changed=final_candidate.candidate_digest != candidate.candidate_digest,
+            )
         relative_result = self._relative(self.project_dir, written_result)
         event_type = (
             ExtensionEventType.COMPLETED
             if status in {ExtensionStatus.PASS, ExtensionStatus.FAIL}
             else ExtensionEventType.BLOCKED
         )
-        self._event(
-            event=event_type,
-            run_id=run_id,
-            extension_id=manifest.id,
-            stage=stage,
-            actor=actor,
-            source_digest=source_digest,
-            candidate_digest=candidate.candidate_digest,
-            result_artifact=relative_result,
-            message="; ".join(blocking_findings),
-        )
+        try:
+            self._event(
+                event=event_type,
+                run_id=run_id,
+                extension_id=manifest.id,
+                stage=stage,
+                actor=actor,
+                source_digest=source_digest,
+                candidate_digest=candidate.candidate_digest,
+                result_artifact=relative_result,
+                message="; ".join(blocking_findings),
+            )
+        except (OSError, ValueError) as exc:
+            status = result.status = ExtensionStatus.BLOCKED
+            blocking_findings.append(f"结果已生成，但事件未落盘：{exc}")
+            result.blocking_findings = list(blocking_findings)
+            try:
+                self.store.write_result(result)
+            except (OSError, ValueError):
+                written_result = None
         if status == ExtensionStatus.PASS and summary is not None:
             message = (
                 f"完成前验证通过：测试 {summary.tests} 项，实际执行 {summary.executed} 项，"
@@ -440,6 +486,78 @@ class ExtensionService:
             summary=summary,
             advisories=advisories,
             run_id=run_id,
+            plan=plan,
+            candidate_changed=final_candidate.candidate_digest != candidate.candidate_digest,
+        )
+
+    def _guard_receipt(self, *paths: Path) -> None:
+        guard = PathGuard(
+            self.project_dir,
+            self._RECEIPT_WRITES,
+            user_directories=self.user_directories,
+        )
+        for path in paths:
+            decision = guard.check_write(path)
+            if not decision.allowed:
+                raise ValueError(decision.reason)
+
+    def _blocked_fresh_receipt(
+        self,
+        *,
+        run_id: str,
+        candidate: CandidateIdentity,
+        stage: str,
+        actor: str,
+        started_at: str,
+        started: float,
+        message: str,
+        execution_uncertain: bool = False,
+        plan: PytestVerificationPlan | None = None,
+    ) -> ProbeOutcome:
+        result = ExtensionResult(
+            schema_version=1,
+            run_id=run_id,
+            extension_id=self.FRESH_VERIFICATION_ID,
+            extension_version="",
+            status=ExtensionStatus.BLOCKED,
+            canonical_stage=stage,
+            source_digest="",
+            candidate=candidate,
+            blocking_findings=[message],
+            started_at=started_at,
+            finished_at=utc_now(),
+            duration_ms=(time.monotonic() - started) * 1000,
+            process_tree_clean=not execution_uncertain,
+        )
+        written = None
+        try:
+            result_path = self.store.run_dir(run_id) / "result.json"
+            self._guard_receipt(result_path, self.store.history_path)
+            result.writes = [self._relative(self.project_dir, result_path)]
+            written = self.store.write_result(result)
+            self._event(
+                event=ExtensionEventType.BLOCKED,
+                run_id=run_id,
+                extension_id=self.FRESH_VERIFICATION_ID,
+                stage=stage,
+                actor=actor,
+                candidate_digest=candidate.candidate_digest,
+                result_artifact=self._relative(self.project_dir, written),
+                message=message,
+            )
+        except (OSError, ValueError) as exc:
+            message += f"；阻断回执或事件未落盘：{exc}"
+            result.blocking_findings.append(message)
+            if written is None:
+                result.writes = []
+        return ProbeOutcome(
+            status=ExtensionStatus.BLOCKED,
+            message=message,
+            result=result,
+            result_path=written,
+            run_id=run_id,
+            plan=plan,
+            candidate_changed=None if execution_uncertain else False,
         )
 
     def run_fresh_verification(
@@ -448,6 +566,7 @@ class ExtensionService:
         stage: str = "delivery",
         actor: str = "cli",
         cancel_event: Event | None = None,
+        on_start: Callable[[PytestVerificationPlan | None], None] | None = None,
     ) -> ProbeOutcome:
         if not self.enabled():
             return ProbeOutcome(
@@ -464,6 +583,62 @@ class ExtensionService:
         started_at = utc_now()
         started = time.monotonic()
         candidate = build_candidate_identity(self.project_dir)
+        try:
+            plan = parse_pytest_verification_plan(self.config().get("fresh_verification"))
+        except PytestPlanValidationError:
+            plan = None
+        if on_start is not None:
+            on_start(plan)
+        try:
+            self._guard_receipt(
+                self.store.run_dir(run_id) / "result.json",
+                self.store.history_path,
+            )
+            outcome = self._execute_fresh_verification(
+                run_id=run_id,
+                candidate=candidate,
+                started_at=started_at,
+                started=started,
+                stage=stage,
+                actor=actor,
+                cancel_event=cancel_event,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            return self._blocked_fresh_receipt(
+                run_id=run_id,
+                candidate=candidate,
+                started_at=started_at,
+                started=started,
+                stage=stage,
+                actor=actor,
+                plan=plan,
+                execution_uncertain=True,
+                message=f"完成前验证无法形成完整证据，执行状态未确认：{exc}",
+            )
+        if outcome.result is None:
+            return self._blocked_fresh_receipt(
+                run_id=run_id,
+                candidate=candidate,
+                started_at=started_at,
+                started=started,
+                stage=stage,
+                actor=actor,
+                plan=plan,
+                message=outcome.message,
+            )
+        return outcome
+
+    def _execute_fresh_verification(
+        self,
+        *,
+        run_id: str,
+        candidate: CandidateIdentity,
+        started_at: str,
+        started: float,
+        stage: str,
+        actor: str,
+        cancel_event: Event | None,
+    ) -> ProbeOutcome:
         self._event(
             event=ExtensionEventType.REQUESTED,
             run_id=run_id,
@@ -769,17 +944,8 @@ class ExtensionService:
             ),
             "time_to_accepted_ms": None,
         }
-        manifest = load_manifest(self.fresh_verification_manifest_path)
         metric_path = self.store.verification_metrics_path
-        guard = PathGuard(
-            self.project_dir,
-            manifest.writes,
-            user_directories=self.user_directories,
-        )
-        for target in (metric_path, self.store.verification_summary_path):
-            decision = guard.check_write(target)
-            if not decision.allowed:
-                raise ValueError(decision.reason)
+        self._guard_receipt(metric_path, self.store.verification_summary_path)
         metric_path = cast(Path, self.store.append_verification_metric(payload))
         replay_contract_path = (
             self.project_dir

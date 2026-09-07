@@ -15,7 +15,7 @@ from .artifact_utils import (
 )
 from .config import ConfigManager
 from .evidence_identity import attach_evidence_identity
-from .extensions.models import ExtensionStatus
+from .extensions.models import ExtensionStatus, PytestVerificationPlan
 from .extensions.service import ExtensionService, ProbeOutcome
 from .proof_pack import ProofPackBuilder
 from .release_readiness import (
@@ -26,6 +26,55 @@ from .release_readiness import (
 
 
 class CliReleaseQualityMixin:
+    def _verification_start(self, plan: PytestVerificationPlan | None, *, verbose: bool) -> None:
+        self.console.print("正在进行完成前验证", style="cyan")
+        self.console.print("原因：发布就绪判断需要对应当前代码的新测试证据。")
+        self.console.print(f"测试计划：{plan.plan_id if plan else '配置待校验'}", markup=False)
+        scope = "、".join(arg for arg in plan.args if not arg.startswith("-")) if plan else "未确定"
+        self.console.print(f"测试范围：{scope[:160]}", markup=False)
+        self.console.print("允许写入：本次验证证据目录（测试使用隔离用户目录）。")
+        self.console.print("不会执行：提交、推送、部署、推进项目阶段或修改用户级配置。")
+        if verbose and plan:
+            self.console.print(
+                f"计划参数：{list(plan.args)}；超时：{plan.timeout_seconds} 秒", markup=False
+            )
+
+    def _verification_summary(self, outcome: ProbeOutcome, check: ReleaseReadinessCheck) -> None:
+        label = {ExtensionStatus.PASS: "通过（PASS）", ExtensionStatus.FAIL: "失败（FAIL）"}.get(
+            outcome.status,
+            "受阻（BLOCKED）",
+        )
+        if outcome.status == ExtensionStatus.PASS and not check.passed:
+            label = "受阻（BLOCKED）"
+        self.console.print(f"完成前验证：{label}")
+        self.console.print(check.detail.replace(str(Path.cwd()), "项目")[:220], markup=False)
+        if outcome.summary is not None:
+            counts = outcome.summary
+            self.console.print(
+                f"测试：{counts.tests}；实际执行：{counts.executed}；跳过：{counts.skipped}；"
+                f"失败：{counts.failures}；错误：{counts.errors}。"
+            )
+        result = outcome.result
+        if result is not None:
+            cleanup = "已确认" if result.process_tree_clean else "未确认"
+            if not result.commands and result.process_tree_clean:
+                cleanup = "未启动测试，无需清理"
+            changed = {True: "是", False: "否", None: "未确认"}[outcome.candidate_changed]
+            self.console.print(f"耗时：{result.duration_ms / 1000:.2f} 秒；进程清理：{cleanup}。")
+            self.console.print(f"代码在验证期间变化：{changed}；Super Dev 未推进项目阶段。")
+        if check.passed:
+            self.console.print("影响：仅本次验证通过，不等于项目完成；仍需满足其他发布条件。")
+        else:
+            self.console.print("影响：当前不能判定发布就绪。")
+        if outcome.advisories:
+            self.console.print("提醒：意外通过可能表示预期失败标记已过期，请复核该标记。")
+        self.console.print(f"下一步：{check.recommendation}", markup=False)
+        self.console.print(
+            "证据：已保存，可用 --verbose 或 --json 展开（再次调用会重新验证）。"
+            if outcome.result_path
+            else "证据：结果未落盘，不能作为完整发布证据。"
+        )
+
     @staticmethod
     def _completion_verification_check(outcome: ProbeOutcome) -> ReleaseReadinessCheck:
         summary = outcome.summary
@@ -38,6 +87,10 @@ class CliReleaseQualityMixin:
             "result_path": str(outcome.result_path or ""),
             "pytest_summary": summary.to_dict() if summary is not None else None,
             "advisories": [item.to_dict() for item in outcome.advisories],
+            "plan": outcome.plan.to_dict() if outcome.plan is not None else None,
+            "candidate_changed": outcome.candidate_changed,
+            "duration_ms": outcome.result.duration_ms if outcome.result else None,
+            "process_tree_clean": outcome.result.process_tree_clean if outcome.result else None,
         }
         if outcome.status == ExtensionStatus.PASS:
             recommendation = (
@@ -102,11 +155,20 @@ class CliReleaseQualityMixin:
             return 1
 
         project_dir = Path.cwd()
-        extension_service = ExtensionService(project_dir)
+        extension_service = None
         try:
+            extension_service = ExtensionService(project_dir)
             verification_outcome = extension_service.run_fresh_verification(
                 stage="delivery",
                 actor="cli",
+                on_start=(
+                    None
+                    if args.json
+                    else lambda plan: self._verification_start(
+                        plan,
+                        verbose=bool(getattr(args, "verbose", False)),
+                    )
+                ),
             )
         except (OSError, RuntimeError, ValueError) as exc:
             verification_outcome = ProbeOutcome(
@@ -130,6 +192,8 @@ class CliReleaseQualityMixin:
                 checks=[item for item in report.checks if item is not verification_check],
             )
             try:
+                if extension_service is None:
+                    raise ValueError("扩展证据目录无法安全初始化")
                 metric_path = extension_service.record_verification_metric(
                     verification_outcome,
                     legacy_would_pass=legacy_report.passed,
@@ -137,6 +201,7 @@ class CliReleaseQualityMixin:
             except (OSError, ValueError) as exc:
                 verification_check.passed = False
                 verification_check.detail += f" 指标证据写入失败：{exc}"
+                verification_check.evidence["status"] = "BLOCKED"
             else:
                 if metric_path is not None:
                     verification_check.evidence["metric_path"] = str(metric_path)
@@ -146,22 +211,25 @@ class CliReleaseQualityMixin:
         payload["json_file"] = str(files["json"])
 
         if args.json:
-            self.console.print(json.dumps(payload, ensure_ascii=False, indent=2))
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0 if report.passed else 1
 
         status = "[green]通过（PASS）[/green]" if report.passed else "[red]失败（FAIL）[/red]"
         self.console.print(f"[cyan]发布就绪度[/cyan] {status} 分数: {report.score}/100")
         if verification_check is not None:
-            verification_status = {
-                ExtensionStatus.PASS: "[green]通过（PASS）[/green]",
-                ExtensionStatus.FAIL: "[red]失败（FAIL）[/red]",
-                ExtensionStatus.BLOCKED: "[yellow]受阻（BLOCKED）[/yellow]",
-            }.get(verification_outcome.status, "[yellow]受阻（BLOCKED）[/yellow]")
-            self.console.print(f"  [cyan]完成前验证[/cyan]：{verification_status}")
-            self.console.print(f"    {verification_check.detail}")
-            result_path = verification_check.evidence.get("result_path")
-            if result_path:
-                self.console.print(f"    证据：{result_path}")
+            self._verification_summary(verification_outcome, verification_check)
+            if not getattr(args, "verbose", False):
+                remaining = [
+                    item.name for item in report.failed_checks if item is not verification_check
+                ]
+                if remaining:
+                    self.console.print(
+                        f"其他待收尾项（{len(remaining)}）：" + "、".join(remaining[:4])
+                    )
+                return 0 if report.passed else 1
+            self.console.print(
+                json.dumps(verification_check.evidence, ensure_ascii=False, indent=2), markup=False
+            )
         self.console.print(f"  [green]✓[/green] Markdown: {files['markdown']}")
         self.console.print(f"  [green]✓[/green] JSON: {files['json']}")
 

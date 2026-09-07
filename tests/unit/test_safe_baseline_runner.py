@@ -18,6 +18,7 @@ def test_modes_are_fixed_and_have_chinese_labels():
         "windows-focused",
         "unit",
         "repeatability",
+        "core-verification",
     }
     assert set(MODE_LABELS) == set(MODE_SELECTORS)
     assert MODE_LABELS["user-surfaces"] == "用户目录检查"
@@ -29,6 +30,15 @@ def test_modes_are_fixed_and_have_chinese_labels():
     assert MODE_EXECUTION_PLAN["repeatability"][-2:] == (
         "repeatability",
         "repeatability",
+    )
+    assert MODE_SELECTORS["core-verification"] == (
+        "tests/extensions",
+        "tests/unit/test_fork_update.py",
+    )
+    assert MODE_EXECUTION_PLAN["core-verification"] == (
+        "isolation-smoke",
+        "user-surfaces",
+        "core-verification",
     )
 
 

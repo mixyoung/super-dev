@@ -28,7 +28,7 @@ Current version: `2.5.0` (mixyoung/super-dev fork release)
 
 The homepage installation story is now intentionally uv-first:
 
-This fork is released on GitHub only, not PyPI. Use the tagged command below to install or upgrade this fork. `super-dev update` retains its existing update-source behavior and is not a guarantee of receiving this fork's latest release.
+This fork is released on GitHub only, not PyPI. Published 2.5.0 still has the old updater; the first transition requires installing a version containing the new updater. Current development code unifies startup hints, `update --check`, and `update` on this fork's stable GitHub Releases. Existing, unmodified project text is refreshed by default; user-level refresh requires explicit `--include-user`. See [update boundaries and recovery](docs/FORK_UPDATES.md). These development changes are not a new published release.
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
