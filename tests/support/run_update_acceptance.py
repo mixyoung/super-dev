@@ -20,6 +20,7 @@ import zipfile
 from pathlib import Path
 
 from super_dev import __version__
+from super_dev.terminal import initialize_terminal_output
 from super_dev.user_directories import UserDirectoryContext
 from tests.support.user_surface_snapshot import (
     capture_user_surfaces,
@@ -101,6 +102,7 @@ def _old_fixture(wheel: Path, directory: Path) -> Path:
 
 
 def main() -> int:
+    initialize_terminal_output()
     parser = argparse.ArgumentParser()
     parser.add_argument("--wheel-dir", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)

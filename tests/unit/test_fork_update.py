@@ -331,6 +331,15 @@ def test_user_skill_requires_explicit_scope(tmp_path):
     assert any(item["path"] == str(user_path) for item in opted_in["entries"])
 
 
+@pytest.mark.parametrize("location", ["home", "parent", "surface"])
+def test_working_directory_does_not_reclassify_user_skills_as_project(location):
+    home = Path.home()
+    user_path = _skill(home)
+    directory = {"home": home, "parent": home.parent, "surface": home / ".agents"}[location]
+    snapshot = snapshot_hosts(directory, include_user=False)
+    assert all(item["path"] != str(user_path) for item in snapshot["entries"])
+
+
 @pytest.mark.parametrize(
     "command,expected",
     [

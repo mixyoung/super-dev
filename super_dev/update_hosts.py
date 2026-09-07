@@ -31,13 +31,20 @@ def _surfaces(
     manager = IntegrationManager(project_dir=project)
     surfaces = {}
     for host in manager.TARGETS:
-        paths = manager.collect_managed_surface_paths(host, include_user_surfaces=include_user)
+        paths = manager.collect_managed_surface_paths(host, include_user_surfaces=True)
+        # Scope comes from the host declaration, not cwd containment. A user can
+        # run update from HOME or a user configuration directory.
+        user_paths = {
+            path.absolute()
+            for key, path in paths.items()
+            if key.startswith(("skill:", "global-", "compatibility-protocol:"))
+        }
         for skill in ("super-dev", "super-dev-seeai"):
             for path in manager.expected_skill_paths(host, skill, project_dir=project):
                 paths[f"skill:{path}"] = path
         for key, path in paths.items():
             path = path.absolute()
-            if not include_user and not path.is_relative_to(project):
+            if not include_user and (path in user_paths or not path.is_relative_to(project)):
                 continue
             if not path.is_file():
                 continue  # update never introduces a new integration surface
