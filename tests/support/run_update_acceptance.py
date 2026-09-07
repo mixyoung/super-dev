@@ -30,11 +30,14 @@ from tests.support.user_surface_snapshot import (
 
 DRIVER = r"""
 import hashlib, json, os, sys
+if sys.platform == "win32":
+    # Reproduce an English Windows pipe even on a Chinese developer machine.
+    sys.stdout.reconfigure(encoding="cp1252")
+    sys.stderr.reconfigure(encoding="cp1252")
 from pathlib import Path
-from types import SimpleNamespace
-from rich.console import Console
 from super_dev import __version__
 from super_dev import release_channel, update_runtime
+from super_dev.cli import SuperDevCLI
 from super_dev.skills.skill_template import SkillTemplate
 assert __version__ == "0.0.1", __version__
 wheel, project, target_version = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
@@ -58,7 +61,7 @@ def transport(url, **kwargs):
     assert url.endswith(wheel.name)
     return data
 release_channel._get = transport
-code = update_runtime.run_update(SimpleNamespace(check=False, method="pip", include_user=False), Console())
+code = SuperDevCLI().run(["update", "--method", "pip"])
 assert code == 0, code
 assert update_runtime.__version__ == "0.0.1"  # old process really remains loaded
 assert skill.read_bytes() != original
