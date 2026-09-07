@@ -167,12 +167,15 @@ def test_batch_appends_ten_records_with_one_batch_and_candidate(
     assert result.summary.timing_comparable_replays == 4
     assert result.summary.replay_candidate_matches_current is True
     assert result.summary.recommend_stage_2b is False
+    assert result.summary.benefit_criteria_met is False
     assert result.completion_report_path == result.evidence_root / "completion-report.md"
     assert result.completion_report_path.is_file()
     completion_report = result.completion_report_path.read_text(encoding="utf-8")
     assert "`controlled-complete-batch`" in completion_report
     assert "本批次共有 10 个场景" in completion_report
-    assert "阶段 2B 推荐（`recommend_stage_2b`）：`false`" in completion_report
+    assert "试点收益条件满足（`benefit_criteria_met`）：`false`" in completion_report
+    assert "程序化排错需求已撤回" in completion_report
+    assert "阶段 2B 推荐" not in completion_report
     for artifact_name in replay_runner.REQUIRED_BATCH_EVIDENCE_FILES:
         assert (result.evidence_root / artifact_name).is_file()
     for scenario_id in replay_runner.EXPECTED_SCENARIO_IDS:

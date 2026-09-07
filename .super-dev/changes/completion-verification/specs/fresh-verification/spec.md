@@ -104,14 +104,18 @@
 #### Scenario: 批次不完整或身份混杂
 - GIVEN 场景缺失、重复、批次或版本混杂
 - WHEN 汇总
-- THEN 不建议阶段 2B
+- THEN 不确认试点收益条件满足
 
-### Requirement: 阶段 2B 不自动推进（`recommend_stage_2b`）
-阶段 2B 建议必须（`SHALL`）保持 `false`，除非全部阈值和用户标签满足；即使满足也只建议，不得自动推进九阶段或接入系统化排错。
+### Requirement: 试点收益观察不派生功能需求（`benefit_criteria_met`、`recommend_stage_2b`）
+2026-09-07 用户条件授权撤回程序化排错需求。系统必须（`SHALL`）保留原收益公式、阈值及人工标签，以 `benefit_criteria_met` 记录观察结果；历史兼容字段 `recommend_stage_2b` 必须（`MUST`）恒为 `false`。任何收益结果均不得自动推进九阶段、创建排错需求或代替项目发布门禁。
 #### Scenario: 时间指标未达线
 - GIVEN 新流程成对正确验收时间中位数不优于旧流程
 - WHEN 生成汇总
-- THEN `recommend_stage_2b=false` 且保持阶段 2
+- THEN `benefit_criteria_met=false`，不把撤回需求当作收益达标
+#### Scenario: 历史收益条件全部满足
+- GIVEN 完整同版本回放、用户标签和全部原阈值满足
+- WHEN 生成汇总
+- THEN `benefit_criteria_met=true` 但 `recommend_stage_2b=false`，不产生程序化排错需求
 
 ### Requirement: 安全权限与中文首屏（`ReleaseReadinessCheck`、`_completion_verification_check`）
 方法必须（`MUST`）拒绝生命周期、编排、生产写入、Git、PR、部署、外部写入和全局安装；首屏必须（`SHALL`）用自然中文显示状态、影响、下一步和证据路径。

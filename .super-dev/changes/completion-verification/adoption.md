@@ -37,8 +37,21 @@
 - README_EN.md
 - docs/INSTALL_OPTIONS.md
 - tests/support/run_update_acceptance.py
+- docs/SUPER_DEV_EXTENSION_PLATFORM_PLAN.md
+- .super-dev/changes/completion-verification/specs/fresh-verification/spec.md
+- super_dev/extensions/verification_metrics.py
+- tests/support/run_verification_replays.py
+- tests/extensions/test_verification_metrics.py
+- tests/extensions/test_verification_replay_runner.py
+- tests/extensions/test_fresh_verification_service.py
+- output/completion-verification-research.md
+- output/completion-verification-prd.md
+- output/completion-verification-architecture.md
+- output/completion-verification-uiux.md
 
 ## 验证与未验证
+
+2026-09-07 撤回程序化排错需求的定向验证：先以新合同观察到 10 项缺少中性收益字段的失败，再实现兼容调整。指标与回放执行器 26 项测试、服务指标落盘 1 项测试通过；Ruff、5 文件格式检查、指标模块类型检查、贡献规则与 Skill 同步检查通过。AST 比较确认原收益公式完全相同。未重跑整仓 CI、未修改历史回放/人工裁决；本次撤回暂为当前分支本地改动，未提交、推送、合并或发布。
 
 开始时工作树干净，版本 2.5.0。先跑新增验收用例复现缺口（清单、阶段回执和提示/展开/JSON 输出失败），再实现修复。初次 Windows 3.13 安全基线为隔离自检 13 通过/1 跳过、用户目录 240 通过/2 跳过、核心扩展 151 通过/2 平台跳过，真实用户目录变化为 0。后续最终复跑结果另行追加。
 
@@ -51,6 +64,10 @@
 原 3 项 CLI 更新集成断言按获批来源变更从 PyPI/旧 migrate 调用改为 fork 来源、方式/用户范围转发及非零退出；没有更改 10 场景答案、计时、真实候选标签或 2B 阈值。误用宽泛 -k update 曾带入无关的 detect_save_profile 集成测试，在本机因没有就绪宿主失败，未顺手修改；精确选择的更新 28 项检查通过。全量类型旧债仍存在；22 个必过入口类型检查通过，新改 5 个模块单独类型检查通过。Linux/其他 Windows 版本需要实际 CI，尚不能宣称已验证。
 
 ## 决定与回退
+
+2026-09-07 交付授权更新：用户随后明确要求“提交推送 合并”。本次撤回随 PR #8 提交、推送，并在新提交全部适用 CI 通过后合并 main；不发布新版。此前“本地改动/不自动合并”是先前轮次边界，不代表本次仍缺少合并授权。
+
+2026-09-07 用户要求“有必要做这个功能吗？如果没有就删除这个需求”。按现有宿主、系统化调试手册和 RCA/Skill 覆盖判断，无独立程序缺口证据，撤回程序化排错（原 2B）需求，不是等待晋级。路线第 1.5 节为权威决定，四文档、Spec 和当前收尾计划同步对齐；历史任务、回放、人工标签、原数值阈值及发布门禁不改写。指标用 benefit_criteria_met 保留同一公式；recommend_stage_2b 保留兼容且新汇总恒为 false，防止继续提示已撤回功能。测试保留原所有数值/身份保护，并补“收益条件满足也不推荐 2B”反例。需要恢复时必须另有实际缺口与用户批准，而不是按阶段编号推进。
 
 发布检查原先只认 `uv tool install super-dev` 字面值，与已发布 fork 的锁定标签安装说明冲突。本批对齐为兼容原写法并准确接受固定仓库的版本标签命令；补充不同来源/未锁定版本/缺安装入口拒绝测试，不移除检查或降低门槛。整份发布报告仍因测试超时和旧合规证据失效而不能作为通过声明。
 

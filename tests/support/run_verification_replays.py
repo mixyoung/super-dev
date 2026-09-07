@@ -935,9 +935,10 @@ def _render_completion_report(
             f"`{_format_report_value(summary.replay_candidate_matches_current)}`。"
         ),
         (
-            "- 阶段 2B 推荐（`recommend_stage_2b`）："
-            f"`{_format_report_value(summary.recommend_stage_2b)}`。"
+            "- 试点收益条件满足（`benefit_criteria_met`）："
+            f"`{_format_report_value(summary.benefit_criteria_met)}`。"
         ),
+        "- 程序化排错需求已撤回；收益观察不派生新功能，也不代替发布门禁。",
         "",
         "## 证据文件合同",
         "",
@@ -1196,8 +1197,9 @@ def main() -> int:
     print(
         "代码版本一致："
         f"{'是' if summary.replay_candidate_matches_current else '否'}；"
-        f"阶段 2B 推荐：{'是' if summary.recommend_stage_2b else '否'}。"
+        f"试点收益条件满足：{'是' if summary.benefit_criteria_met else '否'}。"
     )
+    print("程序化排错需求已撤回；继续观察现有验证，不产生下一阶段开发建议。")
     print(f"证据根：{result.evidence_root.resolve()}")
     print(f"完成报告：{result.completion_report_path.resolve()}")
     return 0

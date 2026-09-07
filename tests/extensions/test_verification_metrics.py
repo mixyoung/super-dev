@@ -137,6 +137,7 @@ def test_unreviewed_and_non_user_labels_are_excluded(tmp_path: Path) -> None:
     assert summary.total_runs == 1
     assert summary.adjudicated_runs == 0
     assert summary.unreviewed_runs == 1
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
     assert any("非用户" in item for item in summary.warnings)
 
@@ -270,6 +271,7 @@ def test_contract_definitions_do_not_count_as_executed_replays(tmp_path: Path) -
 
     assert summary.replay_scenarios_defined == 10
     assert summary.replay_scenarios == 0
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
     assert any("缺失 10 条实测回放记录" in item for item in summary.warnings)
 
@@ -292,6 +294,7 @@ def test_unknown_replay_id_is_ignored_when_contract_is_provided(tmp_path: Path) 
     assert summary.replay_scenarios_defined == 10
     assert summary.replay_scenarios == 1
     assert any("合同外回放场景已忽略" in item for item in summary.warnings)
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
 
 
@@ -332,6 +335,7 @@ def test_contract_counts_only_complete_valid_replays(tmp_path: Path) -> None:
     assert summary.safety_regressions == 0
     assert summary.legacy_time_to_accepted_median_ms == 100.0
     assert summary.verification_time_to_accepted_median_ms == 90.0
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
     assert sum("不完整或非法" in item for item in summary.warnings) == 9
 
@@ -356,6 +360,7 @@ def test_contract_rejects_missing_or_wrong_measurement_scope(tmp_path: Path) -> 
         )
 
         assert summary.replay_scenarios == 0
+        assert summary.benefit_criteria_met is False
         assert summary.recommend_stage_2b is False
         assert any("measurement_scope" in item for item in summary.warnings)
 
@@ -403,6 +408,7 @@ def test_invalid_or_duplicate_contract_does_not_fabricate_completion(tmp_path: P
 
         assert summary.replay_scenarios_defined == 0
         assert summary.replay_scenarios == 0
+        assert summary.benefit_criteria_met is False
         assert summary.recommend_stage_2b is False
         assert any("回放合同损坏" in item for item in summary.warnings)
 
@@ -429,6 +435,7 @@ def test_without_contract_keeps_legacy_replay_metrics_but_cannot_recommend(
     assert summary.replay_scenarios == 1
     assert summary.legacy_time_to_accepted_median_ms == 100.0
     assert summary.verification_time_to_accepted_median_ms == 90.0
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
 
 
@@ -555,6 +562,7 @@ def test_mixed_replay_batch_or_candidate_rejects_recommendation(tmp_path: Path) 
         )
 
         assert summary.replay_scenarios == 10
+        assert summary.benefit_criteria_met is False
         assert summary.recommend_stage_2b is False
         assert any(warning_text in item for item in summary.warnings)
 
@@ -579,11 +587,12 @@ def test_current_candidate_mismatch_rejects_recommendation(tmp_path: Path) -> No
     )
 
     assert summary.replay_candidate_matches_current is False
+    assert summary.benefit_criteria_met is False
     assert summary.recommend_stage_2b is False
     assert any("与当前代码版本不一致" in item for item in summary.warnings)
 
 
-def test_stage_2b_is_only_recommended_after_all_thresholds(tmp_path: Path) -> None:
+def test_benefit_keeps_all_thresholds_without_recommending_retired_feature(tmp_path: Path) -> None:
     path = tmp_path / "metrics.jsonl"
     contract_path = tmp_path / "replay-scenarios.yaml"
     scenario_ids = [f"scenario-{index}" for index in range(10)]
@@ -641,4 +650,7 @@ def test_stage_2b_is_only_recommended_after_all_thresholds(tmp_path: Path) -> No
     assert summary.replay_run_id == "replay-batch-1"
     assert summary.replay_candidate_digest == "candidate-a"
     assert summary.replay_candidate_matches_current is True
-    assert summary.recommend_stage_2b is True
+    assert summary.benefit_criteria_met is True
+    assert summary.recommend_stage_2b is False
+    assert summary.to_dict()["benefit_criteria_met"] is True
+    assert summary.to_dict()["recommend_stage_2b"] is False

@@ -57,8 +57,9 @@ class VerificationMetricsSummary:
     correction_loops: int
     candidate_changed_during_run: int
     safety_regressions: int
-    recommend_stage_2b: bool
+    recommend_stage_2b: bool  # Retired compatibility field; new summaries never recommend 2B.
     warnings: tuple[str, ...]
+    benefit_criteria_met: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -394,9 +395,9 @@ def summarize_verification_metrics(
         next(iter(replay_candidate_digests)) if len(replay_candidate_digests) == 1 else None
     )
     if contract_path is not None and len(replay_run_ids) > 1:
-        warnings.append("回放实测记录混用了多个 replay_run_id，阶段 2B 推荐已拒绝")
+        warnings.append("回放实测记录混用了多个 replay_run_id，试点收益判断已拒绝")
     if contract_path is not None and len(replay_candidate_digests) > 1:
-        warnings.append("回放实测记录混用了多个 candidate_digest，阶段 2B 推荐已拒绝")
+        warnings.append("回放实测记录混用了多个 candidate_digest，试点收益判断已拒绝")
     normalized_current_digest = (
         current_candidate_digest.strip()
         if isinstance(current_candidate_digest, str) and current_candidate_digest.strip()
@@ -408,14 +409,14 @@ def summarize_verification_metrics(
         and replay_candidate_digest == normalized_current_digest
     )
     if contract_path is not None and replays and normalized_current_digest is None:
-        warnings.append("未提供当前代码版本摘要，阶段 2B 推荐已拒绝")
+        warnings.append("未提供当前代码版本摘要，试点收益判断已拒绝")
     elif (
         contract_path is not None
         and replay_candidate_digest is not None
         and normalized_current_digest is not None
         and not replay_candidate_matches_current
     ):
-        warnings.append("回放代码版本摘要与当前代码版本不一致，阶段 2B 推荐已拒绝")
+        warnings.append("回放代码版本摘要与当前代码版本不一致，试点收益判断已拒绝")
     verification_duration_median = _median(
         [
             float(record["verification_duration_ms"])
@@ -443,7 +444,8 @@ def summarize_verification_metrics(
         and len(contract_scenario_ids) >= 10
         and set(replays) == set(contract_scenario_ids)
     )
-    recommend = (
+    # Preserve the original benefit test, not the withdrawn feature proposal.
+    benefit_criteria_met = (
         replay_contract_complete
         and replay_run_id is not None
         and replay_candidate_digest is not None
@@ -483,6 +485,7 @@ def summarize_verification_metrics(
         correction_loops=correction_loops,
         candidate_changed_during_run=candidate_changed,
         safety_regressions=safety_regressions,
-        recommend_stage_2b=recommend,
+        recommend_stage_2b=False,
         warnings=tuple(warnings),
+        benefit_criteria_met=benefit_criteria_met,
     )

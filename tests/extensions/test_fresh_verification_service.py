@@ -337,6 +337,7 @@ def test_service_records_unreviewed_metric_without_self_adjudication(
     assert summary["replay_scenarios"] == 0
     assert any("缺失 10 条实测回放记录" in item for item in summary["warnings"])
     assert summary["recommend_stage_2b"] is False
+    assert summary["benefit_criteria_met"] is False
 
 
 def test_service_stops_temp_projects_from_inheriting_parent_git(tmp_path: Path) -> None:
