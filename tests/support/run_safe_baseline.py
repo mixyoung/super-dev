@@ -54,6 +54,7 @@ MODE_SELECTORS: dict[str, tuple[str, ...]] = {
         "tests/unit/test_integration_manager.py",
     ),
     "unit": ("tests/unit",),
+    "core-verification": ("tests/extensions", "tests/unit/test_fork_update.py"),
     "repeatability": ("tests/unit",),
 }
 
@@ -62,6 +63,7 @@ MODE_LABELS = {
     "user-surfaces": "用户目录检查",
     "windows-focused": "Windows 定向检查",
     "unit": "完整单元检查",
+    "core-verification": "完成前验证与更新核心检查",
     "repeatability": "重复性检查",
 }
 
@@ -70,6 +72,7 @@ MODE_EXECUTION_PLAN: dict[str, tuple[str, ...]] = {
     "user-surfaces": ("isolation-smoke", "user-surfaces"),
     "windows-focused": ("isolation-smoke", "user-surfaces", "windows-focused"),
     "unit": ("isolation-smoke", "user-surfaces", "unit"),
+    "core-verification": ("isolation-smoke", "user-surfaces", "core-verification"),
     "repeatability": (
         "isolation-smoke",
         "user-surfaces",

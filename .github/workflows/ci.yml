@@ -8,6 +8,43 @@ on:
     branches: [main, develop]
 
 jobs:
+  core-verification:
+    name: Core verification (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, python-version: '3.10'}
+          - {os: windows-latest, python-version: '3.11'}
+          - {os: windows-latest, python-version: '3.12'}
+          - {os: windows-latest, python-version: '3.13'}
+          - {os: ubuntu-latest, python-version: '3.13'}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - name: Verify core contract with real user surface snapshots
+        run: >-
+          python -m tests.support.run_safe_baseline core-verification
+          --output-dir artifacts/core-verification
+          --timeout-seconds 1200 --fail-on-test-failure
+      - name: Build current wheel for isolated upgrade acceptance
+        run: python -m build --wheel --outdir artifacts/update-wheel
+      - name: Verify old-process to new-install handoff without global writes
+        run: >-
+          python -m tests.support.run_update_acceptance
+          --wheel-dir artifacts/update-wheel
+          --output-dir artifacts/core-verification/isolated-update
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: core-${{ matrix.os }}-${{ matrix.python-version }}
+          path: artifacts/core-verification
+          if-no-files-found: error
+
   contribution-policy:
     name: Contribution policy (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

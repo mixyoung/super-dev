@@ -575,13 +575,18 @@ class CliParserMixin:
         update_parser = subparsers.add_parser(
             "update",
             help="升级到最新版本",
-            description="检查 PyPI 最新版本并使用 pip 或 uv 升级当前 super-dev",
+            description="检查本 fork GitHub 稳定发布并升级当前隔离安装，不回退原版 PyPI",
         )
         update_parser.add_argument(
             "--check", action="store_true", help="只检查最新版本，不执行升级"
         )
         update_parser.add_argument(
             "--method", choices=["auto", "pip", "uv"], default="auto", help="升级方式（默认: auto）"
+        )
+        update_parser.add_argument(
+            "--include-user",
+            action="store_true",
+            help="显式允许刷新已存在且未被修改的用户级 Super Dev 文本；默认仅当前项目",
         )
 
         clean_parser = subparsers.add_parser(
@@ -714,6 +719,12 @@ class CliParserMixin:
         )
         release_readiness_parser.add_argument(
             "--json", action="store_true", help="以 JSON 输出结果"
+        )
+        release_readiness_parser.add_argument(
+            "--verbose",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="展开完成前验证参数、运行编号及证据路径（会重新执行验证）",
         )
         release_proof_pack_parser = release_subparsers.add_parser(
             "proof-pack", help="生成交付证据包摘要"

@@ -3892,74 +3892,24 @@ class TestCLISkillAndIntegrate:
             os.chdir(original_cwd)
 
     def test_update_check_reports_latest_version(self, capsys, monkeypatch):
-        cli = SuperDevCLI()
+        from types import SimpleNamespace
 
-        class DummyResponse:
-            def raise_for_status(self):
-                return None
-
-            def json(self):
-                return {"info": {"version": "2.1.1"}}
-
-        monkeypatch.setattr("super_dev.cli.requests.get", lambda *args, **kwargs: DummyResponse())
-
-        result = cli.run(["update", "--check"])
-        assert result == 0
+        monkeypatch.setattr("super_dev.update_runtime.latest_release",
+                            lambda: SimpleNamespace(version="9.0.0"))
+        assert SuperDevCLI().run(["update", "--check"]) == 0
         output = capsys.readouterr().out
-        assert "当前版本" in output
-        assert "PyPI 最新版本" in output
-        assert "2.1.1" in output
+        assert "本 fork 最新版本" in output
+        assert "mixyoung/super-dev" in output
 
-    def test_update_uses_uv_when_requested(self, capsys, monkeypatch):
-        cli = SuperDevCLI()
-        calls: list[list[str]] = []
-
-        class DummyResponse:
-            def raise_for_status(self):
-                return None
-
-            def json(self):
-                return {"info": {"version": "2.1.1"}}
-
-        monkeypatch.setattr("super_dev.cli.requests.get", lambda *args, **kwargs: DummyResponse())
-
-        def fake_run(command, check=False):
-            calls.append(command)
-            return SimpleNamespace(returncode=0)
-
-        monkeypatch.setattr("super_dev.cli.subprocess.run", fake_run)
-
-        result = cli.run(["update", "--method", "uv"])
-        assert result == 0
-        assert calls[0] == ["uv", "tool", "upgrade", "super-dev"]
-        assert calls[1] == ["super-dev", "migrate"]
-        output = capsys.readouterr().out
-        assert "升级方式" in output
-        assert "uv" in output
-
-    def test_update_uses_pip_when_requested(self, capsys, monkeypatch):
-        cli = SuperDevCLI()
-        calls: list[list[str]] = []
-
-        class DummyResponse:
-            def raise_for_status(self):
-                return None
-
-            def json(self):
-                return {"info": {"version": "2.1.1"}}
-
-        monkeypatch.setattr("super_dev.cli.requests.get", lambda *args, **kwargs: DummyResponse())
-
-        def fake_run(command, check=False):
-            calls.append(command)
-            return SimpleNamespace(returncode=0)
-
-        monkeypatch.setattr("super_dev.cli.subprocess.run", fake_run)
-
-        result = cli.run(["update", "--method", "pip"])
-        assert result == 0
-        assert calls[0] == [os.sys.executable, "-m", "pip", "install", "-U", "super-dev"]
-        assert calls[1] == ["super-dev", "migrate"]
+    @pytest.mark.parametrize("method", ["pip", "uv"])
+    def test_update_forwards_method_and_explicit_user_scope(self, monkeypatch, method):
+        calls = []
+        def update(args, console):
+            calls.append((args.method, args.include_user, args.check))
+            return 2  # partial failure must reach the CLI exit code
+        monkeypatch.setattr("super_dev.update_runtime.run_update", update)
+        assert SuperDevCLI().run(["update", "--method", method, "--include-user"]) == 2
+        assert calls == [(method, True, False)]
 
     def test_setup_host_runs_onboard_and_doctor(self, temp_project_dir: Path, monkeypatch):
         fake_home = temp_project_dir / "fake-home"

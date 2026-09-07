@@ -30,7 +30,7 @@
 
 首页安装口径默认使用 uv：
 
-本分支只在 GitHub 发布，未上传 PyPI。安装/升级到本分支的确定版本使用下方标签命令；`super-dev update` 保留原更新来源逻辑，不作为获取本分支新版的保证。
+本分支只在 GitHub 发布，未上传 PyPI。已发布的 2.5.0 仍使用旧更新来源，首次过渡须安装包含新更新器的版本；当前开发代码已将启动提示、`update --check` 与 `update` 统一到本 fork 的 GitHub 正式 Release。默认仅刷新当前项目中未被修改的既有宿主文本，用户级刷新须显式 `--include-user`。详见[更新边界与恢复](docs/FORK_UPDATES.md)；本段不表示新版已经发布。
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
@@ -111,7 +111,7 @@ uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2
 # 进入宿主接入引导
 super-dev
 
-# 更新到最新版，并迁移已接入宿主
+# 安装包含新更新器的版本后：更新本 fork，默认仅刷新当前项目
 super-dev update
 
 # 清理已注入的宿主接入面
@@ -678,7 +678,7 @@ Codex CLI: $super-dev
 3. 如果当前已经在自然语言上下文里继续流程，也可以直接输入 `super-dev: 你的需求`。
 4. 默认基础接入面是项目根 `AGENTS.md` 与项目级 `.agents/skills/super-dev/SKILL.md`；官方用户级 Skill `~/.agents/skills/super-dev/SKILL.md` 仍会安装，`CODEX_HOME/AGENTS.md`（默认 `~/.codex/AGENTS.md`）改为显式 `--with-user-surfaces` 时才写入。
 5. 同时会额外生成可选的 repo plugin 增强层：`.agents/plugins/marketplace.json` + `plugins/super-dev-codex/.codex-plugin/plugin.json`，让 Codex App/Desktop 在 AGENTS + Skills 之外还能看到更完整的本地 plugin 面。
-6. 历史安装会在升级时自动迁移到统一的 `super-dev` 命名。
+6. 更新器保留旧别名和用户改动；需要迁移命名时单独复核，不在更新中自动清理。
 7. 如果旧会话没加载新 Skill，重启 `codex` 再试。
 8. 无论使用 `/super-dev`、`$super-dev` 还是 `super-dev:`，都必须进入同一条 Super Dev 流程；长流程里继续修改、补充、确认或恢复时，优先沿用当前入口面。
 

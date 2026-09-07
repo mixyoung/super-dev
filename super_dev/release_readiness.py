@@ -755,12 +755,22 @@ class ReleaseReadinessEvaluator:
             pyproject.read_text(encoding="utf-8", errors="ignore") if pyproject.exists() else ""
         )
 
+        def documented_uv_install(content: str) -> bool:
+            return "uv tool install super-dev" in content or bool(
+                re.search(
+                    r'^uv tool install --force --from "git\+https://github\.com/'
+                    r'mixyoung/super-dev\.git@v\d+\.\d+\.\d+" super-dev$',
+                    content,
+                    re.MULTILINE,
+                )
+            )
+
         checks = [
             install_script.exists(),
             "[project.scripts]" in pyproject_text,
             "super-dev = " in pyproject_text,
-            "uv tool install super-dev" in text,
-            "uv tool install super-dev" in install_options_text,
+            documented_uv_install(text),
+            documented_uv_install(install_options_text),
             "super-dev update" in text,
         ]
         passed = all(checks)
