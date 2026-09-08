@@ -28,6 +28,7 @@
 
 ## 改动范围
 
+- tests/integration/test_web_api.py
 - .gitignore
 - super-dev.yaml
 - super_dev/extensions/evidence.py
@@ -90,6 +91,10 @@
 - output/completion-verification-uiux.md
 
 ## 验证与未验证
+
+PR #9 首轮 CI（34189308042）：Linux 三个 Python 版本均在两个发布就绪集成样例失败，原样例依赖旧固定目录且没有当前变更声明。仅为这两个样例显式指定原有的发布整理变更，名称与隔离样例目录及输出前缀保持一致，避免随机临时目录中的下划线影响名称规范化，不引入新的业务需求；保留 passed、score >= 90、接口只读等原断言，并增加当前变更检查通过断言。不改生产代码、评分线或原测试保护范围；本地复跑及新提交 CI 另行核验。
+
+上述两个集成样例及“无当前变更时不得猜旧目录”的反例，本地 3 项复跑通过；差异和贡献范围检查通过。测试文件的两项旧导入 lint 提示已在 dd82f2f 基线复核存在，本次未顺带修改；生产 lint 首轮 CI 通过。随后以新提交重跑全部 PR CI。
 
 缓存误判修复后的最终关联回归：57 通过、1 平台跳过（output/minimal-rule-fixes/verification-diagnostics-regression-final.xml）；Git/无 Git 精确缓存排除与原证据回归 13 通过、1 跳过。4 文件格式、生产 Ruff、2 核心模块类型检查、22 入口类型门禁、贡献范围、Skill 同步、最终 wheel 构建和 twine check 通过。质量扫描期间的真实文件清单观察保存在 output/minimal-rule-fixes/untracked-cache-observations.json；不再把旧 f8d 运行的具体文件名说成已留存，它没有逐文件附件。完整计划和最终报告在此记录冻结后串行运行，不再编辑生产代码或本记录。
 

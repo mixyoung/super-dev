@@ -5714,10 +5714,15 @@ class TestCLIRunControl:
             os.chdir(original_cwd)
 
     def test_release_readiness_command_json_output(self, temp_project_dir: Path):
+        temp_project_dir = temp_project_dir / "release-hardening-finalization"
+        temp_project_dir.mkdir()
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
             _prepare_release_ready_project(temp_project_dir)
+            save_workflow_state(
+                temp_project_dir, {"active_change_id": "release-hardening-finalization"}
+            )
             cli = SuperDevCLI()
             result = cli.run(["release", "readiness", "--json"])
 
@@ -5732,6 +5737,7 @@ class TestCLIRunControl:
                 {"Host Coverage Depth", "Expert Stage Governance"}
             )
             checks = {check["name"]: check for check in payload["checks"]}
+            assert checks["Release Change Spec"]["passed"] is True
             assert checks["Delivery Closure"]["passed"] is True
             assert any(check["name"] == "Spec Quality" for check in payload["checks"])
         finally:
