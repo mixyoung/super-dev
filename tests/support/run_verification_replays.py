@@ -28,6 +28,7 @@ from super_dev.extensions.verification_metrics import (
     summarize_verification_metrics,
 )
 from super_dev.release_readiness import ReleaseReadinessEvaluator, ReleaseReadinessReport
+from super_dev.review_state import save_workflow_state
 from super_dev.reviewers.quality_gate import quality_evidence_dependency_paths
 from super_dev.user_directories import UserDirectoryContext
 from tests.support.user_surface_snapshot import (
@@ -692,8 +693,10 @@ def _run_scenario(
                 )
                 _mutate_after_prior_run(project_dir, scenario.scenario_id)
 
+            # Bind the fixture before preparing its scoped documents and confirmations.
+            _prepare_spec_quality_change(project_dir, change_id=project_dir.name)
+            save_workflow_state(project_dir, {"active_change_id": project_dir.name})
             _prepare_release_ready_project(project_dir)
-            _prepare_spec_quality_change(project_dir)
             return _compare_final_candidate(
                 scenario,
                 project_dir=project_dir,

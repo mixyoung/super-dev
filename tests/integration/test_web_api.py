@@ -3755,7 +3755,12 @@ class TestWebAPI:
         )
 
     def test_release_readiness_endpoint(self, temp_project_dir: Path):
+        temp_project_dir = temp_project_dir / "release-hardening-finalization"
+        temp_project_dir.mkdir()
         _prepare_release_ready_project(temp_project_dir)
+        save_workflow_state(
+            temp_project_dir, {"active_change_id": "release-hardening-finalization"}
+        )
         client = _make_client()
 
         resp = client.get(
@@ -3766,6 +3771,8 @@ class TestWebAPI:
         payload = resp.json()
         assert payload["passed"] is True
         assert payload["score"] >= 90
+        checks = {check["name"]: check for check in payload["checks"]}
+        assert checks["Release Change Spec"]["passed"] is True
         assert payload["persisted"] is False
         assert payload["report_file"] == ""
         assert payload["json_file"] == ""

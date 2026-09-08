@@ -171,7 +171,8 @@ super-dev-seeai: <goal>
 
 ## 首轮响应契约（强制）
 
-- 首次触发时第一轮回复必须说明：流水线已激活，当前阶段是 `research`。
+- 第一轮说明流水线已激活；new 首次启动时当前阶段是 `research`，evolve/variant/patch 先 baseline。
+- 恢复已有流程时，先读 `.super-dev/SESSION_BRIEF.md` 和已有状态，报告实际阶段并接续未完成动作，不得重置为 research；下列研究与文档顺序仅在对应阶段待完成时执行。
 - 先读取 `.super-dev/WORKFLOW.md` 与 `output/*-bootstrap.md`（若存在）。
 - 说明固定顺序：research -> 三份核心文档 -> 等待确认 -> Spec/tasks -> 前端优先 -> 后端/测试/交付。
 - 三份核心文档完成后暂停等待确认；未经确认不创建 Spec 也不编码。
@@ -237,7 +238,7 @@ super-dev-seeai: <goal>
 
 ## 编码前门禁（Spec 确认后、编码开始前必须执行）
 
-跳过任何一步都会导致大量返工：
+执行与本轮改动相关的准备；仅当本轮涉及 UI 时才要求 UI 工具链、设计 token 与页面骨架，不为纯后端或 CLI 改动新增界面任务：
 
 ### 第 1 步：技术栈预研（最关键）
 - 读取项目依赖文件（package.json / requirements.txt / go.mod 等），找到主要依赖的精确版本号
@@ -249,16 +250,17 @@ super-dev-seeai: <goal>
 - 框架配置文件、tsconfig.json、.env.example
 - 已有代码目录结构
 
-### 第 3 步：声明 UI 工具链
+### 第 3 步：声明 UI 工具链（仅当本轮涉及 UI）
 - 声明并确认图标库（Lucide/Heroicons/Tabler）和组件库已安装
 - 不声明 = 不允许写 UI 代码
 
 ### 第 4 步：确认 API 契约和设计 token
 - 读取 output/*-architecture.md 中的 API 定义
-- 读取 output/*-uiux.md 中的设计 token
+- 仅当本轮涉及 UI 时，读取 output/*-uiux.md 中的设计 token；其他改动核对适用的输入输出与接口契约
 
-### 第 5 步：在宿主里建立页面结构与共享类型并验证构建
-- 按 `output/*-architecture.md` 与 `output/*-uiux.md` 直接在宿主里生成/更新页面结构、组件实现参考与共享类型
+### 第 5 步：验证对应实现入口与构建
+- 仅当本轮涉及 UI 时，按 `output/*-architecture.md` 与 `output/*-uiux.md` 直接在宿主里生成/更新页面结构、组件实现参考与共享类型
+- 后端、CLI 或配置修改验证各自适用的入口与构建，不要求创建页面或安装图标库
 - 运行宿主原生构建命令确认零错误后才开始写业务代码
 
 

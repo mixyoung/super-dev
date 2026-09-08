@@ -64,8 +64,8 @@ class HookHarnessReport:
         lines.extend(
             [
                 f"- Total events: {self.total_events}",
-                f"- Failed: {self.failed_count}",
-                f"- Blocked: {self.blocked_count}",
+                f"- Historical failed: {self.failed_count}",
+                f"- Historical blocked: {self.blocked_count}",
                 "",
                 "## Recent Events",
                 "",
@@ -116,22 +116,25 @@ class HookHarnessBuilder:
         )
         report.failed_count = sum(1 for item in items if not item.success)
         report.blocked_count = sum(1 for item in items if item.blocked)
+        current = HookManager.latest_results(items)
+        unresolved_blocked = sum(1 for item in current if item.blocked)
+        unresolved_failed = sum(1 for item in current if not item.success)
 
-        if report.blocked_count:
+        if unresolved_blocked:
             report.blockers.append(
-                f"最近 {limit} 条 hook 历史中存在 {report.blocked_count} 条阻断事件"
+                f"同一 Hook/事件/阶段/来源的最近结果中仍有 {unresolved_blocked} 条阻断事件"
             )
-        if report.failed_count and not report.blocked_count:
+        if unresolved_failed and not unresolved_blocked:
             report.blockers.append(
-                f"最近 {limit} 条 hook 历史中存在 {report.failed_count} 条失败事件"
+                f"同一 Hook/事件/阶段/来源的最近结果中仍有 {unresolved_failed} 条失败事件"
             )
 
         if report.blockers:
             report.next_actions.append(
-                "检查 .super-dev/hook-history.jsonl 中最近失败/阻断的 hook，修复命令或放宽 blocking 策略后重新执行对应阶段。"
+                "处理最近仍未解除的 Hook 阻断后重试；不自动放宽安全策略，不删除历史记录。"
             )
         else:
-            report.next_actions.append("当前 hook 审计历史干净，可作为发布前辅助证据。")
+            report.next_actions.append("当前 Hook 最近结果已通过，历史失败记录仍保留。")
         return report
 
     def write(self, report: HookHarnessReport) -> dict[str, Path]:

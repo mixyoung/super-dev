@@ -89,6 +89,7 @@ class ReleaseReadinessReport:
     evidence_identity: dict[str, Any] = field(default_factory=dict)
     workflow_context: dict[str, Any] = field(default_factory=dict)
     baseline_governance: dict[str, Any] = field(default_factory=dict)
+    governance_notes: list[str] = field(default_factory=list)
 
     def _weight(self, severity: str) -> int:
         mapping = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -331,6 +332,7 @@ class ReleaseReadinessReport:
             "evidence_identity": dict(self.evidence_identity),
             "workflow_context": dict(self.workflow_context),
             "baseline_governance": dict(self.baseline_governance),
+            "governance_notes": list(self.governance_notes),
         }
 
     def to_markdown(self) -> str:
@@ -387,20 +389,9 @@ class ReleaseReadinessReport:
             )
         lines.append("")
 
-        # 治理就绪度章节
-        governance_checks = [c for c in self.checks if c.name.startswith("Governance:")]
-        if governance_checks:
-            lines.append("## Governance Readiness")
-            lines.append("")
-            gov_passed = sum(1 for c in governance_checks if c.passed)
-            gov_total = len(governance_checks)
-            lines.append(f"- Governance checks: {gov_passed}/{gov_total} passed")
-            lines.append("")
-            lines.append("| Check | Result | Detail |")
-            lines.append("|:---|:---:|:---|")
-            for gc in governance_checks:
-                marker = "PASS" if gc.passed else "FAIL"
-                lines.append(f"| {gc.name} | {marker} | {gc.detail} |")
+        if self.governance_notes:
+            lines.extend(["## 治理资料提示（不计分）", ""])
+            lines.extend(f"- {note}" for note in self.governance_notes)
             lines.append("")
 
         operational_checks = [
@@ -582,8 +573,8 @@ class ReleaseReadinessEvaluator:
                 self._check_operational_harness_trail(),
             ]
         )
-        # 治理能力检查（增量添加，不影响现有逻辑）
-        report.checks.extend(self._check_governance_artifacts())
+        # Directory presence cannot establish correctness or applicability.
+        report.governance_notes = self._governance_artifact_notes()
         if verify_tests and not self.fresh_verification_required:
             report.checks.append(self._check_test_suite())
         if preflight_checks:
@@ -895,9 +886,16 @@ class ReleaseReadinessEvaluator:
         )
 
     def _check_release_spec_exists(self) -> ReleaseReadinessCheck:
-        change_dir = self.project_dir / ".super-dev" / "changes" / "release-hardening-finalization"
+        if not self.active_change_id:
+            return ReleaseReadinessCheck(
+                name="Release Change Spec",
+                passed=False,
+                detail="no active release change identified",
+                severity="medium",
+                recommendation="明确本次发布对应的 change；不按目录时间或旧固定名称猜测。",
+            )
+        change_dir = self.project_dir / ".super-dev" / "changes" / self.active_change_id
         required = [
-            change_dir / "change.yaml",
             change_dir / "proposal.md",
             change_dir / "tasks.md",
         ]
@@ -905,7 +903,11 @@ class ReleaseReadinessEvaluator:
             str(path.relative_to(self.project_dir)) for path in required if not path.exists()
         ]
         passed = not missing
-        detail = "release change spec present" if passed else f"missing {', '.join(missing)}"
+        detail = (
+            f"release change spec present: {self.active_change_id}"
+            if passed
+            else f"missing {', '.join(missing)}"
+        )
         return ReleaseReadinessCheck(
             name="Release Change Spec",
             passed=passed,
@@ -1640,11 +1642,12 @@ class ReleaseReadinessEvaluator:
                 recommendation="如项目启用了 hooks，建议在关键阶段执行后保留 hook 审计历史。",
             )
 
-        blocked = [item for item in history if item.blocked]
-        failed = [item for item in history if not item.success]
+        current = HookManager.latest_results(history)
+        blocked = [item for item in current if item.blocked]
+        failed = [item for item in current if not item.success]
         passed = not blocked and not failed
         if passed:
-            detail = f"recent hook history clean across {len(history)} events"
+            detail = f"latest outcomes passed for {len(current)} hooks; {len(history)} historical events retained"
         elif blocked:
             detail = f"recent hook history contains {len(blocked)} blocked events"
         else:
@@ -1654,7 +1657,7 @@ class ReleaseReadinessEvaluator:
             passed=passed,
             detail=detail,
             severity="medium" if not passed else "low",
-            recommendation="检查 .super-dev/hook-history.jsonl 中最近的失败或阻断 hook，修复命令或放宽 blocking 策略后再重试。",
+            recommendation="处理同一 Hook/事件/阶段/来源最近仍未解除的阻断后重试；保留历史，不自动放宽安全策略。",
         )
 
     def _check_framework_harness_trail(self) -> ReleaseReadinessCheck:
@@ -1721,120 +1724,35 @@ class ReleaseReadinessEvaluator:
             recommendation=recommendation,
         )
 
-    def _check_governance_artifacts(self) -> list[ReleaseReadinessCheck]:
-        """检查治理相关产物是否就绪（增量检查，不影响现有逻辑）。"""
-        checks: list[ReleaseReadinessCheck] = []
-
-        # 1. 治理报告
-        governance_reports = list(self.output_dir.glob("governance-report-*.md"))
-        if governance_reports:
-            checks.append(
-                ReleaseReadinessCheck(
-                    name="Governance: Report",
-                    passed=True,
-                    detail=f"治理报告已生成 ({len(governance_reports)} 份)",
-                    severity="medium",
-                )
-            )
-        else:
-            checks.append(
-                ReleaseReadinessCheck(
-                    name="Governance: Report",
-                    passed=False,
-                    detail="未找到治理报告 (output/governance-report-*.md)",
-                    severity="low",
-                    recommendation="执行治理流程生成 governance-report 后重新评估。",
-                )
-            )
-
-        # 2. 知识引用报告
-        knowledge_refs = list(self.output_dir.glob("*-knowledge-references*.md")) + list(
-            self.output_dir.glob("*-knowledge-references*.json")
-        )
-        knowledge_cache = (
-            list((self.output_dir / "knowledge-cache").glob("*-knowledge-bundle.json"))
-            if (self.output_dir / "knowledge-cache").is_dir()
-            else []
-        )
-        has_knowledge = bool(knowledge_refs or knowledge_cache)
-        checks.append(
-            ReleaseReadinessCheck(
-                name="Governance: Knowledge References",
-                passed=has_knowledge,
-                detail=(
-                    f"知识引用报告 {len(knowledge_refs)} 份, 知识缓存 {len(knowledge_cache)} 份"
-                    if has_knowledge
-                    else "未找到知识引用报告或知识缓存"
-                ),
-                severity="low",
-                recommendation=(
-                    "" if has_knowledge else "建议在文档阶段启用知识库引用，确保决策有据可查。"
-                ),
-            )
-        )
-
-        # 3. 效能度量数据
-        metrics_files = (
-            list(self.output_dir.glob("*-metrics*.json"))
-            + list(self.output_dir.glob("*-pipeline-metrics.json"))
-            + list(self.output_dir.glob("*-pipeline-metrics.md"))
-            + (
-                list((self.output_dir / "metrics-history").glob("*.json"))
-                if (self.output_dir / "metrics-history").is_dir()
-                else []
-            )
-            + list(self.output_dir.glob("*-performance-metrics*.md"))
-        )
-        has_metrics = bool(metrics_files)
-        checks.append(
-            ReleaseReadinessCheck(
-                name="Governance: Performance Metrics",
-                passed=has_metrics,
-                detail=(
-                    f"效能度量文件 {len(metrics_files)} 份" if has_metrics else "未找到效能度量数据"
-                ),
-                severity="low",
-                recommendation="" if has_metrics else "建议生成效能度量报告以量化交付质量。",
-            )
-        )
-
-        # 4. ADR 决策记录
-        adr_dir = self.project_dir / "docs" / "adr"
-        adr_files = list(adr_dir.glob("*.md")) if adr_dir.is_dir() else []
-        # 也检查 output 目录中的 ADR
-        adr_output = list(self.output_dir.glob("*-adr-*.md"))
-        all_adrs = adr_files + adr_output
-        has_adrs = bool(all_adrs)
-        checks.append(
-            ReleaseReadinessCheck(
-                name="Governance: ADR Records",
-                passed=has_adrs,
-                detail=f"ADR 决策记录 {len(all_adrs)} 份" if has_adrs else "未找到 ADR 决策记录",
-                severity="low",
-                recommendation="" if has_adrs else "建议为重要架构决策创建 ADR 记录 (docs/adr/)。",
-            )
-        )
-
-        # 5. 验证规则结果
-        validation_files = list(self.output_dir.glob("*-validation-results*.json")) + list(
-            self.output_dir.glob("*-validation-results*.md")
-        )
-        has_validation = bool(validation_files)
-        checks.append(
-            ReleaseReadinessCheck(
-                name="Governance: Validation Results",
-                passed=has_validation,
-                detail=(
-                    f"验证规则结果 {len(validation_files)} 份"
-                    if has_validation
-                    else "未找到验证规则结果"
-                ),
-                severity="low",
-                recommendation="" if has_validation else "执行验证规则引擎生成结果后重新评估。",
-            )
-        )
-
-        return checks
+    def _governance_artifact_notes(self) -> list[str]:
+        """List optional materials without treating file presence as pass evidence."""
+        groups = {
+            "治理报告": list(self.output_dir.glob("governance-report-*.md")),
+            "知识引用": [
+                *self.output_dir.glob("*-knowledge-references*.md"),
+                *self.output_dir.glob("*-knowledge-references*.json"),
+                *(self.output_dir / "knowledge-cache").glob("*-knowledge-bundle.json"),
+            ],
+            "效能度量": [
+                *self.output_dir.glob("*-metrics*.json"),
+                *self.output_dir.glob("*-pipeline-metrics.md"),
+                *self.output_dir.glob("*-performance-metrics*.md"),
+                *(self.output_dir / "metrics-history").glob("*.json"),
+            ],
+            "架构决策": [
+                *(self.project_dir / "docs" / "adr").glob("*.md"),
+                *self.output_dir.glob("*-adr-*.md"),
+            ],
+            "验证规则资料": [
+                *self.output_dir.glob("*-validation-results*.json"),
+                *self.output_dir.glob("*-validation-results*.md"),
+            ],
+        }
+        return [
+            f"{label}：发现 {len({path for path in paths if path.is_file()})} 份资料；"
+            "仅目录发现，未核验本次适用性与内容，不计分。仅按当前需求补充或审查。"
+            for label, paths in groups.items()
+        ]
 
     def _extract_regex(self, file_path: Path, pattern: str) -> str:
         if not file_path.exists():

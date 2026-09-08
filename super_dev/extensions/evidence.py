@@ -15,6 +15,13 @@ from typing import Any
 
 from .models import CandidateIdentity, ExtensionEvent, ExtensionResult
 
+# Owned by KnowledgeStatsDB, not project source or application databases.
+_RUNTIME_CACHE_PATHS = (
+    ".super-dev/knowledge-stats.db",
+    ".super-dev/knowledge-stats.db-wal",
+    ".super-dev/knowledge-stats.db-shm",
+)
+
 
 def _sha256(value: bytes) -> str:
     return f"sha256:{hashlib.sha256(value).hexdigest()}"
@@ -47,7 +54,7 @@ def _git_text(project_dir: Path, *args: str) -> str:
     return payload.decode("utf-8", errors="replace").strip()
 
 
-def _filesystem_snapshot_digest(project: Path) -> str:
+def _filesystem_snapshot_digest(project: Path, file_manifest: dict[str, str] | None = None) -> str:
     hasher = hashlib.sha256()
     excluded_roots = {
         (project / ".git").resolve(strict=False),
@@ -58,6 +65,9 @@ def _filesystem_snapshot_digest(project: Path) -> str:
         (item for item in project.rglob("*") if item.is_file()),
         key=lambda item: item.relative_to(project).as_posix(),
     ):
+        label = path.relative_to(project).as_posix()
+        if label in _RUNTIME_CACHE_PATHS:
+            continue
         resolved = path.resolve(strict=False)
         if any(root == resolved or root in resolved.parents for root in excluded_roots):
             continue
@@ -66,23 +76,44 @@ def _filesystem_snapshot_digest(project: Path) -> str:
             for part in path.parts
         ):
             continue
-        label = path.relative_to(project).as_posix()
         hasher.update(label.encode("utf-8"))
         hasher.update(b"\0")
         try:
-            hasher.update(path.read_bytes())
+            content = path.read_bytes()
+            fingerprint = _sha256(content) if file_manifest is not None else ""
         except OSError:
-            hasher.update(b"<unreadable>")
+            content = b"<unreadable>"
+            fingerprint = "<unreadable>"
+        hasher.update(content)
+        if file_manifest is not None:
+            file_manifest[label] = fingerprint
         hasher.update(b"\0")
     return f"sha256:{hasher.hexdigest()}"
 
 
-def build_candidate_identity(project_dir: Path, *, base_sha: str = "") -> CandidateIdentity:
+def build_candidate_identity(
+    project_dir: Path,
+    *,
+    base_sha: str = "",
+    file_manifest: dict[str, str] | None = None,
+) -> CandidateIdentity:
+    """Optionally collect diagnostic fingerprints from the same bytes being hashed.
+
+    Git snapshots collect untracked files; the filesystem fallback collects all
+    included files. Diagnostics do not participate in the identity schema.
+    """
+    if file_manifest is not None:
+        file_manifest.clear()
     project = Path(project_dir).resolve()
     repository = _git_text(project, "rev-parse", "--show-toplevel") or str(project)
     head_sha = _git_text(project, "rev-parse", "HEAD")
     resolved_base = base_sha.strip() or head_sha
     git_common = ""
+    excluded_paths = (
+        ":!.super-dev/extensions",
+        ":!output",
+        *(f":!{path}" for path in _RUNTIME_CACHE_PATHS),
+    )
 
     if head_sha:
         dirty_raw = _git_bytes(
@@ -92,8 +123,7 @@ def build_candidate_identity(project_dir: Path, *, base_sha: str = "") -> Candid
             "--no-ext-diff",
             "--",
             ".",
-            ":!.super-dev/extensions",
-            ":!output",
+            *excluded_paths,
         )
         staged_raw = _git_bytes(
             project,
@@ -103,8 +133,7 @@ def build_candidate_identity(project_dir: Path, *, base_sha: str = "") -> Candid
             "--no-ext-diff",
             "--",
             ".",
-            ":!.super-dev/extensions",
-            ":!output",
+            *excluded_paths,
         )
         untracked_raw = _git_bytes(
             project,
@@ -114,8 +143,7 @@ def build_candidate_identity(project_dir: Path, *, base_sha: str = "") -> Candid
             "-z",
             "--",
             ".",
-            ":!.super-dev/extensions",
-            ":!output",
+            *excluded_paths,
         )
         git_common_raw = _git_bytes(project, "rev-parse", "--git-common-dir")
         git_snapshot_available = all(
@@ -139,16 +167,22 @@ def build_candidate_identity(project_dir: Path, *, base_sha: str = "") -> Candid
             untracked_hasher.update(raw_name)
             untracked_hasher.update(b"\0")
             path = project / name
+            fingerprint = "<not-file>"
             if path.is_file():
                 try:
-                    untracked_hasher.update(path.read_bytes())
+                    content = path.read_bytes()
+                    fingerprint = _sha256(content) if file_manifest is not None else ""
                 except OSError:
-                    untracked_hasher.update(b"<unreadable>")
+                    content = b"<unreadable>"
+                    fingerprint = "<unreadable>"
+                untracked_hasher.update(content)
+            if file_manifest is not None:
+                file_manifest[name] = fingerprint
             untracked_hasher.update(b"\0")
         untracked_digest = f"sha256:{untracked_hasher.hexdigest()}"
         git_common = git_common_raw.decode("utf-8", errors="replace").strip()
     else:
-        filesystem_digest = _filesystem_snapshot_digest(project)
+        filesystem_digest = _filesystem_snapshot_digest(project, file_manifest)
         dirty_digest = filesystem_digest
         staged_digest = _sha256(b"<git-state-unavailable>") if head_sha else _sha256(b"")
         untracked_digest = filesystem_digest

@@ -53,6 +53,7 @@ class ProbeOutcome:
     run_id: str = ""
     plan: PytestVerificationPlan | None = None
     candidate_changed: bool | None = None
+    file_changes: dict[str, list[str]] | None = None
 
 
 class ExtensionService:
@@ -367,10 +368,24 @@ class ExtensionService:
         summary: PytestSummary | None,
         advisories: tuple[VerificationAdvisory, ...],
         blocking_findings: list[str],
+        file_manifest_before: dict[str, str] | None = None,
+        file_manifest_after: dict[str, str] | None = None,
     ) -> ProbeOutcome:
         run_dir = self.store.run_dir(run_id)
         result_path = run_dir / "result.json"
         junit_path = run_dir / "pytest.xml"
+        file_changes = None
+        if file_manifest_before is not None and file_manifest_after is not None:
+            before_names, after_names = set(file_manifest_before), set(file_manifest_after)
+            file_changes = {
+                "added": sorted(after_names - before_names),
+                "removed": sorted(before_names - after_names),
+                "modified": sorted(
+                    name
+                    for name in before_names & after_names
+                    if file_manifest_before[name] != file_manifest_after[name]
+                ),
+            }
         summary_payload: dict[str, Any] = {
             "schema_version": 1,
             "run_id": run_id,
@@ -378,6 +393,9 @@ class ExtensionService:
             "plan": plan.to_dict() if plan is not None else None,
             "candidate_before": candidate.to_dict(),
             "candidate_after": final_candidate.to_dict(),
+            "file_manifest_before": file_manifest_before,
+            "file_manifest_after": file_manifest_after,
+            "file_changes": file_changes,
             "pytest_summary": summary.to_dict() if summary is not None else None,
             "advisories": [item.to_dict() for item in advisories],
             "blocking_findings": list(blocking_findings),
@@ -438,6 +456,7 @@ class ExtensionService:
                 run_id=run_id,
                 plan=plan,
                 candidate_changed=final_candidate.candidate_digest != candidate.candidate_digest,
+                file_changes=file_changes,
             )
         relative_result = self._relative(self.project_dir, written_result)
         event_type = (
@@ -488,6 +507,7 @@ class ExtensionService:
             run_id=run_id,
             plan=plan,
             candidate_changed=final_candidate.candidate_digest != candidate.candidate_digest,
+            file_changes=file_changes,
         )
 
     def _guard_receipt(self, *paths: Path) -> None:
@@ -582,7 +602,8 @@ class ExtensionService:
         run_id = uuid.uuid4().hex
         started_at = utc_now()
         started = time.monotonic()
-        candidate = build_candidate_identity(self.project_dir)
+        file_manifest_before: dict[str, str] = {}
+        candidate = build_candidate_identity(self.project_dir, file_manifest=file_manifest_before)
         try:
             plan = parse_pytest_verification_plan(self.config().get("fresh_verification"))
         except PytestPlanValidationError:
@@ -597,6 +618,7 @@ class ExtensionService:
             outcome = self._execute_fresh_verification(
                 run_id=run_id,
                 candidate=candidate,
+                file_manifest_before=file_manifest_before,
                 started_at=started_at,
                 started=started,
                 stage=stage,
@@ -633,6 +655,7 @@ class ExtensionService:
         *,
         run_id: str,
         candidate: CandidateIdentity,
+        file_manifest_before: dict[str, str],
         started_at: str,
         started: float,
         stage: str,
@@ -888,7 +911,17 @@ class ExtensionService:
             advisories = ()
             blocking = [f"内置完成前验证失败: {exc}"]
 
-        final_candidate = build_candidate_identity(self.project_dir)
+        if execution is not None and execution.timed_out:
+            blocking = [item for item in blocking if item != execution.error]
+            blocking.insert(
+                0,
+                f"达到本次运行保护时限（{plan.timeout_seconds} 秒），测试未完成；"
+                "不代表代码质量不合格。",
+            )
+        file_manifest_after: dict[str, str] = {}
+        final_candidate = build_candidate_identity(
+            self.project_dir, file_manifest=file_manifest_after
+        )
         if final_candidate.candidate_digest != candidate.candidate_digest:
             status = ExtensionStatus.BLOCKED
             blocking.append("验证期间当前代码版本发生变化，请在修改结束后重新运行")
@@ -908,6 +941,8 @@ class ExtensionService:
             summary=summary,
             advisories=advisories,
             blocking_findings=blocking,
+            file_manifest_before=file_manifest_before,
+            file_manifest_after=file_manifest_after,
         )
 
     def record_verification_metric(

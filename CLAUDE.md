@@ -185,7 +185,7 @@ This project uses a pipeline-driven development model.
 - On the first reply after a host-supported Super Dev entry (for example `/super-dev ...`, `$super-dev`, `super-dev: ...`, `super-dev：...`, `/super-dev-seeai ...`, `$super-dev-seeai`, `super-dev-seeai: ...`, or `super-dev-seeai：...`), explicitly state that the matching Super Dev mode is now active rather than normal chat mode.
 - If the repository already contains `super-dev.yaml`, `.super-dev/WORKFLOW.md`, `output/*`, `.super-dev/review-state/*`, or an unfinished run state, the first natural-language requirement in a new host session must also default to continuing Super Dev rather than plain chat.
 - Before the first reply, read `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` when present, and treat them as the explicit bootstrap contract for this repository.
-- The first reply must explicitly state that the current phase is `research`, and that you will read `knowledge/` plus `output/knowledge-cache/*-knowledge-bundle.json` first when available before similar-product research.
+- The first reply must report the actual phase: new standard work follows its work-mode entry (new: the current phase is `research`; evolve/variant/patch: baseline), while new SEEAI work starts at research. For resume, read SESSION_BRIEF and continue the recorded phase and pending gates; do not restart. Read knowledge and do research when that stage is pending.
 - In standard mode, the next sequence is research -> three core documents -> wait for user confirmation -> Spec / tasks -> frontend first with runtime verification -> backend / tests / delivery.
 - In SEEAI mode, the next sequence is research -> compact competition docs -> wait for user confirmation -> compact Spec -> full-stack sprint -> polish / handoff.
 - Both modes must explicitly promise that they will stop after the three core documents and wait for approval before creating Spec or writing code.
@@ -229,7 +229,7 @@ This project uses a pipeline-driven development model.
 These rules apply every time you write or edit a file. They are NOT suggestions:
 
 ### Tech Stack Pre-Research
-- Before writing ANY code, run `cat package.json` (or equivalent) to check framework versions.
+- Before writing code, read the actual project dependency manifest (pyproject.toml / requirements.txt / package.json / go.mod as applicable). UI libraries, tokens and page skeletons are required only for UI changes.
 - If unsure about an API for the installed version, use WebFetch to read official docs first.
 - Never guess API signatures. Check docs.
 

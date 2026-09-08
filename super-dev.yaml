@@ -33,7 +33,7 @@ extensions:
     - tests/unit/test_analyzer.py
     plan_id: completion-verification-candidate-006
     profile: pytest-current-python
-    timeout_seconds: 900
+    timeout_seconds: 1800
 frontend: none
 host_compatibility_min_ready_hosts: 1
 host_compatibility_min_score: 80

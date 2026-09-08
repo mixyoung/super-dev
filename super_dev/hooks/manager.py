@@ -104,6 +104,19 @@ class HookManager:
                 break
         return items
 
+    @staticmethod
+    def latest_results(history: list[HookResult]) -> list[HookResult]:
+        """Current outcomes from newest-first history; never erase audit records."""
+        latest: dict[tuple[str, str, str, str], HookResult] = {}
+        unidentified: list[HookResult] = []
+        for item in history:
+            if not item.hook_name or not item.event:
+                unidentified.append(item)
+                continue
+            key = (item.hook_name, item.event, item.phase, item.source)
+            latest.setdefault(key, item)
+        return [*latest.values(), *unidentified]
+
     @classmethod
     def dispatch_workflow_event(
         cls,

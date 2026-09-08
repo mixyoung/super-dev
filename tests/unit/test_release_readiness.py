@@ -452,6 +452,8 @@ def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir
     _prepare_spec_quality_change(temp_project_dir)
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
+    # This fixture explicitly selects the change it created, not a legacy directory.
+    evaluator.active_change_id = "add-proof-ready"
     report = evaluator.evaluate(verify_tests=False)
     files = evaluator.write(report)
 

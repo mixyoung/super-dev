@@ -66,7 +66,7 @@ metadata:
 
 ## 首轮响应契约（强制）
 
-- 首次触发时第一轮回复必须说明：Super Dev SEEAI 赛事模式已激活，当前阶段是 `research`。
+- 第一轮说明 Super Dev SEEAI 赛事模式已激活；新赛事从 research 开始。恢复已有流程时读取 SESSION_BRIEF，接续实际阶段和未完成确认门，不得重置为 research。
 - 先快速理解需求，再做极短顺位思考：作品类型、评委 wow 点、必须完成项、主动放弃项。
 - 如果用户需求模糊，最多只补 1 个关键问题；能合理假设时直接给出假设并推进，不展开长澄清。
 - 先完成 fast research，再写 compact research / PRD / architecture / UIUX。
@@ -780,7 +780,7 @@ npm install && npm run dev
 
 ## Required behavior
 
-1. First reply: say Super Dev SEEAI mode is active and the current phase is `research`.
+1. First reply: say Super Dev SEEAI mode is active. A new competition starts at research; resume uses the recorded phase and pending gates, not a restart.
 2. Use a strict timebox: 0-4 min research, 4-8 min compact docs, 8-10 min confirmation, 10-12 min compact Spec, 12-27 min build sprint, 27-30 min polish/handoff.
 3. Run a fast research pass and write `output/*-research.md` as a real file.
 4. Draft compact `output/*-prd.md`, `output/*-architecture.md`, and `output/*-uiux.md` in the same session and save them as real files.
