@@ -91,6 +91,8 @@ dist_2_0_9/
 .super-dev/workflow-history/
 .super-dev/workflow-events.jsonl
 .super-dev/knowledge-stats.db
+.super-dev/knowledge-stats.db-wal
+.super-dev/knowledge-stats.db-shm
 .super-dev/install-manifest.json
 .super-dev/checkpoints/
 .super-dev/extensions/

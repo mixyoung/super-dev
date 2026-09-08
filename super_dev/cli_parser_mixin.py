@@ -1063,7 +1063,7 @@ class CliParserMixin:
             "--quality-threshold",
             type=int,
             default=None,
-            help="质量门禁阈值（可选；默认按场景自动判定）",
+            help="质量门禁阈值（可选；默认读取 super-dev.yaml 的 quality_gate）",
         )
         pipeline_parser.add_argument(
             "--skip-rehearsal-verify",

@@ -1519,9 +1519,9 @@ class ProofPackBuilder:
             return None
         report_files = builder.write(report)
         summary = (
-            f"recent hook execution history is clean across {report.total_events} recorded events"
+            f"current hook outcomes passed; {report.total_events} historical events retained"
             if report.passed
-            else "hook execution history contains failed or blocked events"
+            else "current hook outcomes contain unresolved failed or blocked events"
         )
         return ProofPackArtifact(
             name="Hook Audit Trail",

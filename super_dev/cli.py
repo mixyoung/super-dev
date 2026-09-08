@@ -3566,7 +3566,11 @@ class SuperDevCLI(
                     name=project_name,
                     tech_stack=tech_stack,
                     scenario_override=scenario,
-                    threshold_override=args.quality_threshold,
+                    threshold_override=(
+                        args.quality_threshold
+                        if args.quality_threshold is not None
+                        else pipeline_config.quality_gate
+                    ),
                     host_compatibility_min_score_override=pipeline_config.host_compatibility_min_score,
                     host_compatibility_min_ready_hosts_override=pipeline_config.host_compatibility_min_ready_hosts,
                 )

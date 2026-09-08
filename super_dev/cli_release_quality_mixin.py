@@ -34,9 +34,14 @@ class CliReleaseQualityMixin:
         self.console.print(f"测试范围：{scope[:160]}", markup=False)
         self.console.print("允许写入：本次验证证据目录（测试使用隔离用户目录）。")
         self.console.print("不会执行：提交、推送、部署、推进项目阶段或修改用户级配置。")
+        if plan:
+            self.console.print(
+                f"运行保护时限：{plan.timeout_seconds} 秒（项目配置，不是性能合格线）。"
+            )
         if verbose and plan:
             self.console.print(
-                f"计划参数：{list(plan.args)}；超时：{plan.timeout_seconds} 秒", markup=False
+                f"计划参数：{list(plan.args)}；运行保护时限：{plan.timeout_seconds} 秒",
+                markup=False,
             )
 
     def _verification_summary(self, outcome: ProbeOutcome, check: ReleaseReadinessCheck) -> None:
@@ -62,6 +67,18 @@ class CliReleaseQualityMixin:
             changed = {True: "是", False: "否", None: "未确认"}[outcome.candidate_changed]
             self.console.print(f"耗时：{result.duration_ms / 1000:.2f} 秒；进程清理：{cleanup}。")
             self.console.print(f"代码在验证期间变化：{changed}；Super Dev 未推进项目阶段。")
+        if outcome.file_changes and any(outcome.file_changes.values()):
+            changes = outcome.file_changes
+            self.console.print(
+                f"文件变化：新增 {len(changes['added'])}；删除 {len(changes['removed'])}；"
+                f"修改 {len(changes['modified'])}。"
+            )
+            for kind, title in (("added", "新增"), ("removed", "删除"), ("modified", "修改")):
+                for path in changes[kind][:5]:
+                    self.console.print(
+                        f"  {title}：{json.dumps(path, ensure_ascii=False)}", markup=False
+                    )
+            self.console.print("完整文件明细见本次 pytest-summary.json；旧校验值不会被替换。")
         if check.passed:
             self.console.print("影响：仅本次验证通过，不等于项目完成；仍需满足其他发布条件。")
         else:
@@ -91,6 +108,7 @@ class CliReleaseQualityMixin:
             "candidate_changed": outcome.candidate_changed,
             "duration_ms": outcome.result.duration_ms if outcome.result else None,
             "process_tree_clean": outcome.result.process_tree_clean if outcome.result else None,
+            "file_changes": outcome.file_changes,
         }
         if outcome.status == ExtensionStatus.PASS:
             recommendation = (
@@ -98,6 +116,8 @@ class CliReleaseQualityMixin:
             )
         elif outcome.status == ExtensionStatus.FAIL:
             recommendation = "修复失败测试后，重新执行 `super-dev release readiness`。"
+        elif outcome.result and any(command.timed_out for command in outcome.result.commands):
+            recommendation = "核查测试进度和项目运行预算，安排完整重跑；未完成的测试不能算通过。"
         else:
             recommendation = "按阻断原因恢复环境或证据后，重新执行发布就绪检查。"
         return ReleaseReadinessCheck(
@@ -216,6 +236,8 @@ class CliReleaseQualityMixin:
 
         status = "[green]通过（PASS）[/green]" if report.passed else "[red]失败（FAIL）[/red]"
         self.console.print(f"[cyan]发布就绪度[/cyan] {status} 分数: {report.score}/100")
+        if report.governance_notes:
+            self.console.print("治理资料仅作不计分提示，详见报告；文件存在不代表验证通过。")
         if verification_check is not None:
             self._verification_summary(verification_outcome, verification_check)
             if not getattr(args, "verbose", False):

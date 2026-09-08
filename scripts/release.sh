@@ -14,7 +14,8 @@ else
     exit 1
 fi
 
-REPOSITORY="pypi"
+REPOSITORY="github"
+RELEASE_GITHUB_REPO="mixyoung/super-dev"
 ALLOW_DIRTY=0
 SKIP_PREFLIGHT=0
 SKIP_BENCHMARK=0
@@ -31,13 +32,13 @@ usage() {
 Usage: ./scripts/release.sh [options]
 
 Options:
-  --repository <pypi|testpypi>  Upload target (default: pypi)
+  --repository <github|pypi|testpypi>  Target (default: github; PyPI requires explicit selection)
   --allow-dirty                 Allow dirty git worktree in preflight
   --skip-preflight              Skip preflight checks
   --skip-benchmark              Skip benchmark in preflight
   --skip-publish                Skip PyPI/TestPyPI publish; reuse existing dist artifacts
   --push-tag                    Create and push git tag v<version>
-  --github-release              Create or update GitHub Release for v<version>
+  --github-release              Create or update this fork's GitHub Release (otherwise prepare only)
   --generate-notes              Use GitHub generated release notes
   --notes-file <path>           Use a custom Markdown file for GitHub Release notes
   --title <text>                Override GitHub Release title
@@ -108,8 +109,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$REPOSITORY" != "pypi" && "$REPOSITORY" != "testpypi" ]]; then
-    echo "[ERROR] --repository must be pypi or testpypi"
+if [[ "$REPOSITORY" != "github" && "$REPOSITORY" != "pypi" && "$REPOSITORY" != "testpypi" ]]; then
+    echo "[ERROR] --repository must be github, pypi or testpypi"
     exit 2
 fi
 
@@ -155,6 +156,16 @@ if [[ "$SKIP_PUBLISH" -eq 1 ]]; then
         echo "[ERROR] Rebuild first or run without --skip-publish"
         exit 1
     fi
+elif [[ "$REPOSITORY" == "github" ]]; then
+    # Keep the existing validation/build steps, without invoking PyPI upload.
+    if [[ "$SKIP_PREFLIGHT" -ne 1 ]]; then
+        PREFLIGHT_ARGS=("./scripts/preflight.sh" "--skip-package")
+        if [[ "$ALLOW_DIRTY" -eq 1 ]]; then PREFLIGHT_ARGS+=("--allow-dirty"); fi
+        if [[ "$SKIP_BENCHMARK" -eq 1 ]]; then PREFLIGHT_ARGS+=("--skip-benchmark"); fi
+        "${PREFLIGHT_ARGS[@]}"
+    fi
+    "$PYTHON_BIN" -m build
+    "$PYTHON_BIN" -m twine check "$WHEEL_PATH" "$SDIST_PATH"
 else
     PUBLISH_ARGS=("./scripts/publish.sh" "--repository" "$REPOSITORY")
     if [[ "$ALLOW_DIRTY" -eq 1 ]]; then
@@ -202,15 +213,19 @@ if [[ "$CREATE_GITHUB_RELEASE" -eq 1 ]]; then
         ASSETS+=("$SDIST_PATH")
     fi
 
-    if gh release view "$TAG" >/dev/null 2>&1; then
+    # The fork updater requires this checksum asset; compute it from these artifacts.
+    "$PYTHON_BIN" -c 'import hashlib, pathlib, sys; files = [pathlib.Path(p) for p in sys.argv[1:]]; pathlib.Path("dist/SHA256SUMS.txt").write_text("".join(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n" for p in files), encoding="utf-8")' "$WHEEL_PATH" "$SDIST_PATH"
+    ASSETS+=("dist/SHA256SUMS.txt")
+
+    if gh release view "$TAG" --repo "$RELEASE_GITHUB_REPO" >/dev/null 2>&1; then
         echo "[INFO] GitHub Release exists; updating ${TAG}"
         EDIT_ARGS=("$TAG" "--title" "$TITLE")
         if [[ -n "$RELEASE_NOTES_FILE" ]]; then
             EDIT_ARGS+=("--notes-file" "$RELEASE_NOTES_FILE")
         fi
-        gh release edit "${EDIT_ARGS[@]}"
+        gh release edit "${EDIT_ARGS[@]}" --repo "$RELEASE_GITHUB_REPO"
         if [[ "${#ASSETS[@]}" -gt 0 ]]; then
-            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber --repo "$RELEASE_GITHUB_REPO"
         fi
         echo "[PASS] GitHub Release updated: ${TAG}"
     else
@@ -224,9 +239,13 @@ if [[ "$CREATE_GITHUB_RELEASE" -eq 1 ]]; then
         if [[ "${#ASSETS[@]}" -gt 0 ]]; then
             CREATE_ARGS+=("${ASSETS[@]}")
         fi
-        gh release create "${CREATE_ARGS[@]}"
+        gh release create "${CREATE_ARGS[@]}" --repo "$RELEASE_GITHUB_REPO"
         echo "[PASS] GitHub Release created: ${TAG}"
     fi
 fi
 
-echo "[PASS] Release flow completed for ${VERSION}"
+if [[ "$REPOSITORY" == "github" && "$CREATE_GITHUB_RELEASE" -ne 1 ]]; then
+    echo "[PASS] Artifacts prepared for ${RELEASE_GITHUB_REPO}; no GitHub Release published (use --github-release)"
+else
+    echo "[PASS] Release flow completed for ${VERSION}"
+fi

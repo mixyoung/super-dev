@@ -31,6 +31,11 @@ JSON 设置、Hook 和可选插件的结构迁移不属于这次自动文本刷�
 
 ## 失败与恢复
 
+维护者的 `scripts/release.sh` 默认准备本 fork 的 GitHub 制品，不自动上传 PyPI；
+仍保留原有预检与构建检查，只有显式 `--github-release` 才创建或更新
+`mixyoung/super-dev` 的 Release，并附带新更新器所需的 `SHA256SUMS.txt`。
+旧 `--repository pypi|testpypi` 仅在明确选择时走原上传路径，不是本 fork 的默认发布方式。
+
 - 未通过来源、哈希或 Python 校验：不启动安装。
 - 安装器失败/超时：不刷新宿主，不能假定旧环境完整；先用原解释器检查版本，再按原安装方式恢复已校验 wheel。
 - 安装结束但新进程/文本刷新失败：非零退出，显示未完成项，不宣称完整升级成功。
