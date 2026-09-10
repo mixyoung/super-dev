@@ -117,7 +117,9 @@ def _collect_constraints(project_dir: Path, workflow_payload: dict[str, Any]) ->
         constraints.append("仓库存在活动 Super Dev workflow，上下文需要继续而不是重新开题。")
     workflow_status = str(workflow_payload.get("status", "")).strip()
     if workflow_status:
-        constraints.append(f"当前 workflow status={workflow_status}，差量方案必须与现有流程状态保持一致。")
+        constraints.append(
+            f"当前 workflow status={workflow_status}，差量方案必须与现有流程状态保持一致。"
+        )
     if (project_dir / "package.json").exists():
         constraints.append("前端/Node 侧依赖与脚本必须兼容现有 package.json。")
     if (project_dir / "pyproject.toml").exists():
@@ -132,11 +134,7 @@ def _infer_delta_scope(project_dir: Path) -> dict[str, list[str]]:
     frontend_surfaces = _infer_frontend_surfaces(project_dir)
     backend_surfaces = _infer_backend_surfaces(project_dir)
     data_surfaces = _infer_data_surfaces(project_dir)
-    for item in (
-        frontend_surfaces
-        + backend_surfaces
-        + data_surfaces
-    ):
+    for item in frontend_surfaces + backend_surfaces + data_surfaces:
         if item not in affected:
             affected.append(item)
     reuse_surfaces = []

@@ -50,14 +50,23 @@ class TestKnowledgeAugmenter:
 
     def test_augment_emits_framework_guidance_for_uniapp(self, temp_project_dir: Path):
         augmenter = KnowledgeAugmenter(project_dir=temp_project_dir, web_enabled=False)
-        bundle = augmenter.augment("构建 uni-app 商城，覆盖微信小程序、H5 与 App 登录支付分享流程", domain="commerce")
+        bundle = augmenter.augment(
+            "构建 uni-app 商城，覆盖微信小程序、H5 与 App 登录支付分享流程", domain="commerce"
+        )
 
-        framework_guidance = bundle.get("knowledge_application_plan", {}).get("framework_guidance", {})
+        framework_guidance = bundle.get("knowledge_application_plan", {}).get(
+            "framework_guidance", {}
+        )
         assert framework_guidance["framework"] == "uni-app"
-        assert any("provider" in item or "登录/支付/分享" in item for item in framework_guidance["critical_modules"])
+        assert any(
+            "provider" in item or "登录/支付/分享" in item
+            for item in framework_guidance["critical_modules"]
+        )
         assert any("微信小程序" in item for item in framework_guidance["validation_surfaces"])
 
-    def test_augment_prioritizes_knowledge_over_docs_when_scores_equal(self, temp_project_dir: Path):
+    def test_augment_prioritizes_knowledge_over_docs_when_scores_equal(
+        self, temp_project_dir: Path
+    ):
         docs_dir = temp_project_dir / "docs"
         docs_dir.mkdir(parents=True, exist_ok=True)
         (docs_dir / "policy.md").write_text(
@@ -237,7 +246,9 @@ class TestKnowledgeAugmenter:
         assert '"cache_signature"' in content
 
     def test_load_cached_bundle_hit(self, temp_project_dir: Path):
-        augmenter = KnowledgeAugmenter(project_dir=temp_project_dir, web_enabled=False, cache_ttl_seconds=1800)
+        augmenter = KnowledgeAugmenter(
+            project_dir=temp_project_dir, web_enabled=False, cache_ttl_seconds=1800
+        )
         bundle = augmenter.augment("实现登录认证流程", domain="auth")
         output_dir = temp_project_dir / "output"
         augmenter.save_bundle(

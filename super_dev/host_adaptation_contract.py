@@ -60,14 +60,17 @@ def _build_official_alignment(profile: Any) -> dict[str, Any]:
     }
 
 
-def build_host_adaptation_contract(profile: Any, *, host_id: str, supports_slash: bool) -> dict[str, Any]:
+def build_host_adaptation_contract(
+    profile: Any, *, host_id: str, supports_slash: bool
+) -> dict[str, Any]:
     flow_probe = build_host_flow_probe(host_id)
     supports_slash_entry = supports_slash or any(
-        str(item.get("entry", "")).strip().startswith("/")
-        for item in profile.entry_variants
+        str(item.get("entry", "")).strip().startswith("/") for item in profile.entry_variants
     )
 
-    official_surface_count = len(profile.official_project_surfaces) + len(profile.official_user_surfaces)
+    official_surface_count = len(profile.official_project_surfaces) + len(
+        profile.official_user_surfaces
+    )
     official_protocol_ready = bool(profile.host_protocol_summary and official_surface_count > 0)
     official_protocol_partial = bool(profile.host_protocol_summary or official_surface_count > 0)
 
@@ -75,9 +78,7 @@ def build_host_adaptation_contract(profile: Any, *, host_id: str, supports_slash
     entry_partial = bool(profile.primary_entry or profile.trigger_command)
 
     continuity_ready = bool(
-        flow_probe.get("enabled")
-        and profile.smoke_test_prompt
-        and profile.smoke_test_steps
+        flow_probe.get("enabled") and profile.smoke_test_prompt and profile.smoke_test_steps
     )
     continuity_partial = bool(flow_probe.get("enabled") or profile.smoke_test_prompt)
 
@@ -87,8 +88,7 @@ def build_host_adaptation_contract(profile: Any, *, host_id: str, supports_slash
         and profile.competition_evidence_template
     )
     competition_partial = bool(
-        profile.competition_smoke_test_prompt
-        or profile.competition_smoke_test_steps
+        profile.competition_smoke_test_prompt or profile.competition_smoke_test_steps
     )
 
     docs_ready = bool(profile.docs_verified and profile.official_docs_references)

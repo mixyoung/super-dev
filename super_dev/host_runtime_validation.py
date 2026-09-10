@@ -123,18 +123,10 @@ def _build_runtime_executive_summary(
         blocker_parts.append(f"{repo_probe_failed_count} 个宿主仓库级 probe 未通过")
     if blocking_count and not blocker_parts:
         blocker_parts.append(f"{blocking_count} 个宿主仍有阻塞项")
-    blocker_text = (
-        " 当前主要阻塞："
-        + "；".join(blocker_parts[:3])
-        + "。"
-        if blocker_parts
-        else ""
-    )
+    blocker_text = " 当前主要阻塞：" + "；".join(blocker_parts[:3]) + "。" if blocker_parts else ""
     quality_bar_text = ""
     if fully_ready_count != total_hosts:
-        quality_bar_text = (
-            " 这类缺口通常不会先表现为代码报错，而是表现为团队接手不顺、宿主恢复不稳、现场演示卡壳。"
-        )
+        quality_bar_text = " 这类缺口通常不会先表现为代码报错，而是表现为团队接手不顺、宿主恢复不稳、现场演示卡壳。"
 
     gate_text = ""
     if gate:
@@ -144,9 +136,7 @@ def _build_runtime_executive_summary(
     elif status:
         gate_text = f" 当前 workflow 状态={status}。"
 
-    ui_note = (
-        " 宿主矩阵通过只说明注入、入口和 runtime 链可用；真正的商业级 UI 质感仍要继续看截图级 UI gate、proof-pack 和 release-readiness。"
-    )
+    ui_note = " 宿主矩阵通过只说明注入、入口和 runtime 链可用；真正的商业级 UI 质感仍要继续看截图级 UI gate、proof-pack 和 release-readiness。"
     framework_text = f" {framework_coaching_summary}" if framework_coaching_summary else ""
     return (
         lead
@@ -178,7 +168,9 @@ def build_runtime_evidence_record(
     )
     evidence = HostRuntimeEvidence(
         host_id=host_id,
-        host_display_name=("Codex" if host_id == "codex-cli" else (get_display_name(host_id) or host_id)),
+        host_display_name=(
+            "Codex" if host_id == "codex-cli" else (get_display_name(host_id) or host_id)
+        ),
         summary="integration and runtime evidence are tracked separately",
         competition_evidence=competition_evidence,
         competition_evidence_ready=competition_evidence_ready(competition_evidence),
@@ -253,8 +245,9 @@ def build_host_runtime_validation_payload(
     pass_criteria_fn: Callable[[str, dict[str, Any], Path], list[str]],
     resume_probe_prompt_fn: Callable[[str, dict[str, Any], Path], str],
     resume_checklist_fn: Callable[[str, Path], list[str]],
-    entry_enricher_fn: Callable[[str, dict[str, Any], dict[str, Any], dict[str, Any]], dict[str, Any]]
-    | None = None,
+    entry_enricher_fn: (
+        Callable[[str, dict[str, Any], dict[str, Any], dict[str, Any]], dict[str, Any]] | None
+    ) = None,
 ) -> dict[str, Any]:
     workflow_context = build_host_workflow_context(project_dir)
     baseline_governance = inspect_baseline_governance(project_dir)
@@ -298,8 +291,7 @@ def build_host_runtime_validation_payload(
             competition_evidence_shallow_sections(competition_evidence, competition_template)
         )
         competition_evidence_ok = (
-            competition_evidence_ready(competition_evidence)
-            and not competition_evidence_shallow
+            competition_evidence_ready(competition_evidence) and not competition_evidence_shallow
         )
         competition_required = bool(competition_template)
         precondition_label = usage.get("precondition_label", "-")
@@ -326,9 +318,7 @@ def build_host_runtime_validation_payload(
                 host_name=str(usage.get("host", "")).strip(),
             )
             blocker_type = "runtime"
-        elif (
-            competition_required and runtime_status == "passed" and not competition_evidence_ok
-        ):
+        elif competition_required and runtime_status == "passed" and not competition_evidence_ok:
             if competition_evidence_shallow and not competition_evidence_missing:
                 blocking_reason = "SEEAI 比赛验收证据内容过浅：" + "、".join(
                     competition_evidence_shallow
@@ -341,7 +331,9 @@ def build_host_runtime_validation_payload(
             )
             blocker_type = "competition_evidence"
         elif runtime_status == "passed" and repo_probe_status == "failed":
-            blocking_reason = str(repo_probe.get("summary", "")).strip() or "宿主仓库级 probe 未通过"
+            blocking_reason = (
+                str(repo_probe.get("summary", "")).strip() or "宿主仓库级 probe 未通过"
+            )
             recommended_action = str(repo_probe.get("recommended_command", "")).strip()
             if not recommended_action:
                 probe_actions = repo_probe.get("next_actions", [])
@@ -363,11 +355,7 @@ def build_host_runtime_validation_payload(
             not surface_ready
             or runtime_status != "passed"
             or repo_probe_blocking
-            or (
-                competition_required
-                and runtime_status == "passed"
-                and not competition_evidence_ok
-            )
+            or (competition_required and runtime_status == "passed" and not competition_evidence_ok)
         ):
             blockers.append(
                 {
@@ -451,9 +439,7 @@ def build_host_runtime_validation_payload(
                 "experience_profile": usage.get("experience_profile", {}),
                 "path_override": usage.get("path_override", {}),
                 "adaptation_contract": usage.get("adaptation_contract", {}),
-                "supports_skill_slash_entry": bool(
-                    usage.get("supports_skill_slash_entry", False)
-                ),
+                "supports_skill_slash_entry": bool(usage.get("supports_skill_slash_entry", False)),
                 "skill_slash_entry_command": usage.get("skill_slash_entry_command", ""),
                 "precondition_label": precondition_label,
                 "precondition_guidance": precondition_guidance,

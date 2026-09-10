@@ -653,8 +653,7 @@ Super Dev 内置 11 位专家 Agent，每位专家有独立的角色定义、专
         uiux_content = cast(str | None, ctx.get("uiux_content"))
         plan_content = cast(str | None, ctx.get("plan_content"))
         frontend_blueprint = cast(str | None, ctx.get("frontend_blueprint"))
-        return (
-            f"""---
+        return f"""---
 
 ## 核心文档摘要
 
@@ -791,9 +790,7 @@ import {{ Save, Search, Settings }} from 'lucide-react';
 1. **输入验证**: 所有用户输入必须验证
 2. **SQL 注入**: 使用参数化查询
 3. **XSS**: 输出转义
-4. **认证**: JWT Token 认证"""
-            + self._build_behavioral_prompts_section()
-        )
+4. **认证**: JWT Token 认证""" + self._build_behavioral_prompts_section()
 
     def _section_session_context(self, **ctx: object) -> str:
         change_content = ctx["change_content"]

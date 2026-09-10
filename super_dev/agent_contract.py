@@ -79,7 +79,9 @@ class AgentAssignment:
             if self.may_delegate:
                 raise AgentContractError("Reviewer assignments cannot delegate")
             if self.write_scope:
-                raise AgentContractError("Reviewer assignments cannot have a production write scope")
+                raise AgentContractError(
+                    "Reviewer assignments cannot have a production write scope"
+                )
         if self.read_only and self.write_scope:
             raise AgentContractError("Read-only assignments cannot have a write scope")
 
@@ -120,9 +122,7 @@ class AgentAssignment:
             role=str(payload["role"]),
             workspace=str(payload["workspace"]),
             write_scope=tuple(str(item) for item in payload.get("write_scope", [])),
-            forbidden_actions=tuple(
-                str(item) for item in payload.get("forbidden_actions", [])
-            ),
+            forbidden_actions=tuple(str(item) for item in payload.get("forbidden_actions", [])),
             placement_owner=str(payload["placement_owner"]),
             result_owner=str(payload["result_owner"]),
             may_delegate=_strict_bool(payload.get("may_delegate", False), "may_delegate"),

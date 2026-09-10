@@ -26,9 +26,7 @@ def canonical_path(
     """生成稳定比较键；Windows 额外统一分隔符、盘符和大小写。"""
 
     resolved = (
-        Path(path).resolve(strict=False)
-        if follow_links
-        else Path(os.path.abspath(os.fspath(path)))
+        Path(path).resolve(strict=False) if follow_links else Path(os.path.abspath(os.fspath(path)))
     )
     is_windows = os.name == "nt" if windows is None else windows
     raw = str(resolved)
@@ -255,9 +253,7 @@ def capture_user_surfaces(paths: list[Path]) -> dict[str, SurfaceState]:
 
 def unsafe_surface_states(states: dict[str, SurfaceState]) -> list[str]:
     return sorted(
-        key
-        for key, state in states.items()
-        if state.kind in {"reparse-point", "unreadable"}
+        key for key, state in states.items() if state.kind in {"reparse-point", "unreadable"}
     )
 
 
@@ -270,9 +266,7 @@ def diff_surface_snapshots(
     return {
         "added": sorted(after_keys - before_keys),
         "removed": sorted(before_keys - after_keys),
-        "changed": sorted(
-            key for key in before_keys & after_keys if before[key] != after[key]
-        ),
+        "changed": sorted(key for key in before_keys & after_keys if before[key] != after[key]),
     }
 
 

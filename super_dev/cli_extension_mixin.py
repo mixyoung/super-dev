@@ -87,18 +87,14 @@ class CliExtensionMixin:
                     {
                         "title": "扩展边界检查",
                         "status": (
-                            "已阻止"
-                            if decision.status == ExtensionStatus.BLOCKED
-                            else "通过"
+                            "已阻止" if decision.status == ExtensionStatus.BLOCKED else "通过"
                         ),
                         "message": "这里只展示申请边界，不执行扩展。",
                         "details": [
                             f"扩展: {manifest.id} {manifest.version}",
                             "所需能力: "
                             + (
-                                ", ".join(
-                                    item.value for item in manifest.required_capabilities
-                                )
+                                ", ".join(item.value for item in manifest.required_capabilities)
                                 or "无"
                             ),
                             f"所有权边界: {decision.status.value}",

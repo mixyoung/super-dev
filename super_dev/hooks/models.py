@@ -120,9 +120,7 @@ class HookConfig:
                 "blocking",
             }
             if unknown_item_fields:
-                validation_errors.append(
-                    f"Hook 包含未知字段: {sorted(unknown_item_fields)}"
-                )
+                validation_errors.append(f"Hook 包含未知字段: {sorted(unknown_item_fields)}")
             try:
                 hook_type = HookType(item.get("type", "command"))
             except ValueError:
@@ -143,11 +141,7 @@ class HookConfig:
                     validation_errors.append("command.args 必须是数组")
             elif not isinstance(raw_command, str):
                 validation_errors.append("command 必须是旧字符串或结构化对象")
-            args = (
-                tuple(str(value) for value in raw_args)
-                if isinstance(raw_args, list)
-                else ()
-            )
+            args = tuple(str(value) for value in raw_args) if isinstance(raw_args, list) else ()
             raw_timeout = item.get("timeout", 30)
             if (
                 not isinstance(raw_timeout, int)

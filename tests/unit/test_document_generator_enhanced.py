@@ -8,10 +8,10 @@
 import pytest
 from super_dev.creators.document_generator import DocumentGenerator
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def generator():
@@ -77,6 +77,7 @@ def bugfix_generator():
 # 初始化
 # ---------------------------------------------------------------------------
 
+
 class TestDocumentGeneratorInit:
     def test_creates_with_required_args(self):
         gen = DocumentGenerator(name="test", description="desc")
@@ -132,7 +133,9 @@ class TestDocumentGeneratorInit:
         assert gen.state_management == []
 
     def test_state_management_custom(self):
-        gen = DocumentGenerator(name="test", description="desc", state_management=["zustand", "react-query"])
+        gen = DocumentGenerator(
+            name="test", description="desc", state_management=["zustand", "react-query"]
+        )
         assert "zustand" in gen.state_management
 
     def test_knowledge_summary_default(self):
@@ -143,6 +146,7 @@ class TestDocumentGeneratorInit:
 # ---------------------------------------------------------------------------
 # PRD 生成
 # ---------------------------------------------------------------------------
+
 
 class TestPRDGeneration:
     def test_generate_prd_returns_string(self, generator):
@@ -190,6 +194,7 @@ class TestPRDGeneration:
 # 架构文档生成
 # ---------------------------------------------------------------------------
 
+
 class TestArchitectureGeneration:
     def test_generate_architecture_returns_string(self, generator):
         arch = generator.generate_architecture()
@@ -222,6 +227,7 @@ class TestArchitectureGeneration:
 # UI/UX 文档生成
 # ---------------------------------------------------------------------------
 
+
 class TestUIUXGeneration:
     def test_generate_uiux_returns_string(self, generator):
         uiux = generator.generate_uiux()
@@ -251,6 +257,7 @@ class TestUIUXGeneration:
 # 执行计划生成
 # ---------------------------------------------------------------------------
 
+
 class TestExecutionPlanGeneration:
     def test_generate_execution_plan_returns_string(self, generator):
         plan = generator.generate_execution_plan()
@@ -266,17 +273,21 @@ class TestExecutionPlanGeneration:
 # 不同技术栈组合
 # ---------------------------------------------------------------------------
 
+
 class TestDifferentStackCombinations:
-    @pytest.fixture(params=[
-        {"platform": "web", "frontend": "react", "backend": "node"},
-        {"platform": "web", "frontend": "vue", "backend": "python"},
-        {"platform": "web", "frontend": "angular", "backend": "java"},
-        {"platform": "web", "frontend": "next", "backend": "go"},
-        {"platform": "mobile", "frontend": "react-native", "backend": "node"},
-    ])
+    @pytest.fixture(
+        params=[
+            {"platform": "web", "frontend": "react", "backend": "node"},
+            {"platform": "web", "frontend": "vue", "backend": "python"},
+            {"platform": "web", "frontend": "angular", "backend": "java"},
+            {"platform": "web", "frontend": "next", "backend": "go"},
+            {"platform": "mobile", "frontend": "react-native", "backend": "node"},
+        ]
+    )
     def stack_generator(self, request):
         return DocumentGenerator(
-            name="combo-test", description="Test",
+            name="combo-test",
+            description="Test",
             **request.param,
         )
 
@@ -300,6 +311,7 @@ class TestDifferentStackCombinations:
 # 边界情况
 # ---------------------------------------------------------------------------
 
+
 class TestDocumentGeneratorEdgeCases:
     def test_unicode_name(self):
         gen = DocumentGenerator(name="中文项目", description="测试描述")
@@ -319,7 +331,8 @@ class TestDocumentGeneratorEdgeCases:
 
     def test_with_knowledge_summary(self):
         gen = DocumentGenerator(
-            name="test", description="desc",
+            name="test",
+            description="desc",
             knowledge_summary={"standards": ["REST API"], "checklists": ["Security"]},
         )
         assert gen.knowledge_summary is not None
@@ -328,7 +341,8 @@ class TestDocumentGeneratorEdgeCases:
 
     def test_with_language_preferences(self):
         gen = DocumentGenerator(
-            name="test", description="desc",
+            name="test",
+            description="desc",
             language_preferences=["zh-CN", "en"],
         )
         prd = gen.generate_prd()
@@ -345,6 +359,7 @@ class TestDocumentGeneratorEdgeCases:
 # ---------------------------------------------------------------------------
 # 生成内容结构验证
 # ---------------------------------------------------------------------------
+
 
 class TestContentStructure:
     def test_prd_has_multiple_sections(self, generator):
@@ -409,14 +424,22 @@ class TestContentStructure:
         assert isinstance(uiux, str) and len(uiux) > 500
 
     def test_different_descriptions_produce_different_prd(self):
-        gen1 = DocumentGenerator(name="app1", description="E-commerce platform for selling books online")
-        gen2 = DocumentGenerator(name="app2", description="Healthcare appointment scheduling system")
+        gen1 = DocumentGenerator(
+            name="app1", description="E-commerce platform for selling books online"
+        )
+        gen2 = DocumentGenerator(
+            name="app2", description="Healthcare appointment scheduling system"
+        )
         prd1 = gen1.generate_prd()
         prd2 = gen2.generate_prd()
         assert prd1 != prd2
 
     def test_all_document_types_are_markdown(self, generator):
-        for doc in [generator.generate_prd(), generator.generate_architecture(), generator.generate_uiux()]:
+        for doc in [
+            generator.generate_prd(),
+            generator.generate_architecture(),
+            generator.generate_uiux(),
+        ]:
             assert isinstance(doc, str)
             assert "#" in doc  # Has markdown headers
             lines = doc.split("\n")

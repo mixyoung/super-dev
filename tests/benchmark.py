@@ -12,6 +12,7 @@ from pathlib import Path
 try:
     from rich.console import Console
     from rich.table import Table
+
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -27,13 +28,7 @@ class PerformanceBenchmark:
         self.console = Console() if RICH_AVAILABLE else None
         self.results = {}
 
-    def benchmark(
-        self,
-        name: str,
-        func: Callable,
-        iterations: int = 10,
-        warmup: int = 3
-    ) -> dict:
+    def benchmark(self, name: str, func: Callable, iterations: int = 10, warmup: int = 3) -> dict:
         """
         执行基准测试
 
@@ -100,7 +95,7 @@ class PerformanceBenchmark:
                 f"{result['median']*1000:.2f}ms",
                 f"{result['min']*1000:.2f}ms",
                 f"{result['max']*1000:.2f}ms",
-                f"{result['percentile_95']*1000:.2f}ms"
+                f"{result['percentile_95']*1000:.2f}ms",
             )
 
         self.console.print(table)
@@ -131,9 +126,7 @@ class PerformanceBenchmark:
 
             if passed:
                 if self.console:
-                    self.console.print(
-                        f"[green]✓[/green] {name}: {actual_ms:.2f}ms ≤ {max_ms}ms"
-                    )
+                    self.console.print(f"[green]✓[/green] {name}: {actual_ms:.2f}ms ≤ {max_ms}ms")
             else:
                 all_pass = False
                 if self.console:
@@ -145,6 +138,7 @@ class PerformanceBenchmark:
 
 
 # ==================== 基准测试套件 ====================
+
 
 class BenchmarkSuite:
     """基准测试套件"""
@@ -167,13 +161,15 @@ class BenchmarkSuite:
         self.benchmark.print_results()
 
         # 检查性能目标
-        return self.benchmark.check_thresholds({
-            "Config Load": 50,
-            "Config Save": 50,
-            "Config Validate": 100,
-            "Engine Init": 100,
-            "Phase Execution": 5000,
-        })
+        return self.benchmark.check_thresholds(
+            {
+                "Config Load": 50,
+                "Config Save": 50,
+                "Config Validate": 100,
+                "Engine Init": 100,
+                "Phase Execution": 5000,
+            }
+        )
 
     def benchmark_config_load(self):
         """测试配置加载"""
@@ -181,6 +177,7 @@ class BenchmarkSuite:
 
         def setup():
             import yaml
+
             config_path.write_text(yaml.dump({"name": "test", "platform": "web"}))
 
         def func():
@@ -192,6 +189,7 @@ class BenchmarkSuite:
 
     def benchmark_config_save(self):
         """测试配置保存"""
+
         def func():
             manager = ConfigManager(self.temp_dir)
             config = ProjectConfig(name="bench-test")
@@ -201,6 +199,7 @@ class BenchmarkSuite:
 
     def benchmark_config_validate(self):
         """测试配置验证"""
+
         def func():
             manager = ConfigManager(self.temp_dir)
             manager.create(name="test")
@@ -210,6 +209,7 @@ class BenchmarkSuite:
 
     def benchmark_workflow_engine_init(self):
         """测试工作流引擎初始化"""
+
         def func():
             engine = WorkflowEngine(self.temp_dir)
             _ = engine.project_dir
@@ -229,10 +229,7 @@ class BenchmarkSuite:
 
         async def func():
             config = ConfigManager(self.temp_dir).create(name="bench-test")
-            context = WorkflowContext(
-                project_dir=self.temp_dir,
-                config=config  # type: ignore
-            )
+            context = WorkflowContext(project_dir=self.temp_dir, config=config)  # type: ignore
             await engine._run_phase(Phase.DISCOVERY, context)
 
         def wrapper():
@@ -242,6 +239,7 @@ class BenchmarkSuite:
 
 
 # ==================== 主函数 ====================
+
 
 def main() -> int:
     """主函数"""

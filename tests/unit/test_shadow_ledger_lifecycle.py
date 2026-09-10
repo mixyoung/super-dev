@@ -79,9 +79,10 @@ def test_repeated_creation_is_idempotent_and_does_not_overwrite(temp_project_dir
     assert first.status == "created"
     assert second.status == "existing"
     assert ledger_path.read_bytes() == original
-    assert load_shadow_ledger(temp_project_dir, ledger_path).ledger.get_stage(
-        "delivery"
-    ).status == StageStatus.PENDING
+    assert (
+        load_shadow_ledger(temp_project_dir, ledger_path).ledger.get_stage("delivery").status
+        == StageStatus.PENDING
+    )
     assert b"\r\n" not in original
 
 
@@ -266,9 +267,7 @@ def test_complete_scope_creates_advisory_without_changing_real_resolutions(
     assert record.ledger.scope_advisory.scope_complete is True
     assert record.ledger.get_stage("frontend").resolution.value == "EXECUTE"
     recommendation = next(
-        item
-        for item in record.ledger.scope_advisory.recommendations
-        if item.stage == "frontend"
+        item for item in record.ledger.scope_advisory.recommendations if item.stage == "frontend"
     )
     assert recommendation.recommended_resolution.value == "NOT_APPLICABLE"
     assert recommendation.approval_required is True
@@ -348,9 +347,7 @@ def test_spec_builder_is_the_single_enabled_auto_creation_entry(
     assert builder.last_shadow_ledger_result["scope_advisory_created"] is True
     assert record.ledger.scope_advisory is not None
     assert record.ledger.scope_advisory.scope_complete is True
-    assert all(
-        not item.approval_required for item in record.ledger.scope_advisory.recommendations
-    )
+    assert all(not item.approval_required for item in record.ledger.scope_advisory.recommendations)
 
 
 def test_existing_change_without_explicit_scope_keeps_full_advisory(
@@ -531,6 +528,4 @@ def test_unexpected_shadow_error_after_tasks_does_not_fail_spec_creation(
     assert change_id == "isolated-error"
     assert builder.last_shadow_ledger_result["status"] == "write_failed"
     assert "unexpected shadow failure" in builder.last_shadow_ledger_result["error"]
-    assert (
-        temp_project_dir / ".super-dev" / "changes" / change_id / "tasks.md"
-    ).is_file()
+    assert (temp_project_dir / ".super-dev" / "changes" / change_id / "tasks.md").is_file()

@@ -89,7 +89,9 @@ def _display_path(project_dir: Path, path: Path) -> str:
         return str(path)
 
 
-def _existing_result(project_dir: Path, change_id: str, ledger_path: Path) -> ShadowLedgerCreationResult:
+def _existing_result(
+    project_dir: Path, change_id: str, ledger_path: Path
+) -> ShadowLedgerCreationResult:
     display_path = _display_path(project_dir, ledger_path)
     try:
         record = load_shadow_ledger(project_dir, ledger_path)

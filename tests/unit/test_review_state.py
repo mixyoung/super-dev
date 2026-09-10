@@ -76,8 +76,6 @@ def test_save_and_load_resume_gate(temp_project_dir: Path) -> None:
     assert payload["current_step_label"] == "等待恢复点确认"
 
 
-
-
 def test_save_and_load_baseline_confirmation(temp_project_dir: Path) -> None:
     save_baseline_confirmation(
         temp_project_dir,

@@ -28,4 +28,3 @@ def save_checkpoint(project_dir: Path, phase: str, context: dict[str, Any]) -> P
     filepath = checkpoint_dir / "latest.json"
     filepath.write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2), encoding="utf-8")
     return filepath
-

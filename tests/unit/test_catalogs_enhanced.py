@@ -12,10 +12,10 @@ from super_dev.catalogs import (
     PLATFORM_IDS,
 )
 
-
 # ---------------------------------------------------------------------------
 # Platform IDs
 # ---------------------------------------------------------------------------
+
 
 class TestPlatformIDs:
     def test_web_in_platforms(self):
@@ -50,6 +50,7 @@ class TestPlatformIDs:
 # Backend IDs
 # ---------------------------------------------------------------------------
 
+
 class TestBackendIDs:
     def test_node_in_backends(self):
         assert "node" in PIPELINE_BACKEND_IDS
@@ -81,6 +82,7 @@ class TestBackendIDs:
 # Frontend Template IDs
 # ---------------------------------------------------------------------------
 
+
 class TestFrontendTemplateIDs:
     def test_react_in_frontends(self):
         found = any("react" in fid.lower() for fid in FULL_FRONTEND_TEMPLATE_IDS)
@@ -109,6 +111,7 @@ class TestFrontendTemplateIDs:
 # Host Tool IDs
 # ---------------------------------------------------------------------------
 
+
 class TestHostToolIDs:
     def test_host_tools_exist(self):
         assert len(HOST_TOOL_IDS) > 0
@@ -134,13 +137,24 @@ class TestHostToolIDs:
 # Cross-catalog consistency
 # ---------------------------------------------------------------------------
 
+
 class TestCrossCatalogConsistency:
     def test_all_catalogs_are_tuples_or_lists(self):
-        for catalog in [PLATFORM_IDS, PIPELINE_BACKEND_IDS, FULL_FRONTEND_TEMPLATE_IDS, HOST_TOOL_IDS]:
+        for catalog in [
+            PLATFORM_IDS,
+            PIPELINE_BACKEND_IDS,
+            FULL_FRONTEND_TEMPLATE_IDS,
+            HOST_TOOL_IDS,
+        ]:
             assert isinstance(catalog, list | tuple | set | frozenset)
 
     def test_all_catalogs_non_empty(self):
-        for catalog in [PLATFORM_IDS, PIPELINE_BACKEND_IDS, FULL_FRONTEND_TEMPLATE_IDS, HOST_TOOL_IDS]:
+        for catalog in [
+            PLATFORM_IDS,
+            PIPELINE_BACKEND_IDS,
+            FULL_FRONTEND_TEMPLATE_IDS,
+            HOST_TOOL_IDS,
+        ]:
             assert len(catalog) > 0
 
     def test_no_overlap_between_platform_and_backend(self):
@@ -154,6 +168,7 @@ class TestCrossCatalogConsistency:
 # ---------------------------------------------------------------------------
 # Platform ID 详细验证
 # ---------------------------------------------------------------------------
+
 
 class TestPlatformIDDetails:
     def test_platform_count(self):
@@ -173,6 +188,7 @@ class TestPlatformIDDetails:
 # Backend ID 详细验证
 # ---------------------------------------------------------------------------
 
+
 class TestBackendIDDetails:
     def test_common_backends_present(self):
         backend_set = set(PIPELINE_BACKEND_IDS)
@@ -191,6 +207,7 @@ class TestBackendIDDetails:
 # ---------------------------------------------------------------------------
 # Frontend Template ID 详细验证
 # ---------------------------------------------------------------------------
+
 
 class TestFrontendIDDetails:
     def test_angular_in_frontends(self):
@@ -223,6 +240,7 @@ class TestFrontendIDDetails:
 # Host Tool ID 详细验证
 # ---------------------------------------------------------------------------
 
+
 class TestHostToolIDDetails:
     def test_windsurf_in_hosts(self):
         found = any("windsurf" in hid.lower() for hid in HOST_TOOL_IDS)
@@ -241,6 +259,7 @@ class TestHostToolIDDetails:
 # ---------------------------------------------------------------------------
 # ID 格式一致性
 # ---------------------------------------------------------------------------
+
 
 class TestIDFormatConsistency:
     def test_platform_ids_are_kebab_or_lower(self):
@@ -264,12 +283,22 @@ class TestIDFormatConsistency:
             assert " " not in fid, f"Frontend ID should not contain spaces: {fid}"
 
     def test_all_ids_are_ascii(self):
-        for catalog in [PLATFORM_IDS, PIPELINE_BACKEND_IDS, FULL_FRONTEND_TEMPLATE_IDS, HOST_TOOL_IDS]:
+        for catalog in [
+            PLATFORM_IDS,
+            PIPELINE_BACKEND_IDS,
+            FULL_FRONTEND_TEMPLATE_IDS,
+            HOST_TOOL_IDS,
+        ]:
             for item_id in catalog:
                 assert item_id.isascii(), f"ID should be ASCII: {item_id}"
 
     def test_no_trailing_whitespace_in_ids(self):
-        for catalog in [PLATFORM_IDS, PIPELINE_BACKEND_IDS, FULL_FRONTEND_TEMPLATE_IDS, HOST_TOOL_IDS]:
+        for catalog in [
+            PLATFORM_IDS,
+            PIPELINE_BACKEND_IDS,
+            FULL_FRONTEND_TEMPLATE_IDS,
+            HOST_TOOL_IDS,
+        ]:
             for item_id in catalog:
                 assert item_id == item_id.strip(), f"ID has trailing whitespace: '{item_id}'"
 

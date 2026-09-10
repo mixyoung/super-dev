@@ -129,13 +129,18 @@ def _load_threshold_defaults(project_dir: Path) -> tuple[float, int, list[str], 
         DEFAULT_MIN_READY_HOSTS,
     )
     raw_targets = raw.get("host_profile_targets", [])
-    profile_targets = [
-        str(item).strip()
-        for item in raw_targets
-        if isinstance(item, str) and str(item).strip()
-    ] if isinstance(raw_targets, list) else []
+    profile_targets = (
+        [str(item).strip() for item in raw_targets if isinstance(item, str) and str(item).strip()]
+        if isinstance(raw_targets, list)
+        else []
+    )
     enforce_selected = bool(raw.get("host_profile_enforce_selected", False))
-    return max(0.0, min(100.0, min_score)), max(0, min_ready_hosts), profile_targets, enforce_selected
+    return (
+        max(0.0, min(100.0, min_score)),
+        max(0, min_ready_hosts),
+        profile_targets,
+        enforce_selected,
+    )
 
 
 def main() -> int:
@@ -169,12 +174,12 @@ def main() -> int:
     args = parser.parse_args()
 
     project_dir = Path(args.project_dir).resolve()
-    default_score, default_ready_hosts, profile_targets, enforce_selected = _load_threshold_defaults(project_dir)
+    default_score, default_ready_hosts, profile_targets, enforce_selected = (
+        _load_threshold_defaults(project_dir)
+    )
     min_score = default_score if args.min_score is None else float(args.min_score)
     min_ready_hosts = (
-        default_ready_hosts
-        if args.min_ready_hosts is None
-        else max(0, int(args.min_ready_hosts))
+        default_ready_hosts if args.min_ready_hosts is None else max(0, int(args.min_ready_hosts))
     )
 
     try:

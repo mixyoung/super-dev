@@ -283,8 +283,7 @@ class KnowledgeStatsDB:
         if conn is None:
             return
         try:
-            conn.executescript(
-                """
+            conn.executescript("""
                 CREATE TABLE IF NOT EXISTS knowledge_stats (
                     file_path     TEXT PRIMARY KEY,
                     domain        TEXT DEFAULT '',
@@ -331,8 +330,7 @@ class KnowledgeStatsDB:
                 CREATE INDEX IF NOT EXISTS idx_violation_run ON constraint_violations(run_id);
                 CREATE INDEX IF NOT EXISTS idx_violation_file ON constraint_violations(file_path);
                 CREATE INDEX IF NOT EXISTS idx_suggestion_run ON evolution_suggestions(run_id);
-            """
-            )
+            """)
             conn.commit()
         except Exception as exc:
             _logger.warning("数据库表初始化失败: %s", exc)
@@ -460,12 +458,10 @@ class KnowledgeStatsDB:
         if conn is None:
             return
         try:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT file_path, total_references, constraints_followed, constraints_violated
                 FROM knowledge_stats
-            """
-            ).fetchall()
+            """).fetchall()
 
             if not rows:
                 return

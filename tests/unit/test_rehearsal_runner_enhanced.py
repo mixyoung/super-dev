@@ -7,10 +7,10 @@
 
 from super_dev.deployers.rehearsal_runner import RehearsalCheck, RehearsalResult
 
-
 # ---------------------------------------------------------------------------
 # RehearsalCheck
 # ---------------------------------------------------------------------------
+
 
 class TestRehearsalCheck:
     def test_basic_creation(self):
@@ -21,12 +21,16 @@ class TestRehearsalCheck:
         assert check.severity == "medium"
 
     def test_with_severity(self):
-        check = RehearsalCheck(name="Security", passed=False, detail="Missing HTTPS", severity="critical")
+        check = RehearsalCheck(
+            name="Security", passed=False, detail="Missing HTTPS", severity="critical"
+        )
         assert check.severity == "critical"
         assert check.passed is False
 
     def test_to_dict(self):
-        check = RehearsalCheck(name="Database", passed=True, detail="Migrations ready", severity="high")
+        check = RehearsalCheck(
+            name="Database", passed=True, detail="Migrations ready", severity="high"
+        )
         d = check.to_dict()
         assert d["name"] == "Database"
         assert d["passed"] is True
@@ -42,6 +46,7 @@ class TestRehearsalCheck:
 # ---------------------------------------------------------------------------
 # RehearsalResult
 # ---------------------------------------------------------------------------
+
 
 class TestRehearsalResult:
     def test_empty_result(self):
@@ -171,7 +176,9 @@ class TestRehearsalResult:
 
     def test_many_checks(self):
         checks = [
-            RehearsalCheck(name=f"check-{i}", passed=(i % 3 != 0), detail=f"detail-{i}", severity="medium")
+            RehearsalCheck(
+                name=f"check-{i}", passed=(i % 3 != 0), detail=f"detail-{i}", severity="medium"
+            )
             for i in range(30)
         ]
         result = RehearsalResult(project_name="big", checks=checks)
@@ -205,6 +212,7 @@ class TestRehearsalResult:
 # RehearsalResult - severity weight
 # ---------------------------------------------------------------------------
 
+
 class TestSeverityWeight:
     def test_critical_weight(self):
         result = RehearsalResult(project_name="test")
@@ -234,6 +242,7 @@ class TestSeverityWeight:
 # ---------------------------------------------------------------------------
 # RehearsalResult - failed_checks
 # ---------------------------------------------------------------------------
+
 
 class TestFailedChecks:
     def test_no_failures(self):
@@ -271,6 +280,7 @@ class TestFailedChecks:
 # RehearsalResult - 综合场景
 # ---------------------------------------------------------------------------
 
+
 class TestRehearsalResultScenarios:
     def test_scenario_production_ready(self):
         """Production-ready scenario: all critical/high checks pass"""
@@ -278,14 +288,40 @@ class TestRehearsalResultScenarios:
             project_name="production",
             threshold=80,
             checks=[
-                RehearsalCheck(name="CI/CD Pipeline", passed=True, detail="GitHub Actions configured", severity="critical"),
-                RehearsalCheck(name="Health Endpoint", passed=True, detail="/health returns 200", severity="critical"),
-                RehearsalCheck(name="Database Migrations", passed=True, detail="All migrations applied", severity="high"),
-                RehearsalCheck(name="Security Scan", passed=True, detail="No critical vulnerabilities", severity="high"),
-                RehearsalCheck(name="Documentation", passed=True, detail="All docs present", severity="medium"),
-                RehearsalCheck(name="Performance Test", passed=True, detail="P99 < 500ms", severity="medium"),
+                RehearsalCheck(
+                    name="CI/CD Pipeline",
+                    passed=True,
+                    detail="GitHub Actions configured",
+                    severity="critical",
+                ),
+                RehearsalCheck(
+                    name="Health Endpoint",
+                    passed=True,
+                    detail="/health returns 200",
+                    severity="critical",
+                ),
+                RehearsalCheck(
+                    name="Database Migrations",
+                    passed=True,
+                    detail="All migrations applied",
+                    severity="high",
+                ),
+                RehearsalCheck(
+                    name="Security Scan",
+                    passed=True,
+                    detail="No critical vulnerabilities",
+                    severity="high",
+                ),
+                RehearsalCheck(
+                    name="Documentation", passed=True, detail="All docs present", severity="medium"
+                ),
+                RehearsalCheck(
+                    name="Performance Test", passed=True, detail="P99 < 500ms", severity="medium"
+                ),
                 RehearsalCheck(name="Code Coverage", passed=True, detail="> 80%", severity="low"),
-                RehearsalCheck(name="Lint Clean", passed=True, detail="No lint errors", severity="low"),
+                RehearsalCheck(
+                    name="Lint Clean", passed=True, detail="No lint errors", severity="low"
+                ),
             ],
         )
         assert result.score == 100
@@ -298,7 +334,9 @@ class TestRehearsalResultScenarios:
             project_name="critical-fail",
             threshold=50,
             checks=[
-                RehearsalCheck(name="CI/CD", passed=False, detail="Pipeline broken", severity="critical"),
+                RehearsalCheck(
+                    name="CI/CD", passed=False, detail="Pipeline broken", severity="critical"
+                ),
                 RehearsalCheck(name="DB", passed=True, detail="ok", severity="high"),
                 RehearsalCheck(name="Docs", passed=True, detail="ok", severity="medium"),
                 RehearsalCheck(name="Tests", passed=True, detail="ok", severity="medium"),
@@ -332,7 +370,7 @@ class TestRehearsalResultScenarios:
             threshold=80,
             checks=[
                 RehearsalCheck(name="A", passed=True, detail="ok", severity="critical"),  # 4
-                RehearsalCheck(name="B", passed=False, detail="fail", severity="low"),    # 1
+                RehearsalCheck(name="B", passed=False, detail="fail", severity="low"),  # 1
             ],
         )
         # total=5, passed=4, score=80
@@ -345,7 +383,7 @@ class TestRehearsalResultScenarios:
             project_name="below",
             threshold=80,
             checks=[
-                RehearsalCheck(name="A", passed=True, detail="ok", severity="high"),     # 3
+                RehearsalCheck(name="A", passed=True, detail="ok", severity="high"),  # 3
                 RehearsalCheck(name="B", passed=False, detail="fail", severity="medium"),  # 2
             ],
         )
@@ -359,7 +397,9 @@ class TestRehearsalResultScenarios:
             threshold=85,
             checks=[
                 RehearsalCheck(name="CI", passed=True, detail="configured", severity="critical"),
-                RehearsalCheck(name="DB", passed=False, detail="missing migrations", severity="high"),
+                RehearsalCheck(
+                    name="DB", passed=False, detail="missing migrations", severity="high"
+                ),
                 RehearsalCheck(name="Docs", passed=True, detail="complete", severity="low"),
             ],
         )

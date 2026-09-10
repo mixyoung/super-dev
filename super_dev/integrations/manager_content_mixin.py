@@ -896,10 +896,10 @@ class IntegrationManagerContentMixin:
                 "- 至少研究 3 到 5 个可借鉴产品\n"
                 "- 总结共性功能、关键交互、信息架构、商业表达与差异化方向\n"
                 "- 未完成 research 阶段前不得直接进入编码\n\n"
-            "## 宿主执行方式\n"
-            "- `/super-dev` 触发后，直接留在宿主里继续研究、出文档、实现和修订，不要把正常开发再转回 `super-dev pipeline`。\n"
-            "- 只有安装、升级、卸载或宿主注入故障时，才回终端运行 `super-dev`、`super-dev update`、`super-dev uninstall`。\n"
-        )
+                "## 宿主执行方式\n"
+                "- `/super-dev` 触发后，直接留在宿主里继续研究、出文档、实现和修订，不要把正常开发再转回 `super-dev pipeline`。\n"
+                "- 只有安装、升级、卸载或宿主注入故障时，才回终端运行 `super-dev`、`super-dev update`、`super-dev uninstall`。\n"
+            )
 
         if target in {"kiro", "kiro-cli"}:
             return self._build_kiro_steering_content(target)
@@ -984,7 +984,7 @@ class IntegrationManagerContentMixin:
                 "## Droid CLI 比赛专项适配\n"
                 "- 优先固定在同一个 Droid session 里完成比赛冲刺，避免频繁重开会话导致上下文漂移。\n"
                 "- 如果当前 slash 菜单还没刷新，直接使用 `super-dev-seeai: <需求>` 文本入口，不要等待索引刷新。\n"
-                "- 如需 headless 续跑，优先使用 `droid exec --session-id <id> \"continue with next steps\"`，不要重新开题。\n\n"
+                '- 如需 headless 续跑，优先使用 `droid exec --session-id <id> "continue with next steps"`，不要重新开题。\n\n'
             )
         design_pack_lines = "\n".join(
             f"- {pack.label}：{pack.fit_for}；守卫：{pack.guardrail}"

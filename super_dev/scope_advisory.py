@@ -32,11 +32,7 @@ def resolve_pipeline_scope_declaration(
 
     surfaces = tuple(
         sorted(
-            {
-                str(item).strip().lower()
-                for item in (changed_surfaces or ())
-                if str(item).strip()
-            }
+            {str(item).strip().lower() for item in (changed_surfaces or ()) if str(item).strip()}
         )
     )
     unknown_surfaces = set(surfaces) - KNOWN_CHANGE_SURFACES
@@ -73,9 +69,7 @@ def build_scope_advisory(
     scope_complete: bool,
     generated_at: str,
 ) -> ScopeAdvisory:
-    surfaces = sorted(
-        {str(item).strip().lower() for item in changed_surfaces if str(item).strip()}
-    )
+    surfaces = sorted({str(item).strip().lower() for item in changed_surfaces if str(item).strip()})
     required = (
         set(
             required_stages_for(
@@ -92,9 +86,7 @@ def build_scope_advisory(
     for stage in CANONICAL_NINE_STAGE_IDS:
         kind = kinds[stage]
         if stage in required:
-            resolution = (
-                StageResolution.REQUIRE if kind == "gate" else StageResolution.EXECUTE
-            )
+            resolution = StageResolution.REQUIRE if kind == "gate" else StageResolution.EXECUTE
             reason = (
                 "范围尚未完整，建议保留该阶段"
                 if not scope_complete

@@ -300,7 +300,9 @@ class KnowledgeTracker:
         tracker.save_report(report)
     """
 
-    def __init__(self, knowledge_dir: str = "knowledge", *, project_dir: Path | None = None) -> None:
+    def __init__(
+        self, knowledge_dir: str = "knowledge", *, project_dir: Path | None = None
+    ) -> None:
         self.knowledge_dir = Path(knowledge_dir)
         self._scan_dir = project_dir / self.knowledge_dir if project_dir else self.knowledge_dir
         self.references: list[KnowledgeReference] = []

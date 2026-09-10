@@ -318,7 +318,11 @@ class CliDeployRuntimeMixin:
             else []
         )
         if screen_recipes:
-            labels = [str(item.get("label", "")).strip() for item in screen_recipes if isinstance(item, dict)]
+            labels = [
+                str(item.get("label", "")).strip()
+                for item in screen_recipes
+                if isinstance(item, dict)
+            ]
             sections = [
                 str(section).strip()
                 for item in screen_recipes
@@ -352,23 +356,20 @@ class CliDeployRuntimeMixin:
             else {}
         )
         if design_context_protocol:
-            checks["ui_design_context_protocol"] = (
-                self._runtime_contains_any(
-                    combined,
-                    [
-                        *(
-                            str(item).strip()
-                            for item in design_context_protocol.get("preferred_import_order", []) or []
-                        ),
-                        *(
-                            str(item).strip()
-                            for item in design_context_protocol.get("github_import_targets", []) or []
-                        ),
-                    ],
-                )
-                and self._runtime_contains_any(
-                    combined, [str(design_context_protocol.get("single_source_rule", "")).strip()]
-                )
+            checks["ui_design_context_protocol"] = self._runtime_contains_any(
+                combined,
+                [
+                    *(
+                        str(item).strip()
+                        for item in design_context_protocol.get("preferred_import_order", []) or []
+                    ),
+                    *(
+                        str(item).strip()
+                        for item in design_context_protocol.get("github_import_targets", []) or []
+                    ),
+                ],
+            ) and self._runtime_contains_any(
+                combined, [str(design_context_protocol.get("single_source_rule", "")).strip()]
             )
 
         tweak_strategy = (
@@ -381,7 +382,10 @@ class CliDeployRuntimeMixin:
                 self._runtime_contains_any(combined, [str(tweak_strategy.get("mode", "")).strip()])
                 and self._runtime_contains_any(
                     combined,
-                    [str(item).strip() for item in tweak_strategy.get("default_controls", []) or []],
+                    [
+                        str(item).strip()
+                        for item in tweak_strategy.get("default_controls", []) or []
+                    ],
                 )
                 and self._runtime_contains_any(
                     combined, [str(tweak_strategy.get("persistence_rule", "")).strip()]
@@ -740,5 +744,7 @@ class CliDeployRuntimeMixin:
                 ]
             )
         report_paths["markdown"].write_text("\n".join(lines) + "\n", encoding="utf-8")
-        report_with_identity["report_files"] = {name: str(path) for name, path in report_paths.items()}
+        report_with_identity["report_files"] = {
+            name: str(path) for name, path in report_paths.items()
+        }
         return report_with_identity

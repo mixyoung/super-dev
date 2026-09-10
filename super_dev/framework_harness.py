@@ -242,7 +242,8 @@ class FrameworkHarnessBuilder:
                     else {}
                 )
                 report.checks["ui_contract_alignment_framework_execution"] = bool(
-                    isinstance(framework_execution, dict) and framework_execution.get("passed", False)
+                    isinstance(framework_execution, dict)
+                    and framework_execution.get("passed", False)
                 )
                 if not report.checks["ui_contract_alignment_framework_execution"]:
                     report.blockers.append(

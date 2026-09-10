@@ -1001,8 +1001,7 @@ jobs:
         doc_parts = []
 
         # 文档头部
-        doc_parts.append(
-            f"""# {self.name} - UI/UX 设计文档
+        doc_parts.append(f"""# {self.name} - UI/UX 设计文档
 
 > **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 > **版本**: v2.5.0
@@ -1028,8 +1027,7 @@ jobs:
 
 AI 基于项目特征，从设计数据库中为您推荐：
 
-"""
-        )
+""")
 
         # 添加推荐摘要
         if recommendations.get("styles"):
@@ -1051,13 +1049,10 @@ AI 基于项目特征，从设计数据库中为您推荐：
 """
             )
 
-        doc_parts.append(
-            f"""**推荐组件生态**: {ui_intelligence['primary_library']['name']}
-"""
-        )
+        doc_parts.append(f"""**推荐组件生态**: {ui_intelligence['primary_library']['name']}
+""")
 
-        doc_parts.append(
-            f"""
+        doc_parts.append(f"""
 ---
 
 ## 1. 设计概述
@@ -1106,14 +1101,12 @@ AI 基于项目特征，从设计数据库中为您推荐：
 
 ### 2.1 色彩规范
 
-"""
-        )
+""")
 
         # 智能配色推荐
         if recommendations.get("colors"):
             color = recommendations["colors"]
-            doc_parts.append(
-                f"""#### 推荐配色方案: {color.get('name', 'Professional Palette')}
+            doc_parts.append(f"""#### 推荐配色方案: {color.get('name', 'Professional Palette')}
 
 **推荐理由**: 基于 {analysis['industry']} {analysis['product_type']} 产品的最佳实践
 
@@ -1142,11 +1135,9 @@ module.exports = {{
 }}
 ```
 
-"""
-            )
+""")
             primary_hex = color.get("primary", color.get("Primary (Hex)", "#2563EB"))
-            doc_parts.append(
-                f"""
+            doc_parts.append(f"""
 #### 色阶系统
 
 | 梯度 | Primary | Neutral | 用途 |
@@ -1173,12 +1164,10 @@ module.exports = {{
 
 ---
 
-"""
-            )
+""")
         else:
             # 默认配色
-            doc_parts.append(
-                """#### 主色调
+            doc_parts.append("""#### 主色调
 
 | 颜色 | 用途 | Hex | RGB |
 |:---|:---|:---|:---|
@@ -1188,10 +1177,8 @@ module.exports = {{
 | **Warning** | 警告状态 | #F59E0B | rgb(245, 158, 11) |
 | **Error** | 错误状态 | #EF4444 | rgb(239, 68, 68) |
 
-"""
-            )
-            doc_parts.append(
-                f"""
+""")
+            doc_parts.append(f"""
 #### 色阶系统
 
 | 梯度 | Primary | Neutral | 用途 |
@@ -1218,21 +1205,16 @@ module.exports = {{
 
 ---
 
-"""
-            )
+""")
 
         # 智能字体推荐
-        doc_parts.append(
-            """### 2.2 字体规范
-"""
-        )
+        doc_parts.append("""### 2.2 字体规范
+""")
 
         if recommendations.get("fonts"):
-            doc_parts.append(
-                """#### 推荐字体组合
+            doc_parts.append("""#### 推荐字体组合
 
-"""
-            )
+""")
             for font in recommendations["fonts"][:2]:
                 doc_parts.append(
                     f"""**{font.get('name', font.get('Font Pairing Name', 'Professional'))}**
@@ -1250,8 +1232,7 @@ module.exports = {{
                 )
 
         # Always add full typography scale
-        doc_parts.append(
-            """#### 字号层级
+        doc_parts.append("""#### 字号层级
 
 | 级别 | 大小 | 字重 | 行高 | 字间距 | 用途 |
 |:---|:---|:---|:---|:---|:---|
@@ -1268,30 +1249,24 @@ module.exports = {{
 
 ---
 
-"""
-        )
+""")
 
-        doc_parts.append(
-            f"""
+        doc_parts.append(f"""
 {self._render_design_token_freeze_output(ui_intelligence, design_system_bundle)}
 
-"""
-        )
+""")
 
         if not recommendations.get("fonts"):
-            doc_parts.append(
-                """#### 字体家族
+            doc_parts.append("""#### 字体家族
 
 ```css
 font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', sans-serif;
 ```
 
-"""
-            )
+""")
 
         # 间距和圆角规范保持不变
-        doc_parts.append(
-            f"""### 2.3 间距规范
+        doc_parts.append(f"""### 2.3 间距规范
 
 使用 8px 基础单位:
 - **xs**: 4px
@@ -1421,8 +1396,7 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
 ## 3. 页面结构
 
 ### 3.1 整体布局
-"""
-        )
+""")
 
         # 如果有 Landing 页面推荐，添加它
         if recommendations.get("landing"):
@@ -1442,8 +1416,7 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
             else:
                 cta_strategy_text = str(cta_strategy)
 
-            doc_parts.append(
-                f"""
+            doc_parts.append(f"""
 #### 推荐页面布局: {landing.get('name', 'Standard Layout')}
 
 **布局类型**: {landing.get('category', 'classic').title()}
@@ -1460,11 +1433,9 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
 
 ---
 
-"""
-            )
+""")
         else:
-            doc_parts.append(
-                """
+            doc_parts.append("""
 ```
 ┌─────────────────────────────────────────────────┐
 │  Header (Logo, Nav, User)                       │
@@ -1481,12 +1452,10 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
 
 ---
 
-"""
-            )
+""")
 
         # 添加其他部分（保持原有的内容结构）
-        doc_parts.append(
-            f"""### 3.2 页面骨架优先级
+        doc_parts.append(f"""### 3.2 页面骨架优先级
 
 {self._render_page_blueprints(ui_intelligence)}
 
@@ -1643,13 +1612,11 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
 - [Dribbble](https://dribbble.com/)
 - [Behance](https://www.behance.net/)
 - [Mobbin](https://mobbin.com/)
-"""
-        )
+""")
 
         # 添加 UX 最佳实践部分
         if recommendations.get("ux_tips"):
-            doc_parts.append(
-                """
+            doc_parts.append("""
 
 ---
 
@@ -1657,8 +1624,7 @@ font-family: 'Plus Jakarta Sans', 'Noto Sans SC', 'PingFang SC', 'Segoe UI', san
 
 基于项目特征，AI 为您推荐以下 UX 最佳实践：
 
-"""
-            )
+""")
             for i, tip in enumerate(recommendations["ux_tips"][:5], 1):
                 guideline = tip.get("guideline", tip)
                 domain = guideline.get("domain", "UX")

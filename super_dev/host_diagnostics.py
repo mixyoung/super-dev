@@ -74,10 +74,10 @@ def build_host_injection_closure(
     )
     competition_user_surfaces_ready = competition_user_available and not missing_competition_user
     standard_flow_ready = default_ready
-    competition_flow_ready = default_ready and (
-        not competition_project_available or competition_project_surfaces_ready
-    ) and (
-        not competition_user_available or competition_user_surfaces_ready
+    competition_flow_ready = (
+        default_ready
+        and (not competition_project_available or competition_project_surfaces_ready)
+        and (not competition_user_available or competition_user_surfaces_ready)
     )
 
     if not default_ready:
@@ -93,7 +93,9 @@ def build_host_injection_closure(
     elif optional_user_available:
         status = "project_default_ready_with_user_opt_in_available"
         label = f"{scope_label}已闭环，可按需启用用户级增强面"
-        summary = f"当前宿主已完成{scope_label}；如需跨项目共享统一宿主心智，可再显式启用用户级增强面。"
+        summary = (
+            f"当前宿主已完成{scope_label}；如需跨项目共享统一宿主心智，可再显式启用用户级增强面。"
+        )
         user_surface_scope = "available-not-enabled"
     else:
         status = "project_default_ready"
@@ -136,13 +138,19 @@ def build_host_injection_closure(
         "competition_flow_label": (
             "SEEAI 比赛模式可直接开工"
             if competition_flow_ready
-            else "SEEAI 比赛模式待补齐项目与用户级补充面"
-            if competition_project_available and competition_user_available
-            else "SEEAI 比赛模式待补齐项目补充面"
-            if competition_project_available
-            else "SEEAI 比赛模式待补齐用户级补充面"
-            if competition_user_available
-            else "SEEAI 比赛模式未配置补充面"
+            else (
+                "SEEAI 比赛模式待补齐项目与用户级补充面"
+                if competition_project_available and competition_user_available
+                else (
+                    "SEEAI 比赛模式待补齐项目补充面"
+                    if competition_project_available
+                    else (
+                        "SEEAI 比赛模式待补齐用户级补充面"
+                        if competition_user_available
+                        else "SEEAI 比赛模式未配置补充面"
+                    )
+                )
+            )
         ),
         "project_default_ready": default_ready,
         "user_surface_scope": user_surface_scope,
@@ -172,8 +180,12 @@ def collect_host_diagnostics(
     check_skill: bool,
     check_slash: bool,
     build_usage_profile_fn: Callable[[IntegrationManager, str], dict[str, Any]],
-    build_diagnosis_fn: Callable[[str, dict[str, Any], IntegrationManager], dict[str, str]] | None = None,
-    skill_primary_file_fn: Callable[[str, list[Path], list[Path], list[Path]], Path | None] | None = None,
+    build_diagnosis_fn: (
+        Callable[[str, dict[str, Any], IntegrationManager], dict[str, str]] | None
+    ) = None,
+    skill_primary_file_fn: (
+        Callable[[str, list[Path], list[Path], list[Path]], Path | None] | None
+    ) = None,
     integrate_no_project_note: str | None = None,
 ) -> dict[str, Any]:
     integration_manager = IntegrationManager(project_dir)
@@ -204,7 +216,7 @@ def collect_host_diagnostics(
             surface_meta = surface_classification.get(surface_key, {})
             exists = surface_path.exists()
             audit_entry: dict[str, Any] = {
-                "path": str(surface_path),
+                "path": surface_path.as_posix(),
                 "exists": exists,
                 "group": str(surface_meta.get("group", "unclassified")),
                 "required": bool(surface_meta.get("required", False)),

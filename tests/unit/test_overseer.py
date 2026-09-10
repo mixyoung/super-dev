@@ -228,9 +228,7 @@ class TestCheckpointPhase:
 
 
 class TestPlanAlignment:
-    def test_missing_expected_output_file_creates_deviation(
-        self, overseer: Overseer
-    ) -> None:
+    def test_missing_expected_output_file_creates_deviation(self, overseer: Overseer) -> None:
         # _check_plan_alignment is only called when both plan_data and actual_output are truthy
         plan_data = {
             "expected_outputs": ["/nonexistent/deeply/nested/output.md"],
@@ -310,9 +308,7 @@ class TestCheckpointStep:
         assert len(report.deviations) == 1
         assert report.deviations[0].category == "data-gap"
 
-    def test_failed_required_verify_gate_creates_deviation(
-        self, overseer: Overseer
-    ) -> None:
+    def test_failed_required_verify_gate_creates_deviation(self, overseer: Overseer) -> None:
         verify_results = [
             {"gate": "lint", "required": True, "passed": False},
             {"gate": "typecheck", "required": True, "passed": True},
@@ -635,9 +631,5 @@ class TestEdgeCases:
             step_label="Do thing",
         )
         report = overseer.get_report()
-        all_ids = [
-            d.id
-            for cp in report.checkpoints
-            for d in cp.deviations
-        ]
+        all_ids = [d.id for cp in report.checkpoints for d in cp.deviations]
         assert len(set(all_ids)) == len(all_ids)  # all unique

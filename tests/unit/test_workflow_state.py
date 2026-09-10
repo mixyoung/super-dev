@@ -321,7 +321,9 @@ def test_active_change_stale_quality_json_is_not_complete(temp_project_dir: Path
     assert summary["workflow_status"] == "missing_quality"
     assert summary["artifacts"]["quality"] is False
     assert summary["artifacts"]["quality_gate_state"]["stale"] is True
-    assert str(prd_file.resolve()) in summary["artifacts"]["quality_gate_state"]["newer_dependencies"]
+    assert (
+        str(prd_file.resolve()) in summary["artifacts"]["quality_gate_state"]["newer_dependencies"]
+    )
 
 
 def test_active_change_passed_current_quality_json_enters_delivery(
@@ -361,6 +363,56 @@ def test_frontend_none_quality_freshness_ignores_ui_and_other_change_artifacts(
     assert summary["workflow_status"] == "missing_delivery"
     assert summary["artifacts"]["quality"] is True
     assert summary["artifacts"]["quality_gate_state"]["stale"] is False
+
+
+def test_cli_delivery_does_not_require_service_rehearsal(temp_project_dir: Path) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir, frontend="none")
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "name: configured-project\nplatform: cli\nfrontend: none\nbackend: none\n",
+        encoding="utf-8",
+    )
+    (output_dir / "active-change-quality-gate.json").write_text(
+        json.dumps({"passed": True}),
+        encoding="utf-8",
+    )
+    delivery_dir = output_dir / "delivery"
+    delivery_dir.mkdir()
+    (delivery_dir / "active-change-delivery-manifest.json").write_text(
+        json.dumps({"status": "ready"}),
+        encoding="utf-8",
+    )
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["artifacts"]["rehearsal_required"] is False
+    assert summary["artifacts"]["rehearsal_report_passed"] is True
+    assert summary["artifacts"]["delivery"] is True
+    assert summary["workflow_status"] == "ready"
+
+
+def test_service_delivery_still_requires_rehearsal(temp_project_dir: Path) -> None:
+    output_dir, _ = _prepare_active_change_pipeline(temp_project_dir, frontend="none")
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "name: configured-project\nplatform: web\nfrontend: none\nbackend: none\n",
+        encoding="utf-8",
+    )
+    (output_dir / "active-change-quality-gate.json").write_text(
+        json.dumps({"passed": True}),
+        encoding="utf-8",
+    )
+    delivery_dir = output_dir / "delivery"
+    delivery_dir.mkdir()
+    (delivery_dir / "active-change-delivery-manifest.json").write_text(
+        json.dumps({"status": "ready"}),
+        encoding="utf-8",
+    )
+
+    summary = detect_pipeline_summary(temp_project_dir)
+
+    assert summary["artifacts"]["rehearsal_required"] is True
+    assert summary["artifacts"]["rehearsal_report_passed"] is False
+    assert summary["artifacts"]["delivery"] is False
+    assert summary["workflow_status"] == "missing_delivery"
 
 
 def test_detect_pipeline_summary_includes_read_only_shadow_ledger(

@@ -475,8 +475,7 @@ class TestExpertLoader:
     def test_parse_frontmatter_basic(self):
         from super_dev.experts.loader import parse_frontmatter
 
-        text = textwrap.dedent(
-            """\
+        text = textwrap.dedent("""\
             ---
             name: PM
             role: PM
@@ -485,8 +484,7 @@ class TestExpertLoader:
             ---
             # Body content
             Some text here.
-        """
-        )
+        """)
         fm, body = parse_frontmatter(text)
         assert fm["name"] == "PM"
         assert fm["role"] == "PM"
@@ -504,8 +502,7 @@ class TestExpertLoader:
     def test_parse_frontmatter_with_list(self):
         from super_dev.experts.loader import parse_frontmatter
 
-        text = textwrap.dedent(
-            """\
+        text = textwrap.dedent("""\
             ---
             name: ARCH
             focus_areas:
@@ -513,8 +510,7 @@ class TestExpertLoader:
             - api contracts
             ---
             Body
-        """
-        )
+        """)
         fm, body = parse_frontmatter(text)
         assert isinstance(fm["focus_areas"], list)
         assert "system design" in fm["focus_areas"]
@@ -524,8 +520,7 @@ class TestExpertLoader:
 
         md_file = tmp_path / "pm.md"
         md_file.write_text(
-            textwrap.dedent(
-                """\
+            textwrap.dedent("""\
                 ---
                 name: PM
                 role: PM
@@ -535,8 +530,7 @@ class TestExpertLoader:
                 ---
                 # Backstory
                 Expert PM with 10 years experience.
-            """
-            ),
+            """),
             encoding="utf-8",
         )
         defn = parse_expert_from_markdown(md_file, source="project")
@@ -550,15 +544,13 @@ class TestExpertLoader:
 
         md_file = tmp_path / "bad.md"
         md_file.write_text(
-            textwrap.dedent(
-                """\
+            textwrap.dedent("""\
                 ---
                 name: BAD
                 role: BAD
                 ---
                 No goal field.
-            """
-            ),
+            """),
             encoding="utf-8",
         )
         defn = parse_expert_from_markdown(md_file)
@@ -570,8 +562,7 @@ class TestExpertLoader:
         experts_dir = tmp_path / ".super-dev" / "experts"
         experts_dir.mkdir(parents=True)
         (experts_dir / "custom.md").write_text(
-            textwrap.dedent(
-                """\
+            textwrap.dedent("""\
                 ---
                 name: CUSTOM
                 role: CODE
@@ -580,8 +571,7 @@ class TestExpertLoader:
                 goal: Do custom things
                 ---
                 Custom body.
-            """
-            ),
+            """),
             encoding="utf-8",
         )
         defs = load_expert_definitions(project_dir=tmp_path)

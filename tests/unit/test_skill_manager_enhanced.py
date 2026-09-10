@@ -8,10 +8,10 @@
 import pytest
 from super_dev.skills.manager import SkillManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def empty_project(tmp_path):
@@ -28,6 +28,7 @@ def manager(empty_project):
 # 初始化
 # ---------------------------------------------------------------------------
 
+
 class TestSkillManagerInit:
     def test_creates_with_valid_dir(self, empty_project):
         mgr = SkillManager(empty_project)
@@ -42,6 +43,7 @@ class TestSkillManagerInit:
 # ---------------------------------------------------------------------------
 # list_targets
 # ---------------------------------------------------------------------------
+
 
 class TestListTargets:
     def test_returns_list(self, manager):
@@ -66,6 +68,7 @@ class TestListTargets:
 # target_path_kind
 # ---------------------------------------------------------------------------
 
+
 class TestTargetPathKind:
     def test_returns_string(self, manager):
         targets = manager.list_targets()
@@ -78,6 +81,7 @@ class TestTargetPathKind:
 # skill_surface_available
 # ---------------------------------------------------------------------------
 
+
 class TestSkillSurfaceAvailable:
     def test_returns_bool(self, manager):
         targets = manager.list_targets()
@@ -89,6 +93,7 @@ class TestSkillSurfaceAvailable:
 # ---------------------------------------------------------------------------
 # list_installed
 # ---------------------------------------------------------------------------
+
 
 class TestListInstalled:
     def test_returns_list(self, manager):
@@ -109,6 +114,7 @@ class TestListInstalled:
 # coverage_gaps
 # ---------------------------------------------------------------------------
 
+
 class TestCoverageGaps:
     def test_returns_dict(self):
         gaps = SkillManager.coverage_gaps()
@@ -123,6 +129,7 @@ class TestCoverageGaps:
 # ---------------------------------------------------------------------------
 # 边界情况
 # ---------------------------------------------------------------------------
+
 
 class TestSkillManagerEdgeCases:
     def test_nonexistent_subdir(self, tmp_path):
@@ -145,6 +152,7 @@ class TestSkillManagerEdgeCases:
 # ---------------------------------------------------------------------------
 # list_targets 深度
 # ---------------------------------------------------------------------------
+
 
 class TestListTargetsDeep:
     def test_targets_include_claude_code(self, manager):
@@ -177,6 +185,7 @@ class TestListTargetsDeep:
 # target_path_kind 深度
 # ---------------------------------------------------------------------------
 
+
 class TestTargetPathKindDeep:
     def test_all_targets_have_path_kind(self, manager):
         for target in manager.list_targets():
@@ -197,6 +206,7 @@ class TestTargetPathKindDeep:
 # skill_surface_available 深度
 # ---------------------------------------------------------------------------
 
+
 class TestSkillSurfaceAvailableDeep:
     def test_all_targets_have_surface_check(self, manager):
         for target in manager.list_targets():
@@ -207,6 +217,7 @@ class TestSkillSurfaceAvailableDeep:
 # ---------------------------------------------------------------------------
 # list_installed 深度
 # ---------------------------------------------------------------------------
+
 
 class TestListInstalledDeep:
     def test_all_targets_return_list(self, manager):

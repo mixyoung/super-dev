@@ -23,7 +23,10 @@ class TestUIIntelligenceAdvisor:
         assert "TanStack Table" in profile["component_stack"]["table"]
         assert "安全" in "".join(profile["trust_modules"])
         assert any("后台" in item or "营销页" in item for item in profile["banned_patterns"])
-        assert any("DaisyUI" in item["name"] or "Aceternity" in item["name"] for item in profile["alternative_libraries"])
+        assert any(
+            "DaisyUI" in item["name"] or "Aceternity" in item["name"]
+            for item in profile["alternative_libraries"]
+        )
         assert any(row["scene"] == "微信小程序" for row in profile["ui_library_matrix"])
         assert len(profile["quality_checklist"]) >= 4
         assert len(profile["design_references"]) == 3
@@ -72,8 +75,15 @@ class TestUIIntelligenceAdvisor:
 
         assert profile["frontend_variant"] == "uni-app"
         assert profile["framework_playbook"]["framework"] == "uni-app"
-        assert any("自定义导航栏" in item for item in profile["framework_playbook"]["implementation_modules"])
-        assert any("provider" in item or "登录/支付/分享" in item for item in profile["framework_playbook"]["anti_patterns"] + profile["framework_playbook"]["platform_constraints"])
+        assert any(
+            "自定义导航栏" in item
+            for item in profile["framework_playbook"]["implementation_modules"]
+        )
+        assert any(
+            "provider" in item or "登录/支付/分享" in item
+            for item in profile["framework_playbook"]["anti_patterns"]
+            + profile["framework_playbook"]["platform_constraints"]
+        )
 
     def test_recommend_desktop_stack_prefers_electron_tauri(self):
         advisor = UIIntelligenceAdvisor()
@@ -91,7 +101,9 @@ class TestUIIntelligenceAdvisor:
         assert "AG Grid" in profile["component_stack"]["table"]
         assert profile["design_references"][0]["name"] in {"Linear", "Raycast"}
         assert profile["framework_playbook"]["framework"] == "Desktop Web Shell"
-        assert any("filesystem" in item for item in profile["framework_playbook"]["native_capabilities"])
+        assert any(
+            "filesystem" in item for item in profile["framework_playbook"]["native_capabilities"]
+        )
 
     def test_recommend_react_native_and_flutter_emit_deep_playbooks(self):
         advisor = UIIntelligenceAdvisor()
@@ -112,10 +124,17 @@ class TestUIIntelligenceAdvisor:
         )
 
         assert rn["framework_playbook"]["framework"] == "React Native"
-        assert any("push notification" in item for item in rn["framework_playbook"]["native_capabilities"])
-        assert any("iOS 真机" in item or "Android" in item for item in rn["framework_playbook"]["validation_surfaces"])
+        assert any(
+            "push notification" in item for item in rn["framework_playbook"]["native_capabilities"]
+        )
+        assert any(
+            "iOS 真机" in item or "Android" in item
+            for item in rn["framework_playbook"]["validation_surfaces"]
+        )
         assert flutter["framework_playbook"]["framework"] == "Flutter"
-        assert any("ThemeData" in item for item in flutter["framework_playbook"]["delivery_evidence"])
+        assert any(
+            "ThemeData" in item for item in flutter["framework_playbook"]["delivery_evidence"]
+        )
 
     def test_recommend_emits_art_direction_candidates_and_guardrails(self):
         advisor = UIIntelligenceAdvisor()
@@ -205,7 +224,11 @@ class TestUIReviewReviewer:
         assert report.alignment_summary["navigation_shell"]["passed"] is True
         assert report.alignment_summary["banned_patterns"]["passed"] is True
         # 验证 UI/UX 专家视角检查已注入
-        expert_findings = [f for f in report.findings if f.title.startswith("[UI 专家]") or f.title.startswith("[UX 专家]")]
+        expert_findings = [
+            f
+            for f in report.findings
+            if f.title.startswith("[UI 专家]") or f.title.startswith("[UX 专家]")
+        ]
         assert len(expert_findings) > 0, "UI/UX 专家视角检查应产生至少一项发现"
 
     def test_review_flags_generic_typography_and_flat_hierarchy(self, temp_project_dir: Path):
@@ -409,7 +432,9 @@ export function App() {
         assert report.alignment_summary["navigation_shell"]["passed"] is False
         assert report.alignment_summary["banned_patterns"]["passed"] is False
 
-    def test_review_flags_uiux_frozen_icon_system_not_reflected_in_source(self, temp_project_dir: Path):
+    def test_review_flags_uiux_frozen_icon_system_not_reflected_in_source(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "brand-uiux.md").write_text(
@@ -445,7 +470,9 @@ export function App() {
         titles = [item.title for item in report.findings]
         assert any("图标系统" in title for title in titles)
 
-    def test_review_flags_uiux_frozen_font_pair_not_reflected_in_source(self, temp_project_dir: Path):
+    def test_review_flags_uiux_frozen_font_pair_not_reflected_in_source(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "fonts-uiux.md").write_text(
@@ -651,9 +678,7 @@ export function App() {
         assert any("frontend runtime 缺少 Claude-Design 协议证据" in title for title in titles)
         assert report.alignment_summary["runtime_claude_design_protocol"]["passed"] is False
 
-    def test_review_flags_runtime_mismatch_for_claude_design_protocol(
-        self, temp_project_dir: Path
-    ):
+    def test_review_flags_runtime_mismatch_for_claude_design_protocol(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
         frontend_output = output_dir / "frontend"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -727,7 +752,9 @@ export function App() {
         report = reviewer.review()
 
         titles = [item.title for item in report.findings]
-        assert any("UI Review 与 frontend runtime 的 Claude-Design 结论不一致" in title for title in titles)
+        assert any(
+            "UI Review 与 frontend runtime 的 Claude-Design 结论不一致" in title for title in titles
+        )
         assert report.alignment_summary["runtime_claude_design_protocol"]["passed"] is False
         assert report.alignment_summary["source_claude_design_protocol"]["passed"] is True
 
@@ -762,8 +789,12 @@ export function App() {
             ),
             encoding="utf-8",
         )
-        (frontend_output / "design-tokens.css").write_text(":root { --color-primary: #0F172A; }\n", encoding="utf-8")
-        (temp_project_dir / "pages.json").write_text('{"globalStyle":{"navigationStyle":"custom"}}', encoding="utf-8")
+        (frontend_output / "design-tokens.css").write_text(
+            ":root { --color-primary: #0F172A; }\n", encoding="utf-8"
+        )
+        (temp_project_dir / "pages.json").write_text(
+            '{"globalStyle":{"navigationStyle":"custom"}}', encoding="utf-8"
+        )
         frontend_dir = temp_project_dir / "frontend"
         frontend_dir.mkdir(parents=True, exist_ok=True)
         (frontend_dir / "App.vue").write_text(
@@ -850,8 +881,12 @@ export function App() {
             ),
             encoding="utf-8",
         )
-        (frontend_output / "design-tokens.css").write_text(":root { --color-primary: #0F172A; }\n", encoding="utf-8")
-        (temp_project_dir / "pages.json").write_text('{"globalStyle":{"navigationStyle":"custom"}}', encoding="utf-8")
+        (frontend_output / "design-tokens.css").write_text(
+            ":root { --color-primary: #0F172A; }\n", encoding="utf-8"
+        )
+        (temp_project_dir / "pages.json").write_text(
+            '{"globalStyle":{"navigationStyle":"custom"}}', encoding="utf-8"
+        )
         frontend_dir = temp_project_dir / "frontend"
         frontend_dir.mkdir(parents=True, exist_ok=True)
         (frontend_dir / "App.vue").write_text(
@@ -924,7 +959,9 @@ export function App() {
         titles = [item.title for item in report.findings]
         assert not any("组件生态" in title for title in titles)
 
-    def test_review_flags_component_import_drift_when_dependency_exists_but_source_not_using_contract(self, temp_project_dir: Path):
+    def test_review_flags_component_import_drift_when_dependency_exists_but_source_not_using_contract(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         frontend_output = output_dir / "frontend"
         output_dir.mkdir(parents=True, exist_ok=True)

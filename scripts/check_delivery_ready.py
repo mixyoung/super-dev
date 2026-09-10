@@ -45,17 +45,9 @@ def _check_manifest(path: Path) -> tuple[bool, str]:
     data = _load_manifest(path)
     status = str(data.get("status", ""))
     missing_required = data.get("missing_required", [])
-    missing_count = (
-        len(missing_required)
-        if isinstance(missing_required, list)
-        else -1
-    )
+    missing_count = len(missing_required) if isinstance(missing_required, list) else -1
     included_files = data.get("included_files", [])
-    included_count = (
-        len(included_files)
-        if isinstance(included_files, list)
-        else -1
-    )
+    included_count = len(included_files) if isinstance(included_files, list) else -1
 
     if status != "ready":
         return False, f"交付状态非 ready: status={status}"
@@ -180,9 +172,7 @@ def _run_smoke(project_root: Path) -> Path:
                 isinstance(missing_required, list)
                 and data.get("status") != "ready"
                 and {
-                    str(item.get("path", ""))
-                    for item in missing_required
-                    if isinstance(item, dict)
+                    str(item.get("path", "")) for item in missing_required if isinstance(item, dict)
                 }
                 == {"output/release-smoke-quality-gate.md"}
             ):
@@ -248,7 +238,9 @@ def main() -> int:
         return 0
 
     try:
-        manifest_path = Path(args.manifest).resolve() if args.manifest else _latest_manifest(project_dir)
+        manifest_path = (
+            Path(args.manifest).resolve() if args.manifest else _latest_manifest(project_dir)
+        )
         ok, message = _check_manifest(manifest_path)
     except Exception as exc:
         print(f"[FAIL] 交付门禁检查失败: {exc}")

@@ -457,7 +457,10 @@ class TestIntegrationManager:
         assert qoder.certification_level == "experimental"
         assert qoder.usage_mode == "native-slash"
         assert qoder.slash_command_file == ".qoder/commands/super-dev.md"
-        assert "AGENTS.md + rules + commands + skills (+ optional agents)" in qoder.host_protocol_summary
+        assert (
+            "AGENTS.md + rules + commands + skills (+ optional agents)"
+            in qoder.host_protocol_summary
+        )
         assert ".qoder/agents/super-dev.md" in qoder.integration_files
         assert ".qoder/rules/super-dev.md" in qoder.official_project_surfaces
         assert "AGENTS.md" in qoder.official_project_surfaces
@@ -513,9 +516,7 @@ class TestIntegrationManager:
         assert "~/.codebuddy/rules/super-dev.md" in codebuddy_cli.optional_user_surfaces
         assert "~/.codebuddy/commands/super-dev-seeai.md" in codebuddy_cli.optional_user_surfaces
         assert "~/.codebuddy/agents/super-dev.md" in codebuddy_cli.optional_user_surfaces
-        assert (
-            ".codebuddy/skills/super-dev/SKILL.md" in codebuddy_cli.official_project_surfaces
-        )
+        assert ".codebuddy/skills/super-dev/SKILL.md" in codebuddy_cli.official_project_surfaces
         assert ".codebuddy/AGENTS.md" in codebuddy_cli.observed_compatibility_surfaces
 
         droid = by_host["droid-cli"]
@@ -524,7 +525,9 @@ class TestIntegrationManager:
         assert "~/.factory/skills/super-dev/SKILL.md" in droid.official_user_surfaces
         assert "~/.factory/commands/super-dev-seeai.md" in droid.optional_user_surfaces
         assert droid.host_protocol_mode == "official-factory"
-        assert "AGENTS.md + .factory/rules + skills (+ legacy commands)" in droid.host_protocol_summary
+        assert (
+            "AGENTS.md + .factory/rules + skills (+ legacy commands)" in droid.host_protocol_summary
+        )
 
         kimi = by_host["kimi-code"]
         assert kimi.category == "cli"
@@ -606,7 +609,10 @@ class TestIntegrationManager:
         assert workbuddy.slash_command_file == ""
         assert workbuddy.skill_dir == "~/.workbuddy/skills"
         assert workbuddy.host_protocol_mode == "manual-task-workbench-mcp"
-        assert workbuddy.host_protocol_summary == "当前推荐任务工作台模型: Skills + MCP + task continuity"
+        assert (
+            workbuddy.host_protocol_summary
+            == "当前推荐任务工作台模型: Skills + MCP + task continuity"
+        )
         assert any("super-dev-seeai:" in item["entry"] for item in workbuddy.entry_variants)
         assert "~/.workbuddy/skills/super-dev/SKILL.md" in workbuddy.optional_user_surfaces
 
@@ -655,14 +661,18 @@ class TestIntegrationManager:
         assert cursor.precondition_status == "project-context-required"
         assert cursor.precondition_items
         assert any("目标项目" in item for item in cursor.precondition_guidance)
-        assert cursor.host_protocol_summary == "官方 Agent Chat + AGENTS.md + rules (+ beta commands)"
+        assert (
+            cursor.host_protocol_summary == "官方 Agent Chat + AGENTS.md + rules (+ beta commands)"
+        )
         assert "AGENTS.md" in cursor.official_project_surfaces
         assert "CLAUDE.md" in cursor.optional_project_surfaces
         assert ".cursor/commands/super-dev.md" in cursor.optional_project_surfaces
 
         kiro_cli = by_host["kiro-cli"]
         assert kiro_cli.host_protocol_mode == "official-steering"
-        assert kiro_cli.host_protocol_summary == "官方 AGENTS.md + steering + skills + native resume"
+        assert (
+            kiro_cli.host_protocol_summary == "官方 AGENTS.md + steering + skills + native resume"
+        )
         assert kiro_cli.usage_mode == "native-slash"
         assert kiro_cli.trigger_command == "/super-dev <需求描述>"
         assert "AGENTS.md" in kiro_cli.official_project_surfaces
@@ -767,9 +777,7 @@ class TestIntegrationManager:
         manager = IntegrationManager(temp_project_dir)
         codex = manager.host_hardening_blueprint("codex-cli")
         claude = manager.host_hardening_blueprint("claude-code")
-        codex_with_user = manager.host_hardening_blueprint(
-            "codex-cli", include_user_surfaces=True
-        )
+        codex_with_user = manager.host_hardening_blueprint("codex-cli", include_user_surfaces=True)
 
         assert codex["trigger_mode"] == "text"
         assert any("install skill" in step for step in codex["required_steps"])
@@ -848,9 +856,9 @@ class TestIntegrationManager:
         skill_content = (
             temp_project_dir / ".qoder" / "skills" / "super-dev" / "SKILL.md"
         ).read_text(encoding="utf-8")
-        qoder_agent_content = (
-            temp_project_dir / ".qoder" / "agents" / "super-dev.md"
-        ).read_text(encoding="utf-8")
+        qoder_agent_content = (temp_project_dir / ".qoder" / "agents" / "super-dev.md").read_text(
+            encoding="utf-8"
+        )
         seeai_skill = temp_project_dir / ".qoder" / "skills" / "super-dev-seeai" / "SKILL.md"
         seeai_command = temp_project_dir / ".qoder" / "commands" / "super-dev-seeai.md"
         assert "Super Dev" in agents_content
@@ -952,7 +960,10 @@ class TestIntegrationManager:
         assert (temp_project_dir / ".trae" / "commands" / "super-dev-seeai.md").exists()
         assert (temp_project_dir / ".trae" / "skills" / "super-dev" / "SKILL.md").exists()
         assert (temp_project_dir / ".trae" / "skills" / "super-dev-seeai" / "SKILL.md").exists()
-        assert slash_file.resolve() == (temp_project_dir / ".trae" / "commands" / "super-dev.md").resolve()
+        assert (
+            slash_file.resolve()
+            == (temp_project_dir / ".trae" / "commands" / "super-dev.md").resolve()
+        )
 
     def test_trae_solocn_generates_rules_and_skill(self, temp_project_dir: Path):
         manager = IntegrationManager(temp_project_dir)
@@ -1025,9 +1036,7 @@ class TestIntegrationManager:
         assert "Super Dev" in rules_content
         assert "super-dev：" in rules_content
         assert (temp_project_dir / ".kilocode" / "skills" / "super-dev" / "SKILL.md").exists()
-        assert (
-            temp_project_dir / ".kilocode" / "skills" / "super-dev-seeai" / "SKILL.md"
-        ).exists()
+        assert (temp_project_dir / ".kilocode" / "skills" / "super-dev-seeai" / "SKILL.md").exists()
 
     def test_slash_content_requires_host_research_first(self, temp_project_dir: Path):
         manager = IntegrationManager(temp_project_dir)
@@ -1104,9 +1113,7 @@ class TestIntegrationManager:
                 if skill_manager.target_path_kind(target) == "observed-compatibility-surface":
                     skill_root.mkdir(parents=True, exist_ok=True)
                 if skill_manager.skill_surface_available(target):
-                    skill_manager.install(
-                        "super-dev", target=target, name="super-dev", force=True
-                    )
+                    skill_manager.install("super-dev", target=target, name="super-dev", force=True)
 
             surfaces = manager.collect_managed_surface_paths(target)
             for _, path in surfaces.items():
@@ -1243,9 +1250,9 @@ class TestIntegrationManager:
         root_agents = temp_project_dir / "AGENTS.md"
         project_agent = temp_project_dir / ".opencode" / "agents" / "super-dev.md"
         assert root_agents.resolve() in [item.resolve() for item in written]
-        assert (
-            temp_project_dir / ".opencode" / "skills" / "super-dev" / "SKILL.md"
-        ).resolve() in [item.resolve() for item in written]
+        assert (temp_project_dir / ".opencode" / "skills" / "super-dev" / "SKILL.md").resolve() in [
+            item.resolve() for item in written
+        ]
         assert project_agent.resolve() in [item.resolve() for item in written]
         assert root_agents.exists()
         assert project_agent.exists()
@@ -1323,9 +1330,7 @@ class TestIntegrationManager:
         seeai_workflow = (
             temp_project_dir / ".windsurf" / "workflows" / "super-dev-seeai.md"
         ).read_text(encoding="utf-8")
-        seeai_skill = (
-            temp_project_dir / ".windsurf" / "skills" / "super-dev-seeai" / "SKILL.md"
-        )
+        seeai_skill = temp_project_dir / ".windsurf" / "skills" / "super-dev-seeai" / "SKILL.md"
         assert workflow_file is not None
         workflow_content = workflow_file.read_text(encoding="utf-8")
         assert "Super Dev" in rules_content

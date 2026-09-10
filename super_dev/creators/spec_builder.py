@@ -91,9 +91,7 @@ class SpecBuilder:
             satisfied_stages = {"spec"}
             if docs_gate_status(self.project_dir).get("confirmed") is True:
                 satisfied_stages.update({"docs", "docs_confirm"})
-            effective_work_mode = work_mode or (
-                "new" if scenario == "0-1" else "evolve"
-            )
+            effective_work_mode = work_mode or ("new" if scenario == "0-1" else "evolve")
             effective_governance_depth = governance_depth or (
                 "commercial" if scenario == "0-1" else "architectural"
             )

@@ -12,6 +12,7 @@ from super_dev.reviewers.code_review import CodeReviewGenerator
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def react_node_generator(tmp_path):
     return CodeReviewGenerator(
@@ -86,6 +87,7 @@ def no_backend_generator(tmp_path):
 # 基本生成测试
 # ---------------------------------------------------------------------------
 
+
 class TestBasicGeneration:
     def test_generates_non_empty_markdown(self, react_node_generator):
         result = react_node_generator.generate()
@@ -135,6 +137,7 @@ class TestBasicGeneration:
 # 技术栈差异化审查
 # ---------------------------------------------------------------------------
 
+
 class TestTechStackDifferentiation:
     def test_react_frontend_section(self, react_node_generator):
         result = react_node_generator.generate()
@@ -162,11 +165,13 @@ class TestTechStackDifferentiation:
 
     def test_different_frontends_produce_different_output(self, tmp_path):
         react_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
+            project_dir=tmp_path,
+            name="t",
             tech_stack={"platform": "web", "frontend": "react", "backend": "node"},
         )
         vue_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
+            project_dir=tmp_path,
+            name="t",
             tech_stack={"platform": "web", "frontend": "vue", "backend": "node"},
         )
         react_result = react_gen.generate()
@@ -176,11 +181,13 @@ class TestTechStackDifferentiation:
 
     def test_different_backends_produce_different_output(self, tmp_path):
         node_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
+            project_dir=tmp_path,
+            name="t",
             tech_stack={"platform": "web", "frontend": "react", "backend": "node"},
         )
         python_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
+            project_dir=tmp_path,
+            name="t",
             tech_stack={"platform": "web", "frontend": "react", "backend": "python"},
         )
         assert node_gen.generate() != python_gen.generate()
@@ -189,6 +196,7 @@ class TestTechStackDifferentiation:
 # ---------------------------------------------------------------------------
 # 领域差异化审查
 # ---------------------------------------------------------------------------
+
 
 class TestDomainDifferentiation:
     def test_fintech_domain_review(self, vue_python_generator):
@@ -205,11 +213,18 @@ class TestDomainDifferentiation:
 
     def test_different_domains_produce_different_output(self, tmp_path):
         fintech_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
-            tech_stack={"platform": "web", "frontend": "react", "backend": "node", "domain": "fintech"},
+            project_dir=tmp_path,
+            name="t",
+            tech_stack={
+                "platform": "web",
+                "frontend": "react",
+                "backend": "node",
+                "domain": "fintech",
+            },
         )
         general_gen = CodeReviewGenerator(
-            project_dir=tmp_path, name="t",
+            project_dir=tmp_path,
+            name="t",
             tech_stack={"platform": "web", "frontend": "react", "backend": "node", "domain": ""},
         )
         assert fintech_gen.generate() != general_gen.generate()
@@ -218,6 +233,7 @@ class TestDomainDifferentiation:
 # ---------------------------------------------------------------------------
 # 代码复杂度分析（生成的指南包含复杂度相关检查项）
 # ---------------------------------------------------------------------------
+
 
 class TestComplexityChecklist:
     def test_function_length_checklist(self, react_node_generator):
@@ -240,6 +256,7 @@ class TestComplexityChecklist:
 # ---------------------------------------------------------------------------
 # 命名规范检查（生成的指南包含命名规范检查项）
 # ---------------------------------------------------------------------------
+
 
 class TestNamingConventionChecklist:
     def test_pascal_case_mentioned(self, react_node_generator):
@@ -267,6 +284,7 @@ class TestNamingConventionChecklist:
 # 安全检查项详情
 # ---------------------------------------------------------------------------
 
+
 class TestSecurityChecklistDetails:
     def test_sql_injection_prevention(self, react_node_generator):
         result = react_node_generator.generate()
@@ -288,6 +306,7 @@ class TestSecurityChecklistDetails:
 # ---------------------------------------------------------------------------
 # 性能检查项详情
 # ---------------------------------------------------------------------------
+
 
 class TestPerformanceChecklistDetails:
     def test_n_plus_one_query_mentioned(self, react_node_generator):
@@ -315,6 +334,7 @@ class TestPerformanceChecklistDetails:
 # 工具推荐
 # ---------------------------------------------------------------------------
 
+
 class TestToolRecommendations:
     def test_eslint_recommended(self, react_node_generator):
         result = react_node_generator.generate()
@@ -332,6 +352,7 @@ class TestToolRecommendations:
 # ---------------------------------------------------------------------------
 # 常见问题检查表
 # ---------------------------------------------------------------------------
+
 
 class TestCommonIssuesChecklist:
     def test_null_handling(self, react_node_generator):
@@ -359,6 +380,7 @@ class TestCommonIssuesChecklist:
 # 初始化和属性
 # ---------------------------------------------------------------------------
 
+
 class TestInitialization:
     def test_project_dir_resolved(self, tmp_path):
         gen = CodeReviewGenerator(tmp_path, "t", {"platform": "web"})
@@ -373,7 +395,8 @@ class TestInitialization:
 
     def test_custom_tech_stack(self, tmp_path):
         gen = CodeReviewGenerator(
-            tmp_path, "t",
+            tmp_path,
+            "t",
             {"platform": "mobile", "frontend": "flutter", "backend": "go", "domain": "education"},
         )
         assert gen.platform == "mobile"
@@ -385,6 +408,7 @@ class TestInitialization:
 # ---------------------------------------------------------------------------
 # 反馈模板
 # ---------------------------------------------------------------------------
+
 
 class TestFeedbackTemplate:
     def test_contains_feedback_template(self, react_node_generator):
@@ -399,6 +423,7 @@ class TestFeedbackTemplate:
 # ---------------------------------------------------------------------------
 # 输出完整性验证
 # ---------------------------------------------------------------------------
+
 
 class TestOutputCompleteness:
     """验证生成的代码审查指南包含所有必要部分"""
@@ -453,17 +478,20 @@ class TestOutputCompleteness:
 # 多技术栈组合测试
 # ---------------------------------------------------------------------------
 
+
 class TestMultiStackCombinations:
     """测试不同技术栈组合生成不同审查内容"""
 
-    @pytest.fixture(params=[
-        ("react", "node"),
-        ("vue", "python"),
-        ("angular", "java"),
-        ("react", "go"),
-        ("vue", "node"),
-        ("svelte", "python"),
-    ])
+    @pytest.fixture(
+        params=[
+            ("react", "node"),
+            ("vue", "python"),
+            ("angular", "java"),
+            ("react", "go"),
+            ("vue", "node"),
+            ("svelte", "python"),
+        ]
+    )
     def stack_generator(self, tmp_path, request):
         frontend, backend = request.param
         return CodeReviewGenerator(
@@ -499,13 +527,15 @@ class TestMultiStackCombinations:
         result = stack_generator.generate()
         assert "命名" in result
 
-    @pytest.fixture(params=[
-        "fintech",
-        "medical",
-        "education",
-        "",
-        "ecommerce",
-    ])
+    @pytest.fixture(
+        params=[
+            "fintech",
+            "medical",
+            "education",
+            "",
+            "ecommerce",
+        ]
+    )
     def domain_generator(self, tmp_path, request):
         return CodeReviewGenerator(
             project_dir=tmp_path,
@@ -532,6 +562,7 @@ class TestMultiStackCombinations:
 # 错误处理边界
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_empty_tech_stack(self, tmp_path):
         gen = CodeReviewGenerator(tmp_path, "edge", {})
@@ -540,37 +571,41 @@ class TestEdgeCases:
         assert len(result) > 500
 
     def test_unknown_frontend(self, tmp_path):
-        gen = CodeReviewGenerator(tmp_path, "edge", {
-            "platform": "web", "frontend": "unknown-framework", "backend": "node"
-        })
+        gen = CodeReviewGenerator(
+            tmp_path,
+            "edge",
+            {"platform": "web", "frontend": "unknown-framework", "backend": "node"},
+        )
         result = gen.generate()
         assert isinstance(result, str)
 
     def test_unknown_backend(self, tmp_path):
-        gen = CodeReviewGenerator(tmp_path, "edge", {
-            "platform": "web", "frontend": "react", "backend": "unknown-lang"
-        })
+        gen = CodeReviewGenerator(
+            tmp_path, "edge", {"platform": "web", "frontend": "react", "backend": "unknown-lang"}
+        )
         result = gen.generate()
         assert isinstance(result, str)
 
     def test_unknown_platform(self, tmp_path):
-        gen = CodeReviewGenerator(tmp_path, "edge", {
-            "platform": "quantum", "frontend": "react", "backend": "node"
-        })
+        gen = CodeReviewGenerator(
+            tmp_path, "edge", {"platform": "quantum", "frontend": "react", "backend": "node"}
+        )
         result = gen.generate()
         assert isinstance(result, str)
 
     def test_special_characters_in_name(self, tmp_path):
-        gen = CodeReviewGenerator(tmp_path, "my-project & test (v2)", {
-            "platform": "web", "frontend": "react", "backend": "node"
-        })
+        gen = CodeReviewGenerator(
+            tmp_path,
+            "my-project & test (v2)",
+            {"platform": "web", "frontend": "react", "backend": "node"},
+        )
         result = gen.generate()
         assert "my-project & test (v2)" in result
 
     def test_very_long_name(self, tmp_path):
         name = "a" * 200
-        gen = CodeReviewGenerator(tmp_path, name, {
-            "platform": "web", "frontend": "react", "backend": "node"
-        })
+        gen = CodeReviewGenerator(
+            tmp_path, name, {"platform": "web", "frontend": "react", "backend": "node"}
+        )
         result = gen.generate()
         assert name in result

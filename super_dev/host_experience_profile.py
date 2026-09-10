@@ -294,7 +294,11 @@ _EXPERIENCE_PROFILES: dict[str, dict[str, Any]] = {
         best_for="中文项目协作、AGENTS + explicit Skill / Flow 入口与 native session resume",
         resume_style="native-resume",
         market_focus="cn",
-        strengths=("中文协作体验", "AGENTS + explicit Skill / Flow 入口", "原生 continue / session resume"),
+        strengths=(
+            "中文协作体验",
+            "AGENTS + explicit Skill / Flow 入口",
+            "原生 continue / session resume",
+        ),
         preferred_entries=("/skill:super-dev 你的需求", "super-dev: 你的需求"),
         native_resume=("kimi --continue", "kimi --session <id>"),
         start_playbook=(
@@ -499,9 +503,7 @@ def build_host_experience_profile(host_id: str) -> dict[str, Any]:
         strengths=("项目接入", "宿主内持续开发", "交付闭环"),
         preferred_entries=("/super-dev 你的需求", "super-dev: 你的需求"),
         native_resume=("/super-dev 继续当前流程", "super-dev: 继续当前流程"),
-        start_playbook=(
-            "起手建议: 优先留在当前宿主会话里进入 Super Dev，不要先切回普通聊天。",
-        ),
+        start_playbook=("起手建议: 优先留在当前宿主会话里进入 Super Dev，不要先切回普通聊天。",),
         repair_playbook="如果入口或规则没刷新，先重开当前宿主会话，再回到 Super Dev 入口。",
     )
 
@@ -509,14 +511,10 @@ def build_host_experience_profile(host_id: str) -> dict[str, Any]:
 def build_host_resume_guidance(host_id: str) -> list[str]:
     profile = build_host_experience_profile(host_id)
     preferred_entries = [
-        str(item).strip()
-        for item in profile.get("preferred_entries", [])
-        if str(item).strip()
+        str(item).strip() for item in profile.get("preferred_entries", []) if str(item).strip()
     ][:2]
     native_resume = [
-        str(item).strip()
-        for item in profile.get("native_resume", [])
-        if str(item).strip()
+        str(item).strip() for item in profile.get("native_resume", []) if str(item).strip()
     ][:2]
     resume_style = str(profile.get("resume_style", "")).strip()
 
@@ -545,9 +543,7 @@ def build_host_resume_guidance(host_id: str) -> list[str]:
 def build_host_start_playbook(host_id: str) -> list[str]:
     profile = build_host_experience_profile(host_id)
     playbook = [
-        str(item).strip()
-        for item in profile.get("start_playbook", [])
-        if str(item).strip()
+        str(item).strip() for item in profile.get("start_playbook", []) if str(item).strip()
     ]
     return playbook[:3]
 
@@ -581,9 +577,7 @@ def build_host_standard_first_prompt(host_id: str) -> str:
         return prompt_map[host_id]
     profile = build_host_experience_profile(host_id)
     preferred_entries = [
-        str(item).strip()
-        for item in profile.get("preferred_entries", [])
-        if str(item).strip()
+        str(item).strip() for item in profile.get("preferred_entries", []) if str(item).strip()
     ]
     return preferred_entries[0] if preferred_entries else "/super-dev 你的需求"
 
@@ -609,9 +603,7 @@ def build_host_competition_first_prompt(host_id: str) -> str:
         return prompt_map[host_id]
     profile = build_host_experience_profile(host_id)
     preferred_entries = [
-        str(item).strip()
-        for item in profile.get("preferred_entries", [])
-        if str(item).strip()
+        str(item).strip() for item in profile.get("preferred_entries", []) if str(item).strip()
     ]
     for item in preferred_entries:
         if "seeai" in item.lower():
@@ -636,9 +628,7 @@ def build_host_official_workflow_checks(host_id: str, usage: dict[str, Any]) -> 
         if str(item).strip()
     ][:3]
     user_surfaces = [
-        str(item).strip()
-        for item in usage.get("official_user_surfaces", [])
-        if str(item).strip()
+        str(item).strip() for item in usage.get("official_user_surfaces", []) if str(item).strip()
     ][:3]
     competition_project_surfaces = [
         str(item).strip()
@@ -656,14 +646,14 @@ def build_host_official_workflow_checks(host_id: str, usage: dict[str, Any]) -> 
         if str(item).strip()
     ][:2]
     optional_user_surfaces = [
-        str(item).strip()
-        for item in usage.get("optional_user_surfaces", [])
-        if str(item).strip()
+        str(item).strip() for item in usage.get("optional_user_surfaces", []) if str(item).strip()
     ][:2]
 
     lines: list[str] = []
     if protocol_mode:
-        protocol_scope = "官方协议面" if protocol_mode.startswith("official") else "当前推荐接入模型"
+        protocol_scope = (
+            "官方协议面" if protocol_mode.startswith("official") else "当前推荐接入模型"
+        )
         lines.append(
             f"确认 {host} 按 {protocol_mode} {protocol_scope}真实加载 Super Dev，而不是只检测到文件存在。"
         )
@@ -682,13 +672,9 @@ def build_host_official_workflow_checks(host_id: str, usage: dict[str, Any]) -> 
             joined.append(f"用户侧 {' / '.join(optional_user_surfaces)}")
         lines.append(f"如启用当前增强接入面，再确认: {'；'.join(joined)}")
     if competition_project_surfaces:
-        lines.append(
-            f"确认 SEEAI 项目补充面真实生效: {' / '.join(competition_project_surfaces)}"
-        )
+        lines.append(f"确认 SEEAI 项目补充面真实生效: {' / '.join(competition_project_surfaces)}")
     if competition_user_surfaces:
-        lines.append(
-            f"确认 SEEAI 用户级补充面真实生效: {' / '.join(competition_user_surfaces)}"
-        )
+        lines.append(f"确认 SEEAI 用户级补充面真实生效: {' / '.join(competition_user_surfaces)}")
 
     host_specific = {
         "antigravity": "确认当前 Antigravity Agent Chat 真实加载 GEMINI.md、.gemini/commands 与当前推荐 `.agent/workflows/`；skills 只按兼容增强层核对。",

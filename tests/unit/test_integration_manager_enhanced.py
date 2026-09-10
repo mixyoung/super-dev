@@ -8,10 +8,10 @@
 import pytest
 from super_dev.integrations.manager import IntegrationManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def empty_project(tmp_path):
@@ -28,6 +28,7 @@ def manager(empty_project):
 # 初始化
 # ---------------------------------------------------------------------------
 
+
 class TestIntegrationManagerInit:
     def test_creates_with_valid_dir(self, empty_project):
         mgr = IntegrationManager(empty_project)
@@ -42,6 +43,7 @@ class TestIntegrationManagerInit:
 # ---------------------------------------------------------------------------
 # list_targets
 # ---------------------------------------------------------------------------
+
 
 class TestListTargets:
     def test_returns_list(self, manager):
@@ -61,6 +63,7 @@ class TestListTargets:
 # ---------------------------------------------------------------------------
 # list_adapter_profiles
 # ---------------------------------------------------------------------------
+
 
 class TestAdapterProfiles:
     def test_returns_list(self, manager):
@@ -86,6 +89,7 @@ class TestAdapterProfiles:
 # get_adapter_profile
 # ---------------------------------------------------------------------------
 
+
 class TestGetAdapterProfile:
     def test_get_known_target(self, manager):
         profiles = manager.list_adapter_profiles()
@@ -106,6 +110,7 @@ class TestGetAdapterProfile:
 # host_hardening_blueprint
 # ---------------------------------------------------------------------------
 
+
 class TestHostHardeningBlueprint:
     def test_returns_dict(self, manager):
         profiles = manager.list_adapter_profiles()
@@ -118,6 +123,7 @@ class TestHostHardeningBlueprint:
 # ---------------------------------------------------------------------------
 # coverage_gaps
 # ---------------------------------------------------------------------------
+
 
 class TestCoverageGaps:
     def test_returns_dict(self):
@@ -133,6 +139,7 @@ class TestCoverageGaps:
 # ---------------------------------------------------------------------------
 # 边界情况
 # ---------------------------------------------------------------------------
+
 
 class TestIntegrationEdgeCases:
     def test_nonexistent_output_dir(self, tmp_path):
@@ -153,6 +160,7 @@ class TestIntegrationEdgeCases:
 # ---------------------------------------------------------------------------
 # 适配器画像深度测试
 # ---------------------------------------------------------------------------
+
 
 class TestAdapterProfilesDeep:
     def test_all_profiles_have_host_field(self, manager):
@@ -208,6 +216,7 @@ class TestAdapterProfilesDeep:
 # list_targets 深度测试
 # ---------------------------------------------------------------------------
 
+
 class TestListTargetsDeep:
     def test_targets_have_name(self, manager):
         for target in manager.list_targets():
@@ -237,6 +246,7 @@ class TestListTargetsDeep:
 # ---------------------------------------------------------------------------
 # coverage_gaps 深度测试
 # ---------------------------------------------------------------------------
+
 
 class TestCoverageGapsDeep:
     def test_gaps_keys_are_strings(self):

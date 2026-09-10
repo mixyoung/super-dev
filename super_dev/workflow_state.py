@@ -866,9 +866,11 @@ def detect_pipeline_summary(
 
     try:
         project_config = ConfigManager(project_dir).load()
+        platform_kind = str(project_config.platform or "").strip().lower()
         frontend_kind = str(project_config.frontend or "").strip().lower()
         backend_kind = str(project_config.backend or "").strip().lower()
     except Exception:  # pragma: no cover - malformed config keeps the legacy requirements
+        platform_kind = "unknown"
         frontend_kind = "unknown"
         backend_kind = "unknown"
     frontend_required = frontend_kind not in {"", "none"}
@@ -1043,7 +1045,8 @@ def detect_pipeline_summary(
             sorted(rehearsal_dir.glob("*-rehearsal-report.json")) if rehearsal_dir.exists() else []
         )
     rehearsal_payload, rehearsal_report_path = _latest_json(rehearsal_candidates)
-    rehearsal_report_passed = bool(rehearsal_payload.get("passed", False))
+    rehearsal_required = platform_kind != "cli"
+    rehearsal_report_passed = not rehearsal_required or bool(rehearsal_payload.get("passed", False))
     delivery_done = delivery_manifest_ready and rehearsal_report_passed
 
     knowledge_payload, knowledge_cache_path = _latest_json(
@@ -1561,6 +1564,7 @@ def detect_pipeline_summary(
             "delivery": delivery_done,
             "delivery_manifest_ready": delivery_manifest_ready,
             "delivery_manifest_path": delivery_manifest_path,
+            "rehearsal_required": rehearsal_required,
             "rehearsal_report_passed": rehearsal_report_passed,
             "rehearsal_report_path": rehearsal_report_path,
         },

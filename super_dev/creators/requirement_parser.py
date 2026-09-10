@@ -1197,7 +1197,9 @@ class RequirementParser:
                         "先做可演示主路径，再补次级页面；宿主必须围绕 UI 契约实现。",
                         "必须先落实视觉方向、品牌信号、证明构图、组件工艺和框架 playbook。",
                     ],
-                    hard_gates=["preview_confirm 未通过前，不允许进入 backend / quality / delivery。"],
+                    hard_gates=[
+                        "preview_confirm 未通过前，不允许进入 backend / quality / delivery。"
+                    ],
                 ),
                 phase(
                     phase_id="phase-3",

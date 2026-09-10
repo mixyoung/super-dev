@@ -546,7 +546,7 @@ super-dev bootstrap --name my-project --platform web --frontend next --backend n
 
 ## 架构概览
 
-Super Dev 2.4.0 架构由四层组成：**宿主接入层**（统一宿主矩阵，按 CLI / IDE / 桌面助手分组）、**知识治理层**（306 索引 / 渐进式加载 / 自演化）、**编排引擎层**（9 阶段流水线 / 11 专家 + Overseer / 验证规则引擎）、**交付审计层**（DORA 度量 / ADR / 一致性检测 / proof-pack）。
+Super Dev 2.5.0 架构由四层组成：**宿主接入层**（统一宿主矩阵，按 CLI / IDE / 桌面助手分组）、**知识治理层**（306 索引 / 渐进式加载 / 自演化）、**编排引擎层**（9 阶段流水线 / 11 专家 + Overseer / 验证规则引擎）、**交付审计层**（DORA 度量 / ADR / 一致性检测 / proof-pack）。
 
 ### 一、系统高阶流转架构
 

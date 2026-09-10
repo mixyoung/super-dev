@@ -112,7 +112,9 @@ class TestPlanStep:
         step = _make_step(
             step_id="s1",
             depends_on=["s0"],
-            verify_gates=[VerifyGate(command="echo ok", gate="smoke", required=True, timeout_seconds=30)],
+            verify_gates=[
+                VerifyGate(command="echo ok", gate="smoke", required=True, timeout_seconds=30)
+            ],
         )
         d = step.to_dict()
         assert d["id"] == "s1"
@@ -522,7 +524,9 @@ class TestVerifyGates:
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="sleep", timeout=1)
         step = _make_step(
             step_id="s1",
-            verify_gates=[VerifyGate(command="sleep 10", gate="slow", required=True, timeout_seconds=1)],
+            verify_gates=[
+                VerifyGate(command="sleep 10", gate="slow", required=True, timeout_seconds=1)
+            ],
         )
         all_passed, results = executor.run_verify_gates(step)
         assert all_passed is False
@@ -605,7 +609,9 @@ class TestCodexReview:
 
 class TestHandleStepFailure:
     def test_first_failure_retries(self, executor: PlanExecutor) -> None:
-        plan = executor.create_plan(phase="frontend", steps=[_make_step(step_id="s1", failure_budget=3)])
+        plan = executor.create_plan(
+            phase="frontend", steps=[_make_step(step_id="s1", failure_budget=3)]
+        )
         step = plan.get_step("s1")
         result = executor.handle_step_failure(plan, step, "test error")
 
@@ -615,7 +621,9 @@ class TestHandleStepFailure:
         assert "test error" in step.errors
 
     def test_exhausted_budget_needs_human(self, executor: PlanExecutor) -> None:
-        plan = executor.create_plan(phase="frontend", steps=[_make_step(step_id="s1", failure_budget=1)])
+        plan = executor.create_plan(
+            phase="frontend", steps=[_make_step(step_id="s1", failure_budget=1)]
+        )
         step = plan.get_step("s1")
         result = executor.handle_step_failure(plan, step, "fatal error")
 
@@ -624,7 +632,9 @@ class TestHandleStepFailure:
         assert step.status == StepStatus.FAILED
 
     def test_failure_increments_count(self, executor: PlanExecutor) -> None:
-        plan = executor.create_plan(phase="frontend", steps=[_make_step(step_id="s1", failure_budget=3)])
+        plan = executor.create_plan(
+            phase="frontend", steps=[_make_step(step_id="s1", failure_budget=3)]
+        )
         step = plan.get_step("s1")
 
         executor.handle_step_failure(plan, step, "error 1")
@@ -638,7 +648,9 @@ class TestHandleStepFailure:
         assert step.status == StepStatus.FAILED
 
     def test_failure_persists_to_disk(self, executor: PlanExecutor) -> None:
-        plan = executor.create_plan(phase="frontend", steps=[_make_step(step_id="s1", failure_budget=1)])
+        plan = executor.create_plan(
+            phase="frontend", steps=[_make_step(step_id="s1", failure_budget=1)]
+        )
         step = plan.get_step("s1")
         executor.handle_step_failure(plan, step, "persist test")
 
@@ -761,7 +773,7 @@ class TestUtilityFunctions:
 
     def test_extract_json_object_returns_non_dict(self) -> None:
         # Array is not a dict
-        assert _extract_json_object('[1, 2, 3]') is None
+        assert _extract_json_object("[1, 2, 3]") is None
 
     def test_json_default_datetime(self) -> None:
         dt = datetime(2026, 4, 11, 12, 0, 0, tzinfo=timezone.utc)

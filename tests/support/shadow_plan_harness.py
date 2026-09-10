@@ -98,9 +98,7 @@ def plan_shadow_scenario(
         governance_depth=scenario.governance_depth,
         merge_or_release_candidate=True,
         executed_stages=frozenset(
-            stage
-            for stage in planned_mandatory
-            if ledger.get_stage(stage).kind != "gate"
+            stage for stage in planned_mandatory if ledger.get_stage(stage).kind != "gate"
         ),
     )
     for entry in ledger.stages:
@@ -151,9 +149,13 @@ def evaluate_shadow_scenario(
             legacy_reductions.append(entry.stage)
         if entry.resolution == StageResolution.REUSE:
             reused_stages.append(entry.stage)
-            if entry.stage not in may_reuse or not entry.evidence or not all(
-                evidence_is_reusable(item, change_id=ledger.change_id)
-                for item in entry.evidence
+            if (
+                entry.stage not in may_reuse
+                or not entry.evidence
+                or not all(
+                    evidence_is_reusable(item, change_id=ledger.change_id)
+                    for item in entry.evidence
+                )
             ):
                 reuse_errors.append(entry.stage)
         if entry.stage in mandatory:
@@ -171,9 +173,7 @@ def evaluate_shadow_scenario(
         elif entry.resolution in {StageResolution.EXECUTE, StageResolution.REQUIRE}:
             false_blocks.append(entry.stage)
 
-    user_gate_count = sum(
-        entry.resolution == StageResolution.REQUIRE for entry in ledger.stages
-    )
+    user_gate_count = sum(entry.resolution == StageResolution.REQUIRE for entry in ledger.stages)
     return ShadowScenarioEvaluation(
         scenario_id=scenario.scenario_id,
         label=scenario.label,

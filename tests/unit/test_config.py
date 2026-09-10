@@ -78,11 +78,7 @@ class TestConfigManager:
 
     def test_load_from_file(self, temp_project_dir: Path):
         """测试从文件加载配置"""
-        config_data = {
-            "name": "loaded-project",
-            "platform": "desktop",
-            "quality_gate": 85
-        }
+        config_data = {"name": "loaded-project", "platform": "desktop", "quality_gate": 85}
         config_path = temp_project_dir / "super-dev.yaml"
         with open(config_path, "w") as f:
             yaml.dump(config_data, f)
@@ -113,7 +109,9 @@ class TestConfigManager:
 
         assert config.name == "minimal-project"
         assert config.quality_gate == 80
-        assert not any("Config schema validation warnings" in record.message for record in caplog.records)
+        assert not any(
+            "Config schema validation warnings" in record.message for record in caplog.records
+        )
 
     def test_save_config(self, temp_project_dir: Path):
         """测试保存配置"""
@@ -178,11 +176,7 @@ class TestConfigManager:
     def test_create_config(self, temp_project_dir: Path):
         """测试创建新配置"""
         manager = ConfigManager(temp_project_dir)
-        config = manager.create(
-            name="new-project",
-            platform="wechat",
-            domain="ecommerce"
-        )
+        config = manager.create(name="new-project", platform="wechat", domain="ecommerce")
 
         assert config.name == "new-project"
         assert config.platform == "wechat"
@@ -255,11 +249,7 @@ class TestConfigManager:
         """测试验证有效配置"""
         manager = ConfigManager(temp_project_dir)
         manager.create(
-            name="valid",
-            platform="web",
-            frontend="react",
-            backend="node",
-            quality_gate=85
+            name="valid", platform="web", frontend="react", backend="node", quality_gate=85
         )
 
         is_valid, errors = manager.validate()
@@ -270,11 +260,7 @@ class TestConfigManager:
         """测试扩展前端框架校验"""
         manager = ConfigManager(temp_project_dir)
         manager.create(
-            name="valid-next",
-            platform="web",
-            frontend="next",
-            backend="node",
-            quality_gate=80
+            name="valid-next", platform="web", frontend="next", backend="node", quality_gate=80
         )
 
         is_valid, errors = manager.validate()

@@ -16,6 +16,7 @@ from super_dev.creators.prompt_templates import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_template(**overrides) -> PromptTemplate:
     defaults = dict(
         id="tpl-test",
@@ -65,6 +66,7 @@ def _write_template_file(
 # PromptTemplate dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestPromptTemplate:
     def test_render_success(self):
         tpl = _make_template()
@@ -88,8 +90,12 @@ class TestPromptTemplate:
 
     def test_default_metadata(self):
         tpl = PromptTemplate(
-            id="t", name="t", version="0.0.1", phase="docs",
-            description="", template="",
+            id="t",
+            name="t",
+            version="0.0.1",
+            phase="docs",
+            description="",
+            template="",
         )
         assert tpl.metadata == {}
         assert tpl.variables == []
@@ -98,6 +104,7 @@ class TestPromptTemplate:
 # ---------------------------------------------------------------------------
 # PromptTemplateManager — loading
 # ---------------------------------------------------------------------------
+
 
 class TestManagerLoading:
     def test_default_relative_dir_resolves_to_package_templates(self):
@@ -145,7 +152,8 @@ class TestManagerLoading:
             ]
         }
         (tmp_path / "manifest.yaml").write_text(
-            yaml.dump(manifest, allow_unicode=True), encoding="utf-8",
+            yaml.dump(manifest, allow_unicode=True),
+            encoding="utf-8",
         )
         mgr = PromptTemplateManager(str(tmp_path))
         tpl = mgr.templates["tpl-demo"]
@@ -156,6 +164,7 @@ class TestManagerLoading:
 # ---------------------------------------------------------------------------
 # PromptTemplateManager — get / render
 # ---------------------------------------------------------------------------
+
 
 class TestManagerGetRender:
     def test_get_template_success(self, tmp_path: Path):
@@ -171,8 +180,11 @@ class TestManagerGetRender:
 
     def test_render_increments_usage(self, tmp_path: Path):
         _write_template_file(
-            tmp_path, "r_template_v1.md",
-            tpl_id="r", body="Hi {var1}!", variables=["var1"],
+            tmp_path,
+            "r_template_v1.md",
+            tpl_id="r",
+            body="Hi {var1}!",
+            variables=["var1"],
         )
         mgr = PromptTemplateManager(str(tmp_path))
         assert mgr.templates["r"].metadata.get("usage_count", 0) == 0
@@ -186,8 +198,11 @@ class TestManagerGetRender:
 
     def test_render_sets_last_used(self, tmp_path: Path):
         _write_template_file(
-            tmp_path, "lu_template_v1.md",
-            tpl_id="lu", body="{var1}", variables=["var1"],
+            tmp_path,
+            "lu_template_v1.md",
+            tpl_id="lu",
+            body="{var1}",
+            variables=["var1"],
         )
         mgr = PromptTemplateManager(str(tmp_path))
         mgr.render("lu", {"var1": "test"})
@@ -195,8 +210,11 @@ class TestManagerGetRender:
 
     def test_render_missing_var_raises(self, tmp_path: Path):
         _write_template_file(
-            tmp_path, "mv_template_v1.md",
-            tpl_id="mv", body="{a} {b}", variables=["a", "b"],
+            tmp_path,
+            "mv_template_v1.md",
+            tpl_id="mv",
+            body="{a} {b}",
+            variables=["a", "b"],
         )
         mgr = PromptTemplateManager(str(tmp_path))
         with pytest.raises(KeyError):
@@ -206,6 +224,7 @@ class TestManagerGetRender:
 # ---------------------------------------------------------------------------
 # PromptTemplateManager — list / filter
 # ---------------------------------------------------------------------------
+
 
 class TestManagerListFilter:
     def test_list_all(self, tmp_path: Path):
@@ -231,6 +250,7 @@ class TestManagerListFilter:
 # ---------------------------------------------------------------------------
 # PromptTemplateManager — version history
 # ---------------------------------------------------------------------------
+
 
 class TestManagerVersionHistory:
     def test_history_recorded_on_load(self, tmp_path: Path):
@@ -269,6 +289,7 @@ class TestManagerVersionHistory:
 # ---------------------------------------------------------------------------
 # PromptTemplateManager — register_template
 # ---------------------------------------------------------------------------
+
 
 class TestManagerRegister:
     def test_register_makes_template_available(self, tmp_path: Path):

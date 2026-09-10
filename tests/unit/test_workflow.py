@@ -50,7 +50,7 @@ class TestPhaseResult:
             success=True,
             duration=1.5,
             quality_score=85.0,
-            output={"data": "test"}
+            output={"data": "test"},
         )
 
         assert result.phase == Phase.DISCOVERY
@@ -62,10 +62,7 @@ class TestPhaseResult:
     def test_failed_result(self):
         """测试失败结果"""
         result = PhaseResult(
-            phase=Phase.INTELLIGENCE,
-            success=False,
-            duration=0.5,
-            errors=["Error 1", "Error 2"]
+            phase=Phase.INTELLIGENCE, success=False, duration=0.5, errors=["Error 1", "Error 2"]
         )
 
         assert not result.success
@@ -78,10 +75,7 @@ class TestWorkflowContext:
     def test_context_creation(self, temp_project_dir: Path):
         """测试上下文创建"""
         config = ProjectConfig(name="test")
-        context = WorkflowContext(
-            project_dir=temp_project_dir,
-            config=config  # type: ignore
-        )
+        context = WorkflowContext(project_dir=temp_project_dir, config=config)  # type: ignore
 
         assert context.project_dir == temp_project_dir
         assert context.config.name == "test"
@@ -91,10 +85,7 @@ class TestWorkflowContext:
     def test_context_shared_data(self, temp_project_dir: Path):
         """测试共享数据"""
         config = ProjectConfig(name="test")
-        context = WorkflowContext(
-            project_dir=temp_project_dir,
-            config=config  # type: ignore
-        )
+        context = WorkflowContext(project_dir=temp_project_dir, config=config)  # type: ignore
 
         context.user_input["requirement"] = "test input"
         context.research_data["market"] = "test data"
@@ -116,10 +107,7 @@ class TestWorkflowEngine:
     def test_get_phases_from_config(self, temp_project_dir: Path):
         """测试从配置获取阶段"""
         config_manager = ConfigManager(temp_project_dir)
-        config_manager.create(
-            name="test",
-            phases=["discovery", "intelligence", "drafting"]
-        )
+        config_manager.create(name="test", phases=["discovery", "intelligence", "drafting"])
 
         engine = WorkflowEngine(temp_project_dir)
         phases = engine._get_phases_from_config()
@@ -198,8 +186,7 @@ class TestWorkflowEngine:
         engine._calculate_quality_score = lambda phase, context: 85.0
 
         results = await engine.run(
-            phases=[Phase.DISCOVERY, Phase.INTELLIGENCE],
-            context=workflow_context
+            phases=[Phase.DISCOVERY, Phase.INTELLIGENCE], context=workflow_context
         )
 
         assert len(results) == 2
@@ -229,8 +216,7 @@ class TestWorkflowEngine:
         engine._calculate_quality_score = lambda phase, context: 88.0
 
         results = await engine.run(
-            phases=[Phase.DISCOVERY, Phase.DRAFTING, Phase.REDTEAM],
-            context=workflow_context
+            phases=[Phase.DISCOVERY, Phase.DRAFTING, Phase.REDTEAM], context=workflow_context
         )
 
         assert results[Phase.DISCOVERY].success
@@ -239,7 +225,9 @@ class TestWorkflowEngine:
         assert Phase.REDTEAM not in results
 
     @pytest.mark.asyncio
-    async def test_skippable_phase_failure_continues_workflow(self, temp_project_dir: Path, workflow_context):
+    async def test_skippable_phase_failure_continues_workflow(
+        self, temp_project_dir: Path, workflow_context
+    ):
         """测试可跳过阶段（INTELLIGENCE）失败后工作流继续"""
         config_manager = ConfigManager(temp_project_dir)
         config_manager.create(name="test", quality_gate=80)
@@ -259,8 +247,7 @@ class TestWorkflowEngine:
         engine._calculate_quality_score = lambda phase, context: 88.0
 
         results = await engine.run(
-            phases=[Phase.DISCOVERY, Phase.INTELLIGENCE, Phase.DRAFTING],
-            context=workflow_context
+            phases=[Phase.DISCOVERY, Phase.INTELLIGENCE, Phase.DRAFTING], context=workflow_context
         )
 
         assert results[Phase.DISCOVERY].success
@@ -279,39 +266,37 @@ class TestWorkflowEngine:
         _prepare_confirmed_workflow_gates(temp_project_dir)
 
         engine = WorkflowEngine(temp_project_dir)
-        context = WorkflowContext(
-            project_dir=temp_project_dir,
-            config=config_manager
-        )
+        context = WorkflowContext(project_dir=temp_project_dir, config=config_manager)
 
         # discovery 低分不应触发门禁
         async def low_score_handler(context):
             from super_dev.orchestrator.engine import PhaseResult
+
             return PhaseResult(
                 phase=Phase.DISCOVERY,
                 success=True,
                 duration=1.0,
                 quality_score=75.0,  # 低于门禁
-                output={"status": "low_score"}
+                output={"status": "low_score"},
             )
 
         # QA 低分应触发门禁并停止
         async def qa_low_score_handler(context):
             from super_dev.orchestrator.engine import PhaseResult
+
             return PhaseResult(
                 phase=Phase.QA,
                 success=True,
                 duration=1.0,
                 quality_score=85.0,  # 低于门禁 90
-                output={"status": "qa_low_score"}
+                output={"status": "qa_low_score"},
             )
 
         engine.register_phase_handler(Phase.DISCOVERY, low_score_handler)
         engine.register_phase_handler(Phase.QA, qa_low_score_handler)
 
         results = await engine.run(
-            phases=[Phase.DISCOVERY, Phase.QA, Phase.DELIVERY],
-            context=context
+            phases=[Phase.DISCOVERY, Phase.QA, Phase.DELIVERY], context=context
         )
 
         # discovery 不应被门禁阻断
@@ -331,10 +316,7 @@ class TestWorkflowEngine:
         _prepare_confirmed_workflow_gates(temp_project_dir)
 
         engine = WorkflowEngine(temp_project_dir)
-        context = WorkflowContext(
-            project_dir=temp_project_dir,
-            config=config_manager
-        )
+        context = WorkflowContext(project_dir=temp_project_dir, config=config_manager)
 
         async def redteam_fail_handler(_context):
             return {
@@ -351,10 +333,7 @@ class TestWorkflowEngine:
         engine.register_phase_handler(Phase.REDTEAM, redteam_fail_handler)
         engine.register_phase_handler(Phase.QA, should_not_run)
 
-        results = await engine.run(
-            phases=[Phase.REDTEAM, Phase.QA],
-            context=context
-        )
+        results = await engine.run(phases=[Phase.REDTEAM, Phase.QA], context=context)
 
         assert Phase.REDTEAM in results
         assert not results[Phase.REDTEAM].success

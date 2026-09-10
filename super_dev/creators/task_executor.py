@@ -153,7 +153,10 @@ class SpecTaskExecutor:
         lowered = str(title).strip().lower()
         if any(token in lowered for token in ("后端", "backend")):
             return ["backend"]
-        if any(token in lowered for token in ("联调", "integration", "qa", "质量", "test", "发布", "delivery", "上线")):
+        if any(
+            token in lowered
+            for token in ("联调", "integration", "qa", "质量", "test", "发布", "delivery", "上线")
+        ):
             if any(token in lowered for token in ("发布", "delivery", "上线")):
                 return ["delivery"]
             if any(token in lowered for token in ("质量", "test", "qa")):

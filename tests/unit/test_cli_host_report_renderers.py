@@ -17,7 +17,10 @@ def _adaptation_contract() -> dict[str, object]:
         "dimensions": {
             "official_protocol": {"status": "ready", "gaps": []},
             "entry_experience": {"status": "ready", "gaps": []},
-            "continuity": {"status": "partial", "gaps": ["resume / flow probe evidence is shallow"]},
+            "continuity": {
+                "status": "partial",
+                "gaps": ["resume / flow probe evidence is shallow"],
+            },
             "competition": {"status": "ready", "gaps": []},
             "docs": {"status": "ready", "gaps": []},
         },
@@ -185,9 +188,13 @@ def test_render_host_runtime_validation_markdown_includes_host_playbooks():
                     "确认 Claude Code 按 official-skills 官方协议面真实加载 Super Dev。",
                 ],
                 "host_repair_playbook": "如果 slash 或技能没刷新，先重开当前 Claude Code 会话，再回到 /super-dev。",
-                "runtime_checklist": ["在宿主中使用最终触发命令进入 Super Dev 流水线：/super-dev 你的需求"],
+                "runtime_checklist": [
+                    "在宿主中使用最终触发命令进入 Super Dev 流水线：/super-dev 你的需求"
+                ],
                 "pass_criteria": ["Claude Code 官方工作流面、入口链和恢复链均已真人验收通过。"],
-                "resume_checklist": ["原生恢复: /super-dev 继续当前流程 / 回当前 Claude Code 会话继续"],
+                "resume_checklist": [
+                    "原生恢复: /super-dev 继续当前流程 / 回当前 Claude Code 会话继续"
+                ],
                 "framework_playbook": {
                     "framework": "next.js",
                     "implementation_modules": ["app router", "design tokens"],
@@ -218,7 +225,10 @@ def test_render_host_runtime_validation_markdown_includes_host_playbooks():
     assert "SEEAI Flow Ready: 0/1" in markdown
     assert "Framework Focus: next.js" in markdown
     assert "Framework Validation Surfaces: SSR；hydration" in markdown
-    assert "Framework Coaching Summary: 当前框架焦点（Framework Coaching Focus）聚焦 next.js" in markdown
+    assert (
+        "Framework Coaching Summary: 当前框架焦点（Framework Coaching Focus）聚焦 next.js"
+        in markdown
+    )
     assert "SEEAI User Supplements Ready: 0/1" in markdown
     assert "SEEAI User Supplements Ready: no" in markdown
     assert "Missing SEEAI User Supplements: ~/.claude/skills/super-dev-seeai/SKILL.md" in markdown

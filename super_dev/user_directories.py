@@ -24,7 +24,8 @@ class UserDirectoryContext:
     def current(cls) -> UserDirectoryContext:
         """按当前进程的真实环境解析目录，保持现有默认行为。"""
 
-        home = Path.home()
+        explicit_home = os.getenv("HOME", "").strip()
+        home = Path(explicit_home) if explicit_home else Path.home()
         codex_raw = os.getenv("CODEX_HOME", "").strip()
         xdg_raw = os.getenv("XDG_CONFIG_HOME", "").strip()
         return cls.from_home(
@@ -53,9 +54,7 @@ class UserDirectoryContext:
             home=resolved_home,
             codex_home=context.expanduser(codex_home) if codex_home else context.codex_home,
             xdg_config_home=(
-                context.expanduser(xdg_config_home)
-                if xdg_config_home
-                else context.xdg_config_home
+                context.expanduser(xdg_config_home) if xdg_config_home else context.xdg_config_home
             ),
         )
 

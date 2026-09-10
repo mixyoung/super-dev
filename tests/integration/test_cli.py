@@ -42,6 +42,16 @@ def _confirm_docs(temp_project_dir: Path) -> None:
     )
 
 
+def _write_fake_command(bin_dir: Path, name: str) -> Path:
+    command = bin_dir / (f"{name}.cmd" if os.name == "nt" else name)
+    command.write_text(
+        f"@echo off\r\necho {name}\r\n" if os.name == "nt" else f"#!/usr/bin/env sh\necho {name}\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o755)
+    return command
+
+
 def _prepare_workflow_context(project_dir: Path) -> None:
     (project_dir / "output").mkdir(parents=True, exist_ok=True)
     (project_dir / ".super-dev" / "review-state").mkdir(parents=True, exist_ok=True)
@@ -2024,7 +2034,7 @@ class TestCLISkillAndIntegrate:
             result = cli.run(["onboard", "--host", "claude-code", "--force", "--yes"])
             assert result == 0
             output = capsys.readouterr().out
-            assert "Onboard smoke guide:" in output
+            assert "接入冒烟验证指南:" in output
             report_dir = temp_project_dir / "output" / "maintenance"
             json_reports = sorted(report_dir.glob("host-onboard-smoke-*.json"))
             markdown_reports = sorted(report_dir.glob("host-onboard-smoke-*.md"))
@@ -2035,7 +2045,7 @@ class TestCLISkillAndIntegrate:
             assert payload["targets"][0]["standard_flow_first_prompt"]
             assert payload["targets"][0]["post_onboard_self_check"]
             markdown = markdown_reports[-1].read_text(encoding="utf-8")
-            assert "Host Onboard Smoke Guide" in markdown
+            assert "宿主接入冒烟验证指南" in markdown
             assert "Official Workflow Checks" in markdown
         finally:
             os.chdir(original_cwd)
@@ -2180,9 +2190,7 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2231,7 +2239,7 @@ class TestCLISkillAndIntegrate:
             assert "使用模式: agents-and-skill" in output
             assert "触发位置" in output
             assert "接入后重启: 是" in output
-            assert "Smoke 验收语句" in output
+            assert "冒烟验证语句" in output
             assert "SMOKE_OK" in output
             assert "系统建议动作:" in output
             assert "重开后第一句直接复制 $super-dev " in output
@@ -2405,10 +2413,8 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
-            os.environ["PATH"] = f"{bin_dir}:{original_path}"
+            _write_fake_command(bin_dir, "codex")
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{original_path}"
 
             cli = SuperDevCLI()
             result = cli.run(["doctor", "--auto", "--json"])
@@ -2630,9 +2636,7 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2788,9 +2792,7 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2811,9 +2813,7 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2839,9 +2839,7 @@ class TestCLISkillAndIntegrate:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2869,9 +2867,7 @@ class TestCLISkillAndIntegrate:
             _prepare_workflow_context(temp_project_dir)
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            codex_cmd = bin_dir / "codex"
-            codex_cmd.write_text("#!/usr/bin/env sh\necho codex\n", encoding="utf-8")
-            codex_cmd.chmod(0o755)
+            _write_fake_command(bin_dir, "codex")
             os.environ["PATH"] = str(bin_dir)
 
             cli = SuperDevCLI()
@@ -2944,7 +2940,7 @@ class TestCLISkillAndIntegrate:
             assert any("最近一次:" in line for line in resume_card["lines"])
             assert any("最近事件:" in line for line in resume_card["lines"])
             assert any("最近 Hook:" in line for line in resume_card["lines"])
-            assert any("Workflow Continuity:" in line for line in resume_card["lines"])
+            assert any("工作流连续性:" in line for line in resume_card["lines"])
             assert any("当前治理焦点:" in line for line in resume_card["lines"])
             assert any("建议先做:" in line for line in resume_card["lines"])
             assert all("super-dev create" not in item for item in resume_card["action_examples"])
@@ -3046,7 +3042,7 @@ class TestCLISkillAndIntegrate:
             assert result == 0
 
             output = capsys.readouterr().out
-            assert "Super Dev 宿主 Smoke 验收" in output
+            assert "Super Dev 宿主冒烟验证" in output
             assert "codex-cli" in output
             assert "SMOKE_OK" in output
             assert "最终输入:" in output
@@ -3075,7 +3071,7 @@ class TestCLISkillAndIntegrate:
             assert result == 1
 
             output = capsys.readouterr().out
-            assert "Super Dev 宿主 Surface 审计" in output
+            assert "Super Dev 宿主接入面审计" in output
             assert "codex-cli" in output
             assert "过期/缺失的接入面" in output
             assert "project:AGENTS.md" in output
@@ -3658,7 +3654,7 @@ class TestCLISkillAndIntegrate:
             output = capsys.readouterr().out
             assert "继续当前流程:" in output
             assert "流程状态卡: " in output
-            assert "恢复探针:" in output
+            assert "恢复检查语句:" in output
             assert ".super-dev/SESSION_BRIEF.md" in output
             assert "跨平台框架专项: uni-app" in output
             assert "原生能力面:" in output
@@ -3686,10 +3682,8 @@ class TestCLISkillAndIntegrate:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
             for command in ("claude", "codex"):
-                cmd_file = bin_dir / command
-                cmd_file.write_text("#!/usr/bin/env sh\necho host\n", encoding="utf-8")
-                cmd_file.chmod(0o755)
-            os.environ["PATH"] = f"{bin_dir}:{original_path}"
+                _write_fake_command(bin_dir, command)
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{original_path}"
 
             cli = SuperDevCLI()
             result = cli.run(
@@ -3787,10 +3781,8 @@ class TestCLISkillAndIntegrate:
             )
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            cmd_file = bin_dir / "claude"
-            cmd_file.write_text("#!/usr/bin/env sh\necho host\n", encoding="utf-8")
-            cmd_file.chmod(0o755)
-            os.environ["PATH"] = f"{bin_dir}:{original_path}"
+            _write_fake_command(bin_dir, "claude")
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{original_path}"
 
             cli = SuperDevCLI()
             result = cli.run(["start", "--json", "--skip-onboard", "--idea", "做一个桌面工具"])
@@ -3862,7 +3854,7 @@ class TestCLISkillAndIntegrate:
         try:
             monkeypatch.setenv("PATH", str(temp_project_dir / "empty-bin"))
             monkeypatch.setattr(
-                "super_dev.cli_host_ops_mixin.host_detection_path_candidates",
+                "super_dev.cli_host_discovery_mixin.host_detection_path_candidates",
                 lambda _target: [],
             )
             cli = SuperDevCLI()
@@ -3892,10 +3884,10 @@ class TestCLISkillAndIntegrate:
             os.chdir(original_cwd)
 
     def test_update_check_reports_latest_version(self, capsys, monkeypatch):
-        from types import SimpleNamespace
 
-        monkeypatch.setattr("super_dev.update_runtime.latest_release",
-                            lambda: SimpleNamespace(version="9.0.0"))
+        monkeypatch.setattr(
+            "super_dev.update_runtime.latest_release", lambda: SimpleNamespace(version="9.0.0")
+        )
         assert SuperDevCLI().run(["update", "--check"]) == 0
         output = capsys.readouterr().out
         assert "本 fork 最新版本" in output
@@ -3904,9 +3896,11 @@ class TestCLISkillAndIntegrate:
     @pytest.mark.parametrize("method", ["pip", "uv"])
     def test_update_forwards_method_and_explicit_user_scope(self, monkeypatch, method):
         calls = []
+
         def update(args, console):
             calls.append((args.method, args.include_user, args.check))
             return 2  # partial failure must reach the CLI exit code
+
         monkeypatch.setattr("super_dev.update_runtime.run_update", update)
         assert SuperDevCLI().run(["update", "--method", method, "--include-user"]) == 2
         assert calls == [(method, True, False)]
@@ -4256,10 +4250,8 @@ class TestCLIPipeline:
         try:
             bin_dir = temp_project_dir / "bin"
             bin_dir.mkdir(parents=True, exist_ok=True)
-            claude_cmd = bin_dir / "claude"
-            claude_cmd.write_text("#!/usr/bin/env sh\necho host\n", encoding="utf-8")
-            claude_cmd.chmod(0o755)
-            os.environ["PATH"] = f"{bin_dir}:{original_path}"
+            _write_fake_command(bin_dir, "claude")
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{original_path}"
 
             cli = SuperDevCLI()
             called: dict[str, bool] = {"value": False}
@@ -4462,7 +4454,7 @@ class TestCLIPipeline:
             assert "重开后第一句直接复制 /super-dev " in output
             assert "如果你是在继续已有流程" in output
             assert "流程状态卡: " in output
-            assert "继续规则: 用户说“改一下 / 补充 / 继续改 / 确认 / 通过”时" in output
+            assert "继续规则: 用户继续修改、补充或确认时" in output
             brief = (temp_project_dir / ".super-dev" / "SESSION_BRIEF.md").read_text(
                 encoding="utf-8"
             )
@@ -4499,7 +4491,7 @@ class TestCLIPipeline:
             assert "SEEAI 项目补充面已写入" in output
             assert "super-dev-seeai" in output
             assert "/skill:super-dev" in output
-            assert "再按 smoke guide 验收" in output
+            assert "再按冒烟验证指南检查" in output
         finally:
             os.chdir(original_cwd)
 

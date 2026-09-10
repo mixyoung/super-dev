@@ -22,9 +22,9 @@ class _HarnessBuilder(Protocol):
 
 
 HARNESS_LABELS: dict[str, str] = {
-    "workflow": "Workflow Continuity",
-    "framework": "Framework Harness",
-    "hooks": "Hook Audit Trail",
+    "workflow": "工作流连续性",
+    "framework": "框架运行验证",
+    "hooks": "Hook 审计记录",
 }
 
 
@@ -123,7 +123,7 @@ def derive_operational_focus(
             "label": "",
             "reason": "",
             "recommended_action": "",
-            "summary": "当前没有运行时 harness 数据。",
+            "summary": "当前没有运行验证数据。",
         }
 
     for key in ("workflow", "framework", "hooks"):
@@ -161,10 +161,10 @@ def derive_operational_focus(
         return {
             "status": "passed",
             "kind": "",
-            "label": "Operational Harness",
+            "label": "运行验证汇总",
             "reason": "",
-            "recommended_action": "当前 workflow / framework / hooks harness 已形成统一运行时证据。",
-            "summary": "当前 workflow / framework / hooks harness 已全部通过。",
+            "recommended_action": "当前工作流、框架和 Hook 运行验证已形成统一证据。",
+            "summary": "当前工作流、框架和 Hook 运行验证已全部通过。",
         }
 
     return {
@@ -173,5 +173,5 @@ def derive_operational_focus(
         "label": "",
         "reason": "",
         "recommended_action": "",
-        "summary": "当前没有启用的运行时 harness。",
+        "summary": "当前没有启用的运行验证。",
     }

@@ -175,9 +175,7 @@ class CliSpecMixin:
                     change_id=change.id,
                     changed_surfaces=getattr(args, "changed_surfaces", None),
                     work_mode=str(getattr(args, "work_mode", "evolve")),
-                    governance_depth=str(
-                        getattr(args, "governance_depth", "architectural")
-                    ),
+                    governance_depth=str(getattr(args, "governance_depth", "architectural")),
                 )
 
             self.console.print(f"[green]✓[/green] 变更提案已创建: {change.id}")
@@ -309,7 +307,11 @@ class CliSpecMixin:
             for key, item in report.checks.items():
                 passed = bool(item.get("passed", False))
                 reason = str(item.get("reason", "")).strip() or "-"
-                table.add_row(key, "[green]pass[/green]" if passed else "[red]fail[/red]", reason)
+                table.add_row(
+                    key,
+                    "[green]通过[/green]" if passed else "[red]失败[/red]",
+                    reason,
+                )
             self.console.print(table)
 
             if report.blockers:
@@ -324,10 +326,10 @@ class CliSpecMixin:
 
             if report.action_plan:
                 self.console.print("[cyan]执行计划:[/cyan]")
-                for item in report.action_plan:
-                    priority = str(item.get("priority", "")).strip()
-                    step = str(item.get("step", "")).strip()
-                    command = str(item.get("command", "")).strip()
+                for action_item in report.action_plan:
+                    priority = str(action_item.get("priority", "")).strip()
+                    step = str(action_item.get("step", "")).strip()
+                    command = str(action_item.get("command", "")).strip()
                     prefix = f"[{priority}] " if priority else ""
                     self.console.print(f"  - {prefix}{step}")
                     if command:
@@ -462,31 +464,37 @@ class CliSpecMixin:
             from .specs.consistency_checker import SpecConsistencyChecker
 
             checker = SpecConsistencyChecker(project_dir)
-            report = checker.check(args.change_id)
+            consistency_report = checker.check(args.change_id)
 
             if getattr(args, "json", False):
-                sys.stdout.write(json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n")
+                sys.stdout.write(
+                    json.dumps(consistency_report.to_dict(), ensure_ascii=False, indent=2) + "\n"
+                )
             else:
                 score_color = (
                     "green"
-                    if report.consistency_score >= 90
-                    else ("yellow" if report.consistency_score >= 70 else "red")
+                    if consistency_report.consistency_score >= 90
+                    else ("yellow" if consistency_report.consistency_score >= 70 else "red")
                 )
-                status_text = "[green]通过[/green]" if report.passed else "[red]未通过[/red]"
+                status_text = (
+                    "[green]通过[/green]" if consistency_report.passed else "[red]未通过[/red]"
+                )
                 self.console.print(
                     f"[cyan]Spec-Code 一致性检测: {args.change_id}[/cyan]  "
                     f"{status_text}  "
-                    f"[{score_color}]{report.consistency_score}/100[/]"
+                    f"[{score_color}]{consistency_report.consistency_score}/100[/]"
                 )
                 self.console.print(
-                    f"  问题: {len(report.issues)} 项 "
-                    f"(critical={report.critical_count}, high={report.high_count}, "
-                    f"medium={report.medium_count}, low={report.low_count})"
+                    f"  问题: {len(consistency_report.issues)} 项 "
+                    f"(严重={consistency_report.critical_count}, "
+                    f"高风险={consistency_report.high_count}, "
+                    f"中风险={consistency_report.medium_count}, "
+                    f"低风险={consistency_report.low_count})"
                 )
 
-                if report.issues:
+                if consistency_report.issues:
                     self.console.print("")
-                    for issue in report.issues:
+                    for issue in consistency_report.issues:
                         severity_color = {
                             "critical": "red",
                             "high": "yellow",
@@ -501,7 +509,7 @@ class CliSpecMixin:
                         self.console.print(f"    [dim]建议: {issue.suggestion}[/dim]")
 
                 if getattr(args, "save", False):
-                    md = report.to_markdown()
+                    md = consistency_report.to_markdown()
                     save_path = (
                         project_dir / ".super-dev" / "changes" / args.change_id / "consistency.md"
                     )

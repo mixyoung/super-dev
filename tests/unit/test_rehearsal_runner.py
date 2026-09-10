@@ -42,19 +42,16 @@ def _prepare_common_artifacts(temp_project_dir: Path, project_name: str) -> None
     delivery_dir = output_dir / "delivery"
     delivery_dir.mkdir(parents=True, exist_ok=True)
     (delivery_dir / f"{project_name}-delivery-manifest.json").write_text(
-        (
-            "{\n"
-            '  "project_name": "demo",\n'
-            '  "status": "ready"\n'
-            "}\n"
-        ),
+        ("{\n" '  "project_name": "demo",\n' '  "status": "ready"\n' "}\n"),
         encoding="utf-8",
     )
 
     rehearsal_dir = output_dir / "rehearsal"
     rehearsal_dir.mkdir(parents=True, exist_ok=True)
     (rehearsal_dir / f"{project_name}-launch-rehearsal.md").write_text("# Launch", encoding="utf-8")
-    (rehearsal_dir / f"{project_name}-rollback-playbook.md").write_text("# Rollback", encoding="utf-8")
+    (rehearsal_dir / f"{project_name}-rollback-playbook.md").write_text(
+        "# Rollback", encoding="utf-8"
+    )
     (rehearsal_dir / f"{project_name}-smoke-checklist.md").write_text("# Smoke", encoding="utf-8")
 
     (temp_project_dir / "backend" / "migrations").mkdir(parents=True, exist_ok=True)
@@ -251,7 +248,9 @@ def test_rehearsal_runner_writes_evidence_identity(temp_project_dir: Path) -> No
     assert payload["evidence_identity"]["inputs_digest"] == expected["inputs_digest"]
 
 
-def test_rehearsal_runner_accepts_legacy_redteam_markdown_without_score(temp_project_dir: Path) -> None:
+def test_rehearsal_runner_accepts_legacy_redteam_markdown_without_score(
+    temp_project_dir: Path,
+) -> None:
     project_name = "demo"
     _prepare_common_artifacts(temp_project_dir, project_name=project_name)
     (temp_project_dir / "output" / f"{project_name}-redteam.md").write_text(
@@ -308,9 +307,7 @@ def test_rehearsal_runner_accepts_live_governance_snapshot_without_final_report(
 ) -> None:
     project_name = "demo"
     _prepare_common_artifacts(temp_project_dir, project_name=project_name)
-    governance_report = (
-        temp_project_dir / "output" / "governance" / "governance-report-20260328.md"
-    )
+    governance_report = temp_project_dir / "output" / "governance" / "governance-report-20260328.md"
     governance_report.unlink()
     (temp_project_dir / "output" / f"{project_name}-pipeline-contract.md").write_text(
         "# Pipeline Contract\n\n- Success: yes\n",
@@ -318,10 +315,7 @@ def test_rehearsal_runner_accepts_live_governance_snapshot_without_final_report(
     )
     (temp_project_dir / "output" / "knowledge-cache").mkdir(parents=True, exist_ok=True)
     (
-        temp_project_dir
-        / "output"
-        / "knowledge-cache"
-        / f"{project_name}-knowledge-bundle.json"
+        temp_project_dir / "output" / "knowledge-cache" / f"{project_name}-knowledge-bundle.json"
     ).write_text(
         '{"local_knowledge":[],"web_knowledge":[],"research_summary":"fixture"}',
         encoding="utf-8",

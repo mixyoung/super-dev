@@ -19,9 +19,7 @@ from .review_state import (
 )
 from .workflow_state import build_host_entry_prompts, load_framework_playbook_summary
 
-GENERIC_CONTINUE_RULE = (
-    "用户说“改一下 / 补充 / 继续改 / 确认 / 通过”时，仍然留在当前 Super Dev 流程。"
-)
+GENERIC_CONTINUE_RULE = "用户继续修改、补充或确认时，仍留在当前 Super Dev 流程。"
 GENERIC_EXIT_RULE = "只有用户明确说取消当前流程、重新开始或切回普通聊天，才允许离开流程。"
 
 
@@ -32,10 +30,12 @@ def _normalize_string_list(values: list[Any] | None) -> list[str]:
 def _collect_session_resume_context(project_dir: Path) -> dict[str, Any]:
     recent_hook_events = HookManager.load_recent_history(project_dir, limit=3)
     return {
-        "session_brief_path": str((project_dir / ".super-dev" / "SESSION_BRIEF.md").resolve()),
-        "workflow_state_path": str(workflow_state_file(project_dir).resolve()),
-        "workflow_event_log_path": str(workflow_event_log_file(project_dir).resolve()),
-        "hook_history_path": str(HookManager.hook_history_file(project_dir).resolve()),
+        "session_brief_path": (project_dir / ".super-dev" / "SESSION_BRIEF.md")
+        .resolve()
+        .as_posix(),
+        "workflow_state_path": workflow_state_file(project_dir).resolve().as_posix(),
+        "workflow_event_log_path": workflow_event_log_file(project_dir).resolve().as_posix(),
+        "hook_history_path": HookManager.hook_history_file(project_dir).resolve().as_posix(),
         "framework_playbook": load_framework_playbook_summary(project_dir),
         "recent_snapshots": load_recent_workflow_snapshots(project_dir, limit=3),
         "recent_events": load_recent_workflow_events(project_dir, limit=3),
@@ -116,11 +116,7 @@ def _build_session_resume_lines(
             else ""
         ),
         f"退出条件: {GENERIC_EXIT_RULE}",
-        (
-            f"当前门禁退出条件: {exit_rule}"
-            if exit_rule and exit_rule != GENERIC_EXIT_RULE
-            else ""
-        ),
+        (f"当前门禁退出条件: {exit_rule}" if exit_rule and exit_rule != GENERIC_EXIT_RULE else ""),
     ]
     if framework_playbook:
         lines.append(f"框架专项: {framework_playbook.get('framework', '-')}")
@@ -132,7 +128,9 @@ def _build_session_resume_lines(
             lines.append(f"必验场景: {' / '.join(str(item) for item in validation[:3])}")
     if recent_snapshots:
         first = recent_snapshots[0]
-        step = str(first.get("current_step_label", "")).strip() or str(first.get("status", "")).strip()
+        step = (
+            str(first.get("current_step_label", "")).strip() or str(first.get("status", "")).strip()
+        )
         updated_at = str(first.get("updated_at", "")).strip() or "-"
         lines.append(f"最近一次: {updated_at} · {step}")
     if recent_events:
@@ -141,7 +139,7 @@ def _build_session_resume_lines(
         lines.append(f"最近事件: {event_time} · {describe_workflow_event(latest_event)}")
     if recent_hook_events:
         latest_hook = recent_hook_events[0]
-        hook_status = "blocked" if latest_hook.blocked else ("ok" if latest_hook.success else "failed")
+        hook_status = "受阻" if latest_hook.blocked else ("通过" if latest_hook.success else "失败")
         lines.append(
             f"最近 Hook: {latest_hook.timestamp} · {latest_hook.event} / "
             f"{latest_hook.phase or '-'} / {latest_hook.hook_name} / {hook_status}"
@@ -149,19 +147,20 @@ def _build_session_resume_lines(
     if recent_timeline:
         latest_timeline = recent_timeline[0]
         timeline_time = str(latest_timeline.get("timestamp", "")).strip() or "-"
-        timeline_title = str(latest_timeline.get("title", "")).strip() or str(
-            latest_timeline.get("kind", "")
-        ).strip()
+        timeline_title = (
+            str(latest_timeline.get("title", "")).strip()
+            or str(latest_timeline.get("kind", "")).strip()
+        )
         timeline_message = str(latest_timeline.get("message", "")).strip() or "-"
         lines.append(f"关键时间线: {timeline_time} · {timeline_title} · {timeline_message}")
     if baseline_summary:
-        lines.append(f"Baseline 摘要: {baseline_summary}")
+        lines.append(f"基线摘要: {baseline_summary}")
     if baseline_reuse_surfaces:
-        lines.append(f"复用面: {' / '.join(baseline_reuse_surfaces[:3])}")
+        lines.append(f"可复用内容: {' / '.join(baseline_reuse_surfaces[:3])}")
     if operational_harnesses:
         for item in operational_harnesses[:3]:
             label = str(item.get("label", "")).strip() or str(item.get("kind", "")).strip()
-            status = "pass" if item.get("passed") else "fail"
+            status = "通过" if item.get("passed") else "失败"
             line = f"{label}: {status}"
             blocker = str(item.get("first_blocker", "")).strip()
             if blocker:
@@ -181,9 +180,11 @@ def _build_session_resume_lines(
             f"自然语言示例: {', '.join(action_examples[:3])}",
         )
     if scenario_cards:
-        insert_at = 4 if user_action_shortcuts and action_examples else 3 if (
-            user_action_shortcuts or action_examples
-        ) else 2
+        insert_at = (
+            4
+            if user_action_shortcuts and action_examples
+            else 3 if (user_action_shortcuts or action_examples) else 2
+        )
         scenario_lines: list[str] = []
         for item in scenario_cards[:4]:
             if not isinstance(item, dict):
@@ -344,7 +345,9 @@ def build_session_resume_card(
         "rules": (
             [GENERIC_CONTINUE_RULE, *specific_rules_list, GENERIC_EXIT_RULE] if enabled else []
         ),
-        "recommended_workflow_command": str(recommended_workflow_command).strip() if enabled else "",
+        "recommended_workflow_command": (
+            str(recommended_workflow_command).strip() if enabled else ""
+        ),
         "workflow_context": dict(workflow_context or {}) if enabled else {},
         "baseline_governance": dict(baseline_governance) if enabled else {},
         "baseline_summary": baseline_summary if enabled else "",

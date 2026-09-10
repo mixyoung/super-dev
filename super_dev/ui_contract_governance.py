@@ -15,8 +15,7 @@ def ui_contract_requires_claude_design_runtime(payload: Mapping[str, Any] | None
     if not isinstance(payload, Mapping):
         return False
     return any(
-        bool(payload.get(field_name))
-        for field_name in CLAUDE_DESIGN_RUNTIME_CHECKS.values()
+        bool(payload.get(field_name)) for field_name in CLAUDE_DESIGN_RUNTIME_CHECKS.values()
     )
 
 

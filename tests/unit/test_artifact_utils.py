@@ -5,8 +5,10 @@ from pathlib import Path
 
 from super_dev import artifact_utils
 from super_dev.artifact_utils import (
+    latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
+    sanitize_artifact_name,
 )
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.proof_pack import ProofPackBuilder
@@ -149,3 +151,38 @@ def test_quality_release_and_proof_pack_share_active_change_prefix(
         )["project_name"]
         == "active-change"
     )
+
+
+def test_latest_artifact_accepts_legacy_underscore_and_mainland_chinese_prefixes(
+    temp_project_dir: Path,
+) -> None:
+    output_dir = temp_project_dir / "output"
+    output_dir.mkdir()
+    underscore = output_dir / "demo_project-quality-gate.json"
+    chinese = output_dir / "中文项目-quality-gate.json"
+    underscore.write_text("{}", encoding="utf-8")
+    chinese.write_text("{}", encoding="utf-8")
+
+    assert (
+        latest_artifact(
+            output_dir,
+            "*-quality-gate.json",
+            preferred_prefix="demo_project",
+            strict_prefix=True,
+        )
+        == underscore
+    )
+    assert (
+        latest_artifact(
+            output_dir,
+            "*-quality-gate.json",
+            preferred_prefix="中文项目",
+            strict_prefix=True,
+        )
+        == chinese
+    )
+
+
+def test_sanitize_artifact_name_removes_windows_unsafe_characters() -> None:
+    assert sanitize_artifact_name(' 项目_A<>:"/\\|?* 版本 ') == "项目-a-版本"
+    assert sanitize_artifact_name("") == ""

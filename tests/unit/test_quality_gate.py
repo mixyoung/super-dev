@@ -239,7 +239,8 @@ class TestQualityGateChecker:
         )
 
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest"
+            "super_dev.reviewers.quality_gate_evidence_mixin.shutil.which",
+            lambda _: "/usr/bin/pytest",
         )
         monkeypatch.setattr(
             checker,
@@ -270,7 +271,8 @@ class TestQualityGateChecker:
         )
 
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.shutil.which", lambda _: "/usr/bin/pytest"
+            "super_dev.reviewers.quality_gate_evidence_mixin.shutil.which",
+            lambda _: "/usr/bin/pytest",
         )
         monkeypatch.setattr(
             checker,
@@ -307,11 +309,11 @@ class TestQualityGateChecker:
             "candidate": {"candidate_digest": "candidate-current"},
         }
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            "super_dev.reviewers.fresh_verification_evidence.EvidenceStore.latest_result",
             lambda self, *, extension_id: payload,
         )
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            "super_dev.reviewers.fresh_verification_evidence.build_candidate_identity",
             lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
         )
         checker = QualityGateChecker(
@@ -352,11 +354,11 @@ class TestQualityGateChecker:
             "candidate": {"candidate_digest": "candidate-current"},
         }
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            "super_dev.reviewers.fresh_verification_evidence.EvidenceStore.latest_result",
             lambda self, *, extension_id: payload,
         )
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            "super_dev.reviewers.fresh_verification_evidence.build_candidate_identity",
             lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
         )
         if mutation == "delete-junit":
@@ -406,11 +408,11 @@ class TestQualityGateChecker:
             fresh_verification=True,
         )
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+            "super_dev.reviewers.fresh_verification_evidence.EvidenceStore.latest_result",
             lambda self, *, extension_id: payload,
         )
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.build_candidate_identity",
+            "super_dev.reviewers.fresh_verification_evidence.build_candidate_identity",
             lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
         )
         checker = QualityGateChecker(
@@ -879,7 +881,7 @@ class TestQualityGateChecker:
         )
 
         monkeypatch.setattr(
-            "super_dev.reviewers.quality_gate.shutil.which",
+            "super_dev.reviewers.quality_gate_evidence_mixin.shutil.which",
             lambda cmd: "/usr/bin/npm" if cmd == "npm" else None,
         )
         monkeypatch.setattr(

@@ -89,6 +89,33 @@
 - output/completion-verification-prd.md
 - output/completion-verification-architecture.md
 - output/completion-verification-uiux.md
+- super_dev/creators/document_architecture_content_mixin.py
+- super_dev/creators/document_delivery_content_mixin.py
+- super_dev/creators/document_generator.py
+- super_dev/creators/document_generator_content_mixin.py
+- super_dev/creators/document_product_content_mixin.py
+- super_dev/creators/document_ui_content_mixin.py
+- super_dev/creators/frontend_builder.py
+- super_dev/creators/frontend_framework_projects_mixin.py
+- super_dev/creators/frontend_quality_config_mixin.py
+- super_dev/creators/implementation_builder.py
+- super_dev/creators/implementation_project_templates_mixin.py
+- super_dev/creators/prompt_generator.py
+- super_dev/creators/requirement_parser.py
+- super_dev/creators/spec_builder.py
+- super_dev/creators/task_executor.py
+- super_dev/orchestrator/knowledge_pusher.py
+- super_dev/reviewers/fresh_verification_evidence.py
+- super_dev/reviewers/quality_gate.py
+- super_dev/reviewers/quality_gate_evidence_mixin.py
+- super_dev/reviewers/quality_gate_models.py
+- super_dev/reviewers/ui_review.py
+- super_dev/reviewers/ui_review_execution_mixin.py
+- super_dev/reviewers/ui_review_models.py
+- super_dev/stage_policy.py
+- super_dev/workflow_contract.py
+- super_dev/workflow_stage_truth.py
+- super_dev/workflow_state.py
 
 ## 验证与未验证
 
@@ -143,3 +170,94 @@ PR #8 首轮 CI：Linux 3.10/3.11/3.12 全量质量检查、Linux 3.13 核心及
 上述修复后 45 项更新/基线定向回归、类型与 Ruff 检查通过；重新构建当前 wheel，并在外层与旧进程均使用 cp1252 的隔离环境完成真实升级，用户目录变化 0（output/verification-closure/scope-cp1252-update/）。以随后 CI 与新提交回放作为最终版本证据，不引用旧回放推荐。
 
 采用已获批准的增量收尾，不改产品路线。若失败则修复本批或回退本批差异，不降低门槛，不改原人工验收。更新与新发布分离，本轮不自动发布新版。
+
+## 2026-09-10 主线真实性与技术债收尾
+
+用户明确要求修复产物前缀、CLI 发布演练适用性、当前代码版本验证、会话状态、任务台账、版本说明，并全量处理类型、格式和超大模块问题；同时要求面向中国大陆用户使用自然、常见的简体中文，避免生僻词、直译腔和不必要的中英混杂。
+
+本批保持原公开入口、流程所有权、确认权、质量阈值和用户验收记录不变。结构调整只按职责搬迁现有方法与静态目录，保留原公开类名和导入路径；不新增第二套流程或执行入口。格式化属于全库机械整理，不改变功能。当前工作只准备修复和验证，不代表已经合并、发布或部署。
+
+### 改动范围
+
+- .agents/skills/super-dev-seeai/SKILL.md
+- .agents/skills/super-dev/SKILL.md
+- .claude/CLAUDE.md
+- .claude/skills/super-dev/SKILL.md
+- CLAUDE.md
+- README.md
+- docs/HOST_CAPABILITY_AUDIT.md
+- docs/PUBLISHING.md
+- docs/WORKFLOW_GUIDE.md
+- docs/WORKFLOW_GUIDE_EN.md
+- plugins/super-dev-claude/skills/super-dev/SKILL.md
+- plugins/super-dev-codex/skills/super-dev-seeai/SKILL.md
+- plugins/super-dev-codex/skills/super-dev/SKILL.md
+- pyproject.toml
+- super-dev.yaml
+- super_dev/artifact_utils.py
+- super_dev/cli.py
+- super_dev/cli_host_commands_mixin.py
+- super_dev/cli_host_discovery_mixin.py
+- super_dev/cli_host_guidance_mixin.py
+- super_dev/cli_host_ops_mixin.py
+- super_dev/cli_integration_runtime_mixin.py
+- super_dev/cli_pipeline_runtime_mixin.py
+- super_dev/cli_workflow_runtime_mixin.py
+- super_dev/creators/document_architecture_content_mixin.py
+- super_dev/creators/document_delivery_content_mixin.py
+- super_dev/creators/document_generator.py
+- super_dev/creators/document_generator_content_mixin.py
+- super_dev/creators/document_product_content_mixin.py
+- super_dev/creators/document_ui_content_mixin.py
+- super_dev/creators/frontend_builder.py
+- super_dev/creators/frontend_framework_projects_mixin.py
+- super_dev/creators/frontend_quality_config_mixin.py
+- super_dev/creators/implementation_builder.py
+- super_dev/creators/implementation_project_templates_mixin.py
+- super_dev/creators/prompt_generator.py
+- super_dev/creators/requirement_parser.py
+- super_dev/creators/spec_builder.py
+- super_dev/creators/task_executor.py
+- super_dev/design/ui_intelligence.py
+- super_dev/design/ui_intelligence_foundation_catalog.py
+- super_dev/design/ui_intelligence_models.py
+- super_dev/design/ui_intelligence_stack_catalog.py
+- super_dev/host_diagnostics.py
+- super_dev/host_session_resume.py
+- super_dev/integrations/catalog_mixin.py
+- super_dev/integrations/manager.py
+- super_dev/integrations/models.py
+- super_dev/migrate.py
+- super_dev/orchestrator/knowledge_pusher.py
+- super_dev/release_readiness.py
+- super_dev/reviewers/fresh_verification_evidence.py
+- super_dev/reviewers/quality_gate.py
+- super_dev/reviewers/quality_gate_evidence_mixin.py
+- super_dev/reviewers/quality_gate_models.py
+- super_dev/reviewers/ui_review.py
+- super_dev/reviewers/ui_review_execution_mixin.py
+- super_dev/reviewers/ui_review_models.py
+- super_dev/skills/skill_template.py
+- super_dev/stage_policy.py
+- super_dev/user_directories.py
+- super_dev/web/api.py
+- super_dev/web/api_host_support.py
+- super_dev/workflow_contract.py
+- super_dev/workflow_stage_truth.py
+- super_dev/workflow_state.py
+- tests/e2e/test_full_flow.py
+- tests/integration/test_cli.py
+- tests/integration/test_web_api.py
+- tests/unit/test_artifact_utils.py
+- tests/unit/test_quality_gate.py
+- tests/unit/test_release_readiness.py
+- tests/unit/test_release_readiness_enhanced.py
+- tests/unit/test_super_dev_skill_contracts.py
+- tests/unit/test_user_directories.py
+- tests/unit/test_workflow_state.py
+
+其余由 Black 产生的文件变化只包含格式调整，统一通过全库 Ruff、Black、类型检查和完整测试核对；不把格式变化解释为新增功能。
+
+### 验证与回退
+
+文件冻结后依次执行全库 Ruff、Black、Mypy、字节码编译、贡献范围检查、Skill 同步、完整 pytest、当前代码版本验证、质量门禁、发布就绪和证据包。任何一项未完成或失败都不记为通过。若结构拆分出现回归，按本批文件搬迁反向恢复，不改原流程语义、阈值或用户验收标签。

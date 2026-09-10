@@ -74,4 +74,3 @@ def test_delivery_gate_script_fails_with_incomplete_manifest(temp_project_dir: P
 
     assert proc.returncode == 1
     assert "[FAIL]" in proc.stdout
-

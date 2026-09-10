@@ -218,7 +218,10 @@ def test_host_runtime_probe_reports_missing_baseline_workflow_context(
     assert context["baseline_audit_status"] == "missing"
     assert context["baseline_confirmation_status"] == "missing"
     assert context["blocking_gate"] == "missing_baseline"
-    assert context["recommended_host_action"] == "$super-dev 先扫描当前项目并建立 baseline，再继续当前流程"
+    assert (
+        context["recommended_host_action"]
+        == "$super-dev 先扫描当前项目并建立 baseline，再继续当前流程"
+    )
     assert (
         context["recommended_host_sentence"]
         == "super-dev: 先扫描当前项目并建立 baseline，再继续当前流程"

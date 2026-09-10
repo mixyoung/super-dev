@@ -11,10 +11,10 @@ from super_dev.design.ui_intelligence import (
     UIIntelligenceAdvisor,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def advisor():
@@ -25,11 +25,15 @@ def advisor():
 # LibraryRecommendation
 # ---------------------------------------------------------------------------
 
+
 class TestLibraryRecommendation:
     def test_to_dict(self):
         rec = LibraryRecommendation(
-            name="shadcn/ui", category="Primary", rationale="Best for modern apps",
-            strengths=["Composable", "Accessible"], notes=["Requires Tailwind"],
+            name="shadcn/ui",
+            category="Primary",
+            rationale="Best for modern apps",
+            strengths=["Composable", "Accessible"],
+            notes=["Requires Tailwind"],
         )
         d = rec.to_dict()
         assert d["name"] == "shadcn/ui"
@@ -45,6 +49,7 @@ class TestLibraryRecommendation:
 # ---------------------------------------------------------------------------
 # Frontend alias normalization
 # ---------------------------------------------------------------------------
+
 
 class TestFrontendAliases:
     def test_next_maps_to_react(self, advisor):
@@ -81,6 +86,7 @@ class TestFrontendAliases:
 # ---------------------------------------------------------------------------
 # Product profiles
 # ---------------------------------------------------------------------------
+
 
 class TestProductProfiles:
     def test_landing_profile_exists(self, advisor):
@@ -129,6 +135,7 @@ class TestProductProfiles:
 # Industry trust rules
 # ---------------------------------------------------------------------------
 
+
 class TestIndustryTrustRules:
     def test_healthcare_has_privacy(self, advisor):
         rules = advisor.INDUSTRY_TRUST_RULES["healthcare"]
@@ -168,6 +175,7 @@ class TestIndustryTrustRules:
 # ---------------------------------------------------------------------------
 # Component library recommendations
 # ---------------------------------------------------------------------------
+
 
 class TestComponentLibraryRecommendations:
     def test_react_has_shadcn_primary(self, advisor):
@@ -224,6 +232,7 @@ class TestComponentLibraryRecommendations:
 # Token 一致性检查
 # ---------------------------------------------------------------------------
 
+
 class TestTokenConsistency:
     def test_form_stack_covers_all_frontends(self, advisor):
         expected = {"react", "vue", "angular", "svelte", "miniapp", "default"}
@@ -269,6 +278,7 @@ class TestTokenConsistency:
 # Dark mode
 # ---------------------------------------------------------------------------
 
+
 class TestDarkModeGeneration:
     def test_light_palette_generates_dark_variant(self, advisor):
         palette = {"background": "#FFFFFF", "text": "#1A1A1A", "primary": "#3B82F6"}
@@ -285,11 +295,15 @@ class TestDarkModeGeneration:
 # recommend() integration
 # ---------------------------------------------------------------------------
 
+
 class TestRecommendIntegration:
     def test_react_dashboard_fintech(self, advisor):
         profile = advisor.recommend(
-            description="金融数据分析工作台", frontend="react",
-            product_type="dashboard", industry="fintech", style="professional",
+            description="金融数据分析工作台",
+            frontend="react",
+            product_type="dashboard",
+            industry="fintech",
+            style="professional",
         )
         assert "primary_library" in profile
         assert "component_stack" in profile
@@ -299,118 +313,166 @@ class TestRecommendIntegration:
 
     def test_vue_saas_general(self, advisor):
         profile = advisor.recommend(
-            description="企业协作平台", frontend="vue",
-            product_type="saas", industry="general", style="modern",
+            description="企业协作平台",
+            frontend="vue",
+            product_type="saas",
+            industry="general",
+            style="modern",
         )
         assert "Naive" in profile["primary_library"]["name"]
 
     def test_nextjs_alias(self, advisor):
         profile = advisor.recommend(
-            description="Next.js 营销站", frontend="nextjs",
-            product_type="landing", industry="general", style="modern",
+            description="Next.js 营销站",
+            frontend="nextjs",
+            product_type="landing",
+            industry="general",
+            style="modern",
         )
         assert profile["normalized_frontend"] == "react"
 
     def test_taro_alias(self, advisor):
         profile = advisor.recommend(
-            description="小程序商城", frontend="taro",
-            product_type="ecommerce", industry="general", style="modern",
+            description="小程序商城",
+            frontend="taro",
+            product_type="ecommerce",
+            industry="general",
+            style="modern",
         )
         assert profile["normalized_frontend"] == "miniapp"
 
     def test_unknown_frontend_uses_default(self, advisor):
         profile = advisor.recommend(
-            description="Unknown frontend", frontend="zig-ui",
-            product_type="general", industry="general", style="modern",
+            description="Unknown frontend",
+            frontend="zig-ui",
+            product_type="general",
+            industry="general",
+            style="modern",
         )
         assert "primary_library" in profile
 
     def test_unknown_product_type_fallback(self, advisor):
         profile = advisor.recommend(
-            description="Some app", frontend="react",
-            product_type="nonexistent_type", industry="general", style="modern",
+            description="Some app",
+            frontend="react",
+            product_type="nonexistent_type",
+            industry="general",
+            style="modern",
         )
         assert "primary_library" in profile
 
     def test_alternative_libraries_present(self, advisor):
         profile = advisor.recommend(
-            description="Dashboard", frontend="react",
-            product_type="dashboard", industry="general", style="modern",
+            description="Dashboard",
+            frontend="react",
+            product_type="dashboard",
+            industry="general",
+            style="modern",
         )
         assert "alternative_libraries" in profile
         assert len(profile["alternative_libraries"]) >= 1
 
     def test_ui_library_matrix_present(self, advisor):
         profile = advisor.recommend(
-            description="Landing", frontend="react",
-            product_type="landing", industry="general", style="modern",
+            description="Landing",
+            frontend="react",
+            product_type="landing",
+            industry="general",
+            style="modern",
         )
         assert "ui_library_matrix" in profile
         assert isinstance(profile["ui_library_matrix"], list)
 
     def test_desktop_frontend(self, advisor):
         profile = advisor.recommend(
-            description="桌面客户端", frontend="electron",
-            product_type="dashboard", industry="general", style="professional",
+            description="桌面客户端",
+            frontend="electron",
+            product_type="dashboard",
+            industry="general",
+            style="professional",
         )
         assert profile["normalized_frontend"] == "desktop"
 
     def test_flutter_frontend(self, advisor):
         profile = advisor.recommend(
-            description="Flutter 移动端", frontend="flutter",
-            product_type="general", industry="general", style="modern",
+            description="Flutter 移动端",
+            frontend="flutter",
+            product_type="general",
+            industry="general",
+            style="modern",
         )
         assert profile["normalized_frontend"] == "flutter"
 
     def test_swiftui_frontend(self, advisor):
         profile = advisor.recommend(
-            description="iOS 原生", frontend="swiftui",
-            product_type="general", industry="general", style="modern",
+            description="iOS 原生",
+            frontend="swiftui",
+            product_type="general",
+            industry="general",
+            style="modern",
         )
         assert profile["normalized_frontend"] == "swiftui"
 
     def test_content_product_type(self, advisor):
         profile = advisor.recommend(
-            description="内容平台", frontend="react",
-            product_type="content", industry="general", style="editorial",
+            description="内容平台",
+            frontend="react",
+            product_type="content",
+            industry="general",
+            style="editorial",
         )
         assert "primary_library" in profile
 
     def test_ecommerce_product_type(self, advisor):
         profile = advisor.recommend(
-            description="电商平台", frontend="react",
-            product_type="ecommerce", industry="general", style="modern",
+            description="电商平台",
+            frontend="react",
+            product_type="ecommerce",
+            industry="general",
+            style="modern",
         )
         assert "primary_library" in profile
 
     def test_healthcare_trust_modules(self, advisor):
         profile = advisor.recommend(
-            description="医疗平台", frontend="react",
-            product_type="saas", industry="healthcare", style="professional",
+            description="医疗平台",
+            frontend="react",
+            product_type="saas",
+            industry="healthcare",
+            style="professional",
         )
         trust = profile.get("trust_modules", [])
         assert any("隐私" in m or "安全" in m for m in trust)
 
     def test_legal_trust_modules(self, advisor):
         profile = advisor.recommend(
-            description="法律平台", frontend="react",
-            product_type="saas", industry="legal", style="professional",
+            description="法律平台",
+            frontend="react",
+            product_type="saas",
+            industry="legal",
+            style="professional",
         )
         trust = profile.get("trust_modules", [])
         assert any("资质" in m or "律师" in m for m in trust)
 
     def test_beauty_industry(self, advisor):
         profile = advisor.recommend(
-            description="美容预约", frontend="react",
-            product_type="saas", industry="beauty", style="modern",
+            description="美容预约",
+            frontend="react",
+            product_type="saas",
+            industry="beauty",
+            style="modern",
         )
         trust = profile.get("trust_modules", [])
         assert any("案例" in m for m in trust)
 
     def test_education_industry(self, advisor):
         profile = advisor.recommend(
-            description="在线教育", frontend="react",
-            product_type="saas", industry="education", style="modern",
+            description="在线教育",
+            frontend="react",
+            product_type="saas",
+            industry="education",
+            style="modern",
         )
         trust = profile.get("trust_modules", [])
         assert any("进度" in m or "课程" in m for m in trust)
@@ -420,20 +482,35 @@ class TestRecommendIntegration:
 # 产品类型 x 前端栈矩阵
 # ---------------------------------------------------------------------------
 
+
 class TestProductFrontendMatrix:
     @pytest.fixture(params=["landing", "saas", "dashboard", "ecommerce", "content", "general"])
     def product_type(self, request):
         return request.param
 
-    @pytest.fixture(params=["react", "vue", "angular", "svelte", "nextjs", "taro", "electron", "flutter", "swiftui"])
+    @pytest.fixture(
+        params=[
+            "react",
+            "vue",
+            "angular",
+            "svelte",
+            "nextjs",
+            "taro",
+            "electron",
+            "flutter",
+            "swiftui",
+        ]
+    )
     def frontend(self, request):
         return request.param
 
     def test_all_combinations_produce_valid_profile(self, advisor, product_type, frontend):
         profile = advisor.recommend(
             description=f"Test {product_type} with {frontend}",
-            frontend=frontend, product_type=product_type,
-            industry="general", style="modern",
+            frontend=frontend,
+            product_type=product_type,
+            industry="general",
+            style="modern",
         )
         assert "primary_library" in profile
         assert profile["primary_library"]["name"]
@@ -443,32 +520,45 @@ class TestProductFrontendMatrix:
 # 组件栈完整性
 # ---------------------------------------------------------------------------
 
+
 class TestComponentStackCompleteness:
     def test_react_dashboard_has_table(self, advisor):
         profile = advisor.recommend(
-            description="Dashboard", frontend="react",
-            product_type="dashboard", industry="general", style="modern",
+            description="Dashboard",
+            frontend="react",
+            product_type="dashboard",
+            industry="general",
+            style="modern",
         )
         assert "table" in profile["component_stack"]
 
     def test_react_dashboard_has_form(self, advisor):
         profile = advisor.recommend(
-            description="Dashboard", frontend="react",
-            product_type="dashboard", industry="general", style="modern",
+            description="Dashboard",
+            frontend="react",
+            product_type="dashboard",
+            industry="general",
+            style="modern",
         )
         assert "form" in profile["component_stack"]
 
     def test_react_dashboard_has_chart(self, advisor):
         profile = advisor.recommend(
-            description="Dashboard", frontend="react",
-            product_type="dashboard", industry="general", style="modern",
+            description="Dashboard",
+            frontend="react",
+            product_type="dashboard",
+            industry="general",
+            style="modern",
         )
         assert "chart" in profile["component_stack"]
 
     def test_vue_saas_stack_complete(self, advisor):
         profile = advisor.recommend(
-            description="SaaS platform", frontend="vue",
-            product_type="saas", industry="general", style="modern",
+            description="SaaS platform",
+            frontend="vue",
+            product_type="saas",
+            industry="general",
+            style="modern",
         )
         stack = profile["component_stack"]
         expected_keys = {"form", "chart", "icons", "motion"}
@@ -479,18 +569,25 @@ class TestComponentStackCompleteness:
 # Quality checklist
 # ---------------------------------------------------------------------------
 
+
 class TestQualityChecklist:
     def test_quality_checklist_is_list(self, advisor):
         profile = advisor.recommend(
-            description="Test", frontend="react",
-            product_type="landing", industry="general", style="modern",
+            description="Test",
+            frontend="react",
+            product_type="landing",
+            industry="general",
+            style="modern",
         )
         assert isinstance(profile["quality_checklist"], list)
 
     def test_quality_checklist_has_minimum_items(self, advisor):
         profile = advisor.recommend(
-            description="Test", frontend="react",
-            product_type="landing", industry="general", style="modern",
+            description="Test",
+            frontend="react",
+            product_type="landing",
+            industry="general",
+            style="modern",
         )
         assert len(profile["quality_checklist"]) >= 4
 
@@ -498,6 +595,7 @@ class TestQualityChecklist:
 # ---------------------------------------------------------------------------
 # Banned patterns
 # ---------------------------------------------------------------------------
+
 
 class TestBannedPatterns:
     def test_landing_banned_hero(self, advisor):

@@ -80,7 +80,9 @@ def test_adjust_resume_stage_keeps_stage_when_docs_complete(temp_project_dir) ->
     required = cli._stage_one_artifact_paths(output_dir=output_dir, project_name="resume-demo")
     for path in required.values():
         path.write_text("ok", encoding="utf-8")
-    (output_dir / "resume-demo-frontend-runtime.json").write_text('{"passed": true}', encoding="utf-8")
+    (output_dir / "resume-demo-frontend-runtime.json").write_text(
+        '{"passed": true}', encoding="utf-8"
+    )
     change_dir = temp_project_dir / ".super-dev" / "changes" / "resume-change"
     change_dir.mkdir(parents=True, exist_ok=True)
     (change_dir / "proposal.md").write_text("# proposal", encoding="utf-8")
@@ -129,10 +131,13 @@ def test_write_resume_audit_outputs_json_and_markdown(temp_project_dir) -> None:
 def test_public_host_targets_prioritize_primary_product_scope() -> None:
     cli = SuperDevCLI()
     integration_manager = SimpleNamespace(
-        list_targets=lambda: [SimpleNamespace(name=host_id) for host_id in (
-            *PRIMARY_HOST_TOOL_IDS,
-            "legacy-host",
-        )]
+        list_targets=lambda: [
+            SimpleNamespace(name=host_id)
+            for host_id in (
+                *PRIMARY_HOST_TOOL_IDS,
+                "legacy-host",
+            )
+        ]
     )
 
     targets = cli._public_host_targets(integration_manager=integration_manager)
@@ -179,7 +184,9 @@ def test_stage_jump_impact_includes_core_messages() -> None:
     assert any("质量" in item or "交付" in item for item in quality_impact)
 
 
-def test_run_confirm_phase_updates_run_state_for_generic_phase(temp_project_dir, monkeypatch) -> None:
+def test_run_confirm_phase_updates_run_state_for_generic_phase(
+    temp_project_dir, monkeypatch
+) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
     cli._write_pipeline_run_state(
@@ -234,9 +241,7 @@ def test_run_status_recommendation_treats_missing_scope_status_as_unknown() -> N
     assert recommendation == "在宿主里继续当前流程，并优先补齐缺失范围与高优先级功能项"
 
 
-def test_run_status_not_initialized_json_is_valid(
-    temp_project_dir, monkeypatch, capsys
-) -> None:
+def test_run_status_not_initialized_json_is_valid(temp_project_dir, monkeypatch, capsys) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
 
@@ -308,9 +313,7 @@ def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
     assert payload["shadow_ledger"]["approval_required_count"] == 5
 
 
-def test_finalized_next_step_payload_includes_shadow_ledger(
-    temp_project_dir, monkeypatch
-) -> None:
+def test_finalized_next_step_payload_includes_shadow_ledger(temp_project_dir, monkeypatch) -> None:
     cli = SuperDevCLI()
     ledger = ChangeLedger.create(
         change_id="next-ledger",

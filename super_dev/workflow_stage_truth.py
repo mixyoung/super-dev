@@ -38,9 +38,7 @@ _CANONICAL_STAGE_ALIASES: OrderedDict[str, tuple[str, ...]] = OrderedDict(
 )
 
 _ALIAS_TO_CANONICAL: dict[str, str] = {
-    alias: canonical
-    for canonical, aliases in _CANONICAL_STAGE_ALIASES.items()
-    for alias in aliases
+    alias: canonical for canonical, aliases in _CANONICAL_STAGE_ALIASES.items() for alias in aliases
 }
 
 _ENGINE_PHASE_SEQUENCE: OrderedDict[str, tuple[str, ...]] = OrderedDict(
@@ -71,7 +69,14 @@ _ENGINE_PHASE_TO_CANONICAL_STAGE: dict[str, str] = {
     "deployment": "delivery",
 }
 
-_DOCS_CONFIRM_LATE_STAGES = {"spec", "frontend", "preview_confirm", "backend", "quality", "delivery"}
+_DOCS_CONFIRM_LATE_STAGES = {
+    "spec",
+    "frontend",
+    "preview_confirm",
+    "backend",
+    "quality",
+    "delivery",
+}
 _PREVIEW_CONFIRM_LATE_STAGES = {"backend", "quality", "delivery"}
 
 WORKFLOW_STAGE_EXPERTS: dict[str, tuple[str, ...]] = {

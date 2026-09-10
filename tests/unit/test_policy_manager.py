@@ -86,7 +86,9 @@ def test_validate_pipeline_args_checks_min_quality_threshold(temp_project_dir: P
     assert any("质量阈值过低" in item for item in violations)
 
 
-def test_validate_pipeline_args_requires_latest_host_report_when_enforced(temp_project_dir: Path) -> None:
+def test_validate_pipeline_args_requires_latest_host_report_when_enforced(
+    temp_project_dir: Path,
+) -> None:
     manager = PipelinePolicyManager(temp_project_dir)
     manager.policy_path.parent.mkdir(parents=True, exist_ok=True)
     manager.policy_path.write_text(

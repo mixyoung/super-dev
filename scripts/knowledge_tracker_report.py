@@ -54,6 +54,7 @@ def _load_json(filepath: Path) -> dict:
 # 子命令实现
 # ---------------------------------------------------------------------------
 
+
 def cmd_project(args: argparse.Namespace) -> None:
     """查看某项目的最新知识引用报告"""
     metrics_dir = Path(args.output_dir) / "metrics-history"
@@ -200,8 +201,7 @@ def cmd_coverage(args: argparse.Namespace) -> None:
         tracker = KnowledgeTracker(knowledge_dir=args.knowledge_dir)
         coverage_raw = tracker.get_knowledge_coverage()
         coverage = {
-            d: {"total": v["total"], "referenced": 0, "rate": 0.0}
-            for d, v in coverage_raw.items()
+            d: {"total": v["total"], "referenced": 0, "rate": 0.0} for d, v in coverage_raw.items()
         }
         source_label = f"实时扫描: {args.knowledge_dir}"
 
@@ -249,6 +249,7 @@ def cmd_coverage(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 # CLI 入口
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     """构建命令行参数解析器"""

@@ -14,7 +14,9 @@ class TestAIPromptGenerator:
         (output_dir / "demo-architecture.md").write_text("# architecture", encoding="utf-8")
         (output_dir / "demo-uiux.md").write_text("# uiux", encoding="utf-8")
         (output_dir / "demo-execution-plan.md").write_text("# plan", encoding="utf-8")
-        (output_dir / "demo-frontend-blueprint.md").write_text("# frontend blueprint", encoding="utf-8")
+        (output_dir / "demo-frontend-blueprint.md").write_text(
+            "# frontend blueprint", encoding="utf-8"
+        )
         (temp_project_dir / ".super-dev").mkdir(parents=True, exist_ok=True)
         (temp_project_dir / ".super-dev" / "WORKFLOW.md").write_text("# workflow", encoding="utf-8")
         (output_dir / "demo-bootstrap.md").write_text("# bootstrap", encoding="utf-8")
@@ -75,7 +77,14 @@ class TestAIPromptGenerator:
     def test_generate_bugfix_prompt_requires_lightweight_docs(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        for suffix in ("research", "prd", "architecture", "uiux", "execution-plan", "frontend-blueprint"):
+        for suffix in (
+            "research",
+            "prd",
+            "architecture",
+            "uiux",
+            "execution-plan",
+            "frontend-blueprint",
+        ):
             (output_dir / f"demo-{suffix}.md").write_text(f"# {suffix}", encoding="utf-8")
 
         config = {
@@ -97,7 +106,14 @@ class TestAIPromptGenerator:
     def test_generate_uniapp_prompt_includes_framework_playbook(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        for suffix in ("research", "prd", "architecture", "uiux", "execution-plan", "frontend-blueprint"):
+        for suffix in (
+            "research",
+            "prd",
+            "architecture",
+            "uiux",
+            "execution-plan",
+            "frontend-blueprint",
+        ):
             (output_dir / f"uni-shop-{suffix}.md").write_text(f"# {suffix}", encoding="utf-8")
 
         config = {

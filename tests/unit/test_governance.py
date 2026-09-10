@@ -1,4 +1,5 @@
 """Tests for PipelineGovernance integration layer."""
+
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,9 @@ class TestPipelineGovernance:
     def test_track_knowledge(self, governance):
         governance.start_governance("test-project")
         governance.enter_phase("research")
-        governance.track_knowledge("knowledge/security/01-standards/owasp.md", usage_type="constraint")
+        governance.track_knowledge(
+            "knowledge/security/01-standards/owasp.md", usage_type="constraint"
+        )
         assert len(governance.knowledge_tracker.references) == 1
 
     def test_record_quality(self, governance):

@@ -172,9 +172,7 @@ def test_spec_propose_creates_complete_advisory_from_declared_scope(
 
     assert cli._cmd_spec(args) == 0
 
-    ledger_path = (
-        temp_project_dir / ".super-dev" / "changes" / "fix-order-api" / "ledger.json"
-    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "fix-order-api" / "ledger.json"
     ledger = load_shadow_ledger(temp_project_dir, ledger_path).ledger
     assert ledger.work_mode == "patch"
     assert ledger.governance_depth == "bounded"
@@ -277,9 +275,7 @@ def test_spec_propose_never_overwrites_existing_scope_ledger(
         ]
     )
     assert cli._cmd_spec(first_args) == 0
-    ledger_path = (
-        temp_project_dir / ".super-dev" / "changes" / "stable-scope" / "ledger.json"
-    )
+    ledger_path = temp_project_dir / ".super-dev" / "changes" / "stable-scope" / "ledger.json"
     original = ledger_path.read_bytes()
 
     second_args = cli.parser.parse_args(

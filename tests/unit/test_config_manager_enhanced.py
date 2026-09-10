@@ -10,10 +10,10 @@ import yaml
 from super_dev import __version__
 from super_dev.config.manager import ConfigManager, ProjectConfig
 
-
 # ---------------------------------------------------------------------------
 # ProjectConfig 数据类
 # ---------------------------------------------------------------------------
+
 
 class TestProjectConfig:
     def test_default_values(self):
@@ -50,8 +50,13 @@ class TestProjectConfig:
     def test_default_phases(self):
         config = ProjectConfig(name="test")
         expected_phases = [
-            "discovery", "intelligence", "drafting",
-            "redteam", "qa", "delivery", "deployment",
+            "discovery",
+            "intelligence",
+            "drafting",
+            "redteam",
+            "qa",
+            "delivery",
+            "deployment",
         ]
         assert config.phases == expected_phases
 
@@ -102,6 +107,7 @@ class TestProjectConfig:
 # ---------------------------------------------------------------------------
 # ConfigManager - 文件操作
 # ---------------------------------------------------------------------------
+
 
 class TestConfigManagerFileOps:
     def test_load_from_valid_yaml(self, tmp_path):
@@ -202,6 +208,7 @@ class TestConfigManagerFileOps:
 # ConfigManager - 验证
 # ---------------------------------------------------------------------------
 
+
 class TestConfigManagerValidation:
     def test_valid_platform_ids(self, tmp_path):
         for platform in ["web", "mobile", "wechat", "desktop"]:
@@ -232,6 +239,7 @@ class TestConfigManagerValidation:
 # ConfigManager - Singleton 行为
 # ---------------------------------------------------------------------------
 
+
 class TestConfigManagerSingleton:
     def test_same_dir_returns_consistent_config(self, tmp_path):
         (tmp_path / "super-dev.yaml").write_text("name: singleton-test\n")
@@ -257,6 +265,7 @@ class TestConfigManagerSingleton:
 # ---------------------------------------------------------------------------
 # ConfigManager - 技术栈获取
 # ---------------------------------------------------------------------------
+
 
 class TestConfigManagerTechStack:
     def test_get_tech_stack_dict(self, tmp_path):
@@ -296,6 +305,7 @@ class TestConfigManagerTechStack:
 # ---------------------------------------------------------------------------
 # ConfigManager - Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestConfigManagerEdgeCases:
     def test_empty_yaml_file(self, tmp_path):
@@ -342,6 +352,7 @@ class TestConfigManagerEdgeCases:
 # ProjectConfig - 深入字段测试
 # ---------------------------------------------------------------------------
 
+
 class TestProjectConfigFields:
     def test_all_supported_platforms(self):
         for platform in ["web", "mobile", "wechat", "desktop"]:
@@ -349,7 +360,21 @@ class TestProjectConfigFields:
             assert config.platform == platform
 
     def test_all_supported_backends(self):
-        for backend in ["node", "python", "go", "java", "rust", "php", "ruby", "csharp", "kotlin", "swift", "elixir", "scala", "dart"]:
+        for backend in [
+            "node",
+            "python",
+            "go",
+            "java",
+            "rust",
+            "php",
+            "ruby",
+            "csharp",
+            "kotlin",
+            "swift",
+            "elixir",
+            "scala",
+            "dart",
+        ]:
             config = ProjectConfig(name="test", backend=backend)
             assert config.backend == backend
 
@@ -398,6 +423,7 @@ class TestProjectConfigFields:
 # ConfigManager - YAML 格式兼容性
 # ---------------------------------------------------------------------------
 
+
 class TestYAMLCompatibility:
     def test_boolean_values(self, tmp_path):
         content = "name: test\nhost_profile_enforce_selected: true\n"
@@ -416,6 +442,7 @@ class TestYAMLCompatibility:
 
     def test_nested_cli_dict(self, tmp_path):
         import textwrap
+
         content = textwrap.dedent("""\
             name: test
             cli:
@@ -430,6 +457,7 @@ class TestYAMLCompatibility:
 
     def test_multiline_description(self, tmp_path):
         import textwrap
+
         content = textwrap.dedent("""\
             name: test
             description: |
@@ -450,6 +478,7 @@ class TestYAMLCompatibility:
 
     def test_all_fields_roundtrip(self, tmp_path):
         import textwrap
+
         content = textwrap.dedent("""\
             name: roundtrip-test
             description: Full roundtrip

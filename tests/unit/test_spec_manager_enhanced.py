@@ -23,10 +23,10 @@ from super_dev.specs.models import (
     TaskStatus,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def project_dir(tmp_path):
@@ -51,6 +51,7 @@ def change_manager(project_dir):
 # SpecManager 基本操作
 # ---------------------------------------------------------------------------
 
+
 class TestSpecManagerBasics:
     def test_init_creates_specs_dir(self, spec_manager, project_dir):
         specs_dir = project_dir / ".super-dev" / "specs"
@@ -68,10 +69,20 @@ class TestSpecManagerBasics:
     def test_save_and_load_spec(self, spec_manager):
         spec = Spec(name="user-auth", title="User Authentication")
         spec.purpose = "Handle user login and registration"
-        spec.requirements.append(Requirement(
-            name="Login", keyword="SHALL", description="support email/password login",
-            scenarios=[Scenario(given="valid credentials", when="user submits login form", then="user receives auth token")],
-        ))
+        spec.requirements.append(
+            Requirement(
+                name="Login",
+                keyword="SHALL",
+                description="support email/password login",
+                scenarios=[
+                    Scenario(
+                        given="valid credentials",
+                        when="user submits login form",
+                        then="user receives auth token",
+                    )
+                ],
+            )
+        )
         spec_manager.save_spec(spec)
         loaded = spec_manager.load_spec("user-auth")
         assert loaded is not None
@@ -100,10 +111,13 @@ class TestSpecManagerBasics:
 # Spec 模板差异化
 # ---------------------------------------------------------------------------
 
+
 class TestSpecTemplateDifferentiation:
     def test_shall_keyword_persists(self, spec_manager):
         spec = Spec(name="test-shall", title="SHALL test")
-        spec.requirements.append(Requirement(name="R1", keyword="SHALL", description="be implemented"))
+        spec.requirements.append(
+            Requirement(name="R1", keyword="SHALL", description="be implemented")
+        )
         spec_manager.save_spec(spec)
         loaded = spec_manager.load_spec("test-shall")
         assert loaded.requirements[0].keyword == "SHALL"
@@ -117,7 +131,9 @@ class TestSpecTemplateDifferentiation:
 
     def test_should_keyword_persists(self, spec_manager):
         spec = Spec(name="test-should", title="SHOULD test")
-        spec.requirements.append(Requirement(name="R1", keyword="SHOULD", description="be recommended"))
+        spec.requirements.append(
+            Requirement(name="R1", keyword="SHOULD", description="be recommended")
+        )
         spec_manager.save_spec(spec)
         loaded = spec_manager.load_spec("test-should")
         assert loaded.requirements[0].keyword == "SHOULD"
@@ -142,13 +158,17 @@ class TestSpecTemplateDifferentiation:
 
     def test_scenario_roundtrip(self, spec_manager):
         spec = Spec(name="scenario-test", title="Scenario Test")
-        spec.requirements.append(Requirement(
-            name="Auth", keyword="SHALL", description="authenticate users",
-            scenarios=[
-                Scenario(given="valid token", when="request made", then="200 OK"),
-                Scenario(given="invalid token", when="request made", then="401 Unauthorized"),
-            ],
-        ))
+        spec.requirements.append(
+            Requirement(
+                name="Auth",
+                keyword="SHALL",
+                description="authenticate users",
+                scenarios=[
+                    Scenario(given="valid token", when="request made", then="200 OK"),
+                    Scenario(given="invalid token", when="request made", then="401 Unauthorized"),
+                ],
+            )
+        )
         spec_manager.save_spec(spec)
         loaded = spec_manager.load_spec("scenario-test")
         assert len(loaded.requirements[0].scenarios) == 2
@@ -157,6 +177,7 @@ class TestSpecTemplateDifferentiation:
 # ---------------------------------------------------------------------------
 # ChangeManager 基本操作
 # ---------------------------------------------------------------------------
+
 
 class TestChangeManagerBasics:
     def test_init_creates_changes_dir(self, change_manager, project_dir):
@@ -206,10 +227,15 @@ class TestChangeManagerBasics:
 # 变更影响分析 (archive_change)
 # ---------------------------------------------------------------------------
 
+
 class TestChangeImpactAnalysis:
     def test_archive_adds_new_requirements(self, change_manager, spec_manager):
-        delta = SpecDelta(spec_name="auth", delta_type=DeltaType.ADDED, description="Add",
-                          requirements=[Requirement(name="Login", keyword="SHALL", description="support login")])
+        delta = SpecDelta(
+            spec_name="auth",
+            delta_type=DeltaType.ADDED,
+            description="Add",
+            requirements=[Requirement(name="Login", keyword="SHALL", description="support login")],
+        )
         change = Change(id="add-login", title="Add Login")
         change.spec_deltas = [delta]
         change_manager.save_change(change)
@@ -222,8 +248,12 @@ class TestChangeImpactAnalysis:
         spec = Spec(name="auth", title="Auth")
         spec.requirements = [Requirement(name="Login", keyword="SHALL", description="v1")]
         spec_manager.save_spec(spec)
-        delta = SpecDelta(spec_name="auth", delta_type=DeltaType.MODIFIED, description="Update",
-                          requirements=[Requirement(name="Login", keyword="MUST", description="v2 with MFA")])
+        delta = SpecDelta(
+            spec_name="auth",
+            delta_type=DeltaType.MODIFIED,
+            description="Update",
+            requirements=[Requirement(name="Login", keyword="MUST", description="v2 with MFA")],
+        )
         change = Change(id="update-login", title="Update")
         change.spec_deltas = [delta]
         change_manager.save_change(change)
@@ -238,8 +268,12 @@ class TestChangeImpactAnalysis:
             Requirement(name="Register", keyword="SHALL", description="register"),
         ]
         spec_manager.save_spec(spec)
-        delta = SpecDelta(spec_name="auth", delta_type=DeltaType.REMOVED, description="Remove",
-                          requirements=[Requirement(name="Register", keyword="SHALL", description="register")])
+        delta = SpecDelta(
+            spec_name="auth",
+            delta_type=DeltaType.REMOVED,
+            description="Remove",
+            requirements=[Requirement(name="Register", keyword="SHALL", description="register")],
+        )
         change = Change(id="remove", title="Remove")
         change.spec_deltas = [delta]
         change_manager.save_change(change)
@@ -260,6 +294,7 @@ class TestChangeImpactAnalysis:
 # ---------------------------------------------------------------------------
 # Task 解析
 # ---------------------------------------------------------------------------
+
 
 class TestTaskParsing:
     def test_parse_standard_format(self, change_manager):
@@ -306,6 +341,7 @@ class TestTaskParsing:
 # Task 格式化
 # ---------------------------------------------------------------------------
 
+
 class TestTaskFormatting:
     def test_format_groups_by_number(self, change_manager):
         tasks = [
@@ -344,6 +380,7 @@ class TestTaskFormatting:
 # Proposal 解析
 # ---------------------------------------------------------------------------
 
+
 class TestProposalParsing:
     def test_parse_extracts_fields(self, change_manager):
         content = textwrap.dedent("""\
@@ -369,11 +406,14 @@ class TestProposalParsing:
 # Spec Delta 解析
 # ---------------------------------------------------------------------------
 
+
 class TestSpecDeltaParsing:
     def test_parse_added_delta(self, change_manager, project_dir):
         specs_dir = project_dir / ".super-dev" / "changes" / "test" / "specs" / "auth"
         specs_dir.mkdir(parents=True)
-        (specs_dir / "spec.md").write_text("## ADDED\n\n### Requirement: Login\nSHALL support login\n")
+        (specs_dir / "spec.md").write_text(
+            "## ADDED\n\n### Requirement: Login\nSHALL support login\n"
+        )
         deltas = change_manager._parse_spec_deltas(specs_dir.parent)
         assert len(deltas) == 1
         assert deltas[0].delta_type == DeltaType.ADDED
@@ -381,7 +421,9 @@ class TestSpecDeltaParsing:
     def test_parse_modified_delta(self, change_manager, project_dir):
         specs_dir = project_dir / ".super-dev" / "changes" / "t2" / "specs" / "auth"
         specs_dir.mkdir(parents=True)
-        (specs_dir / "spec.md").write_text("## MODIFIED\n\n### Requirement: Login\nMUST support login with MFA\n")
+        (specs_dir / "spec.md").write_text(
+            "## MODIFIED\n\n### Requirement: Login\nMUST support login with MFA\n"
+        )
         deltas = change_manager._parse_spec_deltas(specs_dir.parent)
         assert deltas[0].delta_type == DeltaType.MODIFIED
 
@@ -397,9 +439,12 @@ class TestSpecDeltaParsing:
 # Change metadata
 # ---------------------------------------------------------------------------
 
+
 class TestChangeMetadata:
     def test_status_persisted_as_yaml(self, change_manager, project_dir):
-        change_manager.save_change(Change(id="meta-test", title="Meta", status=ChangeStatus.PROPOSED))
+        change_manager.save_change(
+            Change(id="meta-test", title="Meta", status=ChangeStatus.PROPOSED)
+        )
         meta_path = project_dir / ".super-dev" / "changes" / "meta-test" / "change.yaml"
         data = yaml.safe_load(meta_path.read_text())
         assert data["status"] == "proposed"
@@ -423,6 +468,7 @@ class TestChangeMetadata:
 # Design notes
 # ---------------------------------------------------------------------------
 
+
 class TestDesignNotes:
     def test_design_notes_saved_and_loaded(self, change_manager):
         change = Change(id="design-test", title="Design")
@@ -436,6 +482,7 @@ class TestDesignNotes:
 # Spec 数据模型
 # ---------------------------------------------------------------------------
 
+
 class TestSpecModels:
     def test_scenario_to_markdown(self):
         scenario = Scenario(given="logged in", when="clicks save", then="data persisted")
@@ -448,8 +495,12 @@ class TestSpecModels:
         assert Scenario().to_markdown() == ""
 
     def test_requirement_to_dict(self):
-        req = Requirement(name="Auth", keyword="MUST", description="authenticate",
-                          scenarios=[Scenario(given="t", when="r", then="200")])
+        req = Requirement(
+            name="Auth",
+            keyword="MUST",
+            description="authenticate",
+            scenarios=[Scenario(given="t", when="r", then="200")],
+        )
         d = req.to_dict()
         assert d["name"] == "Auth"
         assert len(d["scenarios"]) == 1
@@ -472,6 +523,7 @@ class TestSpecModels:
 # Spec roundtrip
 # ---------------------------------------------------------------------------
 
+
 class TestSpecRoundTrip:
     def test_spec_with_purpose(self, spec_manager):
         spec = Spec(name="rt", title="RT")
@@ -493,14 +545,21 @@ class TestSpecRoundTrip:
 # ChangeManager completeness
 # ---------------------------------------------------------------------------
 
+
 class TestChangeManagerCompleteness:
     def test_change_with_all_fields(self, change_manager):
         change = Change(id="full", title="Full", status=ChangeStatus.IN_PROGRESS)
         change.proposal = Proposal(title="P", description="D", motivation="M", impact="I")
         change.tasks = [Task(id="1.1", title="T1", status=TaskStatus.COMPLETED)]
         change.design_notes = "Notes"
-        change.spec_deltas = [SpecDelta(spec_name="a", delta_type=DeltaType.ADDED, description="",
-                                        requirements=[Requirement(name="R", keyword="SHALL", description="d")])]
+        change.spec_deltas = [
+            SpecDelta(
+                spec_name="a",
+                delta_type=DeltaType.ADDED,
+                description="",
+                requirements=[Requirement(name="R", keyword="SHALL", description="d")],
+            )
+        ]
         change_manager.save_change(change)
         loaded = change_manager.load_change("full")
         assert loaded.proposal is not None
@@ -510,10 +569,12 @@ class TestChangeManagerCompleteness:
 
     def test_normalize_datetime_naive(self, change_manager):
         from datetime import datetime
+
         result = change_manager._normalize_datetime(datetime(2026, 1, 1))
         assert result.tzinfo is not None
 
     def test_normalize_datetime_aware(self, change_manager):
         from datetime import datetime, timezone
+
         result = change_manager._normalize_datetime(datetime(2026, 1, 1, tzinfo=timezone.utc))
         assert result.tzinfo is not None

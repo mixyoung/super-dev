@@ -70,7 +70,9 @@ def _delivery_readiness_note(host: dict[str, Any]) -> str:
     if not isinstance(host, dict):
         return "-"
     if bool(host.get("ready_for_delivery", False)):
-        return "当前宿主已经进入可交付态：团队可以直接在这个宿主里继续主流程，不需要额外解释接入方式。"
+        return (
+            "当前宿主已经进入可交付态：团队可以直接在这个宿主里继续主流程，不需要额外解释接入方式。"
+        )
     blocking_reason = str(host.get("blocking_reason", "")).strip()
     if "截图" in blocking_reason or "视觉" in blocking_reason:
         return "当前先不要把这个宿主当成最终演示入口，视觉与体验风险还会直接暴露给用户。"
@@ -503,7 +505,10 @@ def render_host_runtime_validation_markdown(
                 playbook = host.get("framework_playbook", {})
                 if isinstance(playbook, dict) and playbook:
                     framework_focus_name = str(playbook.get("framework", "")).strip()
-                    if not isinstance(framework_validation_surfaces, list) or not framework_validation_surfaces:
+                    if (
+                        not isinstance(framework_validation_surfaces, list)
+                        or not framework_validation_surfaces
+                    ):
                         framework_validation_surfaces = playbook.get("validation_surfaces", [])
                     break
         if executive_runtime_summary:
@@ -536,7 +541,8 @@ def render_host_runtime_validation_markdown(
                 (
                     "- Framework Validation Surfaces: "
                     + "；".join(str(item) for item in framework_validation_surfaces[:4])
-                    if isinstance(framework_validation_surfaces, list) and framework_validation_surfaces
+                    if isinstance(framework_validation_surfaces, list)
+                    and framework_validation_surfaces
                     else "- Framework Validation Surfaces: -"
                 ),
                 (
@@ -767,7 +773,9 @@ def render_host_runtime_validation_markdown(
                     f"- Standard Flow: {injection_closure.get('standard_flow_label', '-')}"
                 )
             if "competition_flow_label" in injection_closure:
-                lines.append(f"- SEEAI Flow: {injection_closure.get('competition_flow_label', '-')}")
+                lines.append(
+                    f"- SEEAI Flow: {injection_closure.get('competition_flow_label', '-')}"
+                )
             if "competition_project_surfaces_ready" in injection_closure:
                 lines.append(
                     "- SEEAI Project Supplements Ready: "
@@ -790,7 +798,9 @@ def render_host_runtime_validation_markdown(
                 lines.append(f"- User-Surface Opt-In: {injection_closure.get('opt_in_flag')}")
             missing_optional = injection_closure.get("missing_optional_user_surfaces", [])
             if isinstance(missing_optional, list) and missing_optional:
-                lines.append("- Missing Optional User Surfaces: " + " / ".join(missing_optional[:3]))
+                lines.append(
+                    "- Missing Optional User Surfaces: " + " / ".join(missing_optional[:3])
+                )
             missing_competition = injection_closure.get(
                 "missing_managed_competition_project_surfaces", []
             )
@@ -1131,9 +1141,7 @@ def write_host_hardening_report(
     onepage_file = output_dir / f"{project_name}-host-parity-onepage.md"
     onepage_file.write_text(render_parity_onepage_fn(payload), encoding="utf-8")
     history_onepage = (
-        output_dir
-        / "host-hardening-history"
-        / f"{project_name}-host-parity-onepage-{stamp}.md"
+        output_dir / "host-hardening-history" / f"{project_name}-host-parity-onepage-{stamp}.md"
     )
     history_onepage.write_text(render_parity_onepage_fn(payload), encoding="utf-8")
     written["onepage_markdown"] = onepage_file
