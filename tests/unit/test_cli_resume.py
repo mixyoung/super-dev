@@ -1,6 +1,7 @@
 import json
 from types import SimpleNamespace
 
+import super_dev.cli_workflow_runtime_mixin as workflow_runtime
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
@@ -344,6 +345,41 @@ def test_finalized_next_step_payload_includes_shadow_ledger(temp_project_dir, mo
 
     assert payload["shadow_ledger"]["active_change_id"] == "next-ledger"
     assert payload["shadow_ledger"]["control_authority"] == "none"
+
+
+def test_next_step_uses_active_artifact_prefix_when_repo_name_differs(
+    temp_project_dir, monkeypatch
+) -> None:
+    cli = SuperDevCLI()
+    output_dir = temp_project_dir / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    change_id = "completion-verification"
+    change_dir = temp_project_dir / ".super-dev" / "changes" / change_id
+    change_dir.mkdir(parents=True, exist_ok=True)
+    workflow_state_path = temp_project_dir / ".super-dev" / "workflow-state.json"
+    workflow_state_path.write_text(
+        json.dumps({"active_change_id": change_id}),
+        encoding="utf-8",
+    )
+    (output_dir / f"{change_id}-prd.md").write_text("# PRD", encoding="utf-8")
+    (output_dir / f"{change_id}-release-readiness.json").write_text(
+        json.dumps({"failed_checks": ["Delivery Closure"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "_project_has_super_dev_context", lambda _path: True)
+    monkeypatch.setattr(
+        workflow_runtime,
+        "detect_pipeline_summary",
+        lambda *_args, **_kwargs: {
+            "workflow_status": "ready",
+            "recommended_command": "继续",
+        },
+    )
+
+    payload = cli._build_next_step_payload(temp_project_dir)
+
+    assert payload["artifact_prefix"] == change_id
+    assert payload["status"] == "delivery_closure_incomplete"
 
 
 def test_status_alias_routes_to_run_status(monkeypatch) -> None:

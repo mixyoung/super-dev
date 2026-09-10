@@ -2009,7 +2009,8 @@ class CliWorkflowRuntimeMixin:
                 },
             )
 
-        readiness_path = project_dir / "output" / f"{project_dir.name}-release-readiness.json"
+        artifact_prefix = resolve_current_artifact_prefix(project_dir)
+        readiness_path = project_dir / "output" / f"{artifact_prefix}-release-readiness.json"
         if readiness_path.exists():
             try:
                 readiness_payload = json.loads(readiness_path.read_text(encoding="utf-8"))
@@ -2031,7 +2032,7 @@ class CliWorkflowRuntimeMixin:
                     },
                 )
 
-        product_audit_path = project_dir / "output" / f"{project_dir.name}-product-audit.json"
+        product_audit_path = project_dir / "output" / f"{artifact_prefix}-product-audit.json"
         if product_audit_path.exists():
             try:
                 product_audit_payload = json.loads(product_audit_path.read_text(encoding="utf-8"))
@@ -2049,7 +2050,7 @@ class CliWorkflowRuntimeMixin:
                     },
                 )
 
-        proof_pack_path = project_dir / "output" / f"{project_dir.name}-proof-pack.json"
+        proof_pack_path = project_dir / "output" / f"{artifact_prefix}-proof-pack.json"
         if proof_pack_path.exists():
             try:
                 proof_pack_payload = json.loads(proof_pack_path.read_text(encoding="utf-8"))

@@ -23,6 +23,7 @@ from super_dev.analyzer import (
     detect_project_type,
     detect_tech_stack,
 )
+from super_dev.artifact_utils import sanitize_artifact_name
 
 
 class TestProjectCategory:
@@ -529,7 +530,7 @@ class TestRepoMapBuilder:
         report = builder.build()
         files = builder.write(report)
 
-        assert report.project_name == temp_project_dir.name.lower().replace("_", "-")
+        assert report.project_name == sanitize_artifact_name(temp_project_dir.name)
         assert any(item.path == "main.py" for item in report.entry_points)
         assert any(item.path == "app" for item in report.top_modules)
         assert files["markdown"].exists()
