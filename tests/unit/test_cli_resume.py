@@ -381,6 +381,21 @@ def test_next_step_uses_active_artifact_prefix_when_repo_name_differs(
     assert payload["artifact_prefix"] == change_id
     assert payload["status"] == "delivery_closure_incomplete"
 
+    (output_dir / f"{change_id}-release-readiness.json").write_text(
+        json.dumps({"passed": True, "failed_checks": []}),
+        encoding="utf-8",
+    )
+    (output_dir / f"{change_id}-proof-pack.json").write_text(
+        json.dumps({"status": "ready"}),
+        encoding="utf-8",
+    )
+
+    ready_payload = cli._build_next_step_payload(temp_project_dir)
+
+    assert ready_payload["status"] == "delivery_ready"
+    assert ready_payload["current_step_label"] == "交付证据已就绪"
+    assert "合并或发布授权" in ready_payload["reason"]
+
 
 def test_status_alias_routes_to_run_status(monkeypatch) -> None:
     cli = SuperDevCLI()

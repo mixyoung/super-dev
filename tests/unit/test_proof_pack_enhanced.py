@@ -189,6 +189,7 @@ class TestProofPackReport:
         assert report.total_count == 20
         assert report.status == "ready"
         assert report.completion_percent == 100
+        assert "仍需用户明确授权" in report.next_actions[0]
 
 
 # ---------------------------------------------------------------------------

@@ -422,6 +422,7 @@ def workflow_continuity_rules(status: str) -> list[str]:
         "delivery_closure_incomplete",
         "product_revision_required",
         "proof_pack_incomplete",
+        "delivery_ready",
     }:
         return [
             "当前仓库已经有活动的 Super Dev 流程。后续自然语言需求默认继续当前流程，不要切回普通聊天。",
@@ -664,6 +665,12 @@ def _build_action_card(
             "user_action": "按当前状态面板继续，不要重新开一轮普通聊天。",
             "examples": ["继续", "下一步", "按当前流程往下做"],
         },
+        "delivery_ready": {
+            "mode": "release",
+            "title": "交付证据已就绪",
+            "user_action": "查看验证结果，并决定是否合并或发布。",
+            "examples": ["查看验证结果", "查看交付证据包", "决定是否合并", "决定是否发布"],
+        },
     }
     action = dict(mapping.get(workflow_status, mapping["ready"]))
     raw_examples = action.get("examples")
@@ -728,6 +735,7 @@ def build_workflow_scenario_cards(summary: dict[str, Any]) -> list[dict[str, Any
         "missing_delivery": "当前先补交付与发布",
         "delivery_closure_incomplete": "当前先补交付闭环证据",
         "proof_pack_incomplete": "当前先重建证据包",
+        "delivery_ready": "当前等待合并或发布决定",
     }
     stage_specific_when: dict[str, str] = {
         "waiting_resume_gate": "宿主窗口被关、电脑重启、第二天回来继续或想精确恢复阶段时",
@@ -745,6 +753,7 @@ def build_workflow_scenario_cards(summary: dict[str, Any]) -> list[dict[str, Any
         "missing_delivery": "质量门禁已通过，准备交付时",
         "delivery_closure_incomplete": "proof-pack / readiness 还没闭环时",
         "proof_pack_incomplete": "交付证据包不完整时",
+        "delivery_ready": "质量、发布就绪与证据包均已通过，但尚未获得合并或发布授权时",
     }
 
     cards: list[dict[str, Any]] = [

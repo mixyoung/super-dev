@@ -229,6 +229,7 @@ PR #8 首轮 CI：Linux 3.10/3.11/3.12 全量质量检查、Linux 3.13 核心及
 - super_dev/integrations/models.py
 - super_dev/migrate.py
 - super_dev/orchestrator/knowledge_pusher.py
+- super_dev/proof_pack.py
 - super_dev/release_readiness.py
 - super_dev/reviewers/fresh_verification_evidence.py
 - super_dev/reviewers/quality_gate.py
@@ -249,6 +250,8 @@ PR #8 首轮 CI：Linux 3.10/3.11/3.12 全量质量检查、Linux 3.13 核心及
 - tests/integration/test_cli.py
 - tests/integration/test_web_api.py
 - tests/unit/test_artifact_utils.py
+- tests/unit/test_cli_resume.py
+- tests/unit/test_proof_pack_enhanced.py
 - tests/unit/test_quality_gate.py
 - tests/unit/test_release_readiness.py
 - tests/unit/test_release_readiness_enhanced.py
@@ -261,3 +264,5 @@ PR #8 首轮 CI：Linux 3.10/3.11/3.12 全量质量检查、Linux 3.13 核心及
 ### 验证与回退
 
 文件冻结后依次执行全库 Ruff、Black、Mypy、字节码编译、贡献范围检查、Skill 同步、完整 pytest、当前代码版本验证、质量门禁、发布就绪和证据包。任何一项未完成或失败都不记为通过。若结构拆分出现回归，按本批文件搬迁反向恢复，不改原流程语义、阈值或用户验收标签。
+
+状态收尾补充：`next` 统一按当前活动变更的产物前缀读取发布就绪、产品审查和证据包；三者已通过时显示“交付证据已就绪”，仅等待用户决定，不自动获得合并或发布授权。未启用的框架和 Hook 运行验证显示为“不适用”，不再误写为“失败”；会话简报在保存状态后重新读取最新快照。Windows Python 3.10 暴露出的临时目录双下划线断言改为复用同一名称规范化函数，不放宽生产行为。

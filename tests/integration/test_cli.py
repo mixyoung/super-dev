@@ -4460,7 +4460,7 @@ class TestCLIPipeline:
             )
             assert ".super-dev/SESSION_BRIEF.md" in brief
             assert ".super-dev/hook-history.jsonl" in brief
-            assert "## 运行时 Harness 摘要" in brief
+            assert "## 运行验证摘要" in brief
             assert "## 最近 Hook 事件" in brief
             assert "## 最近关键时间线" in brief
         finally:

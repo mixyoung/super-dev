@@ -298,7 +298,10 @@ class ProofPackReport:
                 "重新执行 `super-dev release readiness --verify-tests`，确认当前仓库达到发布阈值。"
             )
         if not actions:
-            actions.append("当前关键交付证据已经齐全，可以直接对外交付或发布。")
+            actions.append(
+                "当前关键交付证据已经齐全，可以进入合并或发布决策；"
+                "实际合并或发布仍需用户明确授权。"
+            )
         return actions
 
     @property

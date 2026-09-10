@@ -1494,13 +1494,16 @@ class CliWorkflowRuntimeMixin:
                 lines.append(f"- 必验场景: {' / '.join(str(item) for item in validation[:3])}")
         harness_summaries = summarize_operational_harnesses(project_dir, write_reports=False)
         if harness_summaries:
-            lines.extend(["", "## 运行时 Harness 摘要"])
+            lines.extend(["", "## 运行验证摘要"])
             for harness_summary in harness_summaries[:3]:
                 label = (
                     str(harness_summary.get("label", "")).strip()
                     or str(harness_summary.get("kind", "")).strip()
                 )
-                status = "通过" if harness_summary.get("passed") else "失败"
+                if not harness_summary.get("enabled"):
+                    status = "不适用"
+                else:
+                    status = "通过" if harness_summary.get("passed") else "失败"
                 line = f"- {label}: {status}"
                 blocker = str(harness_summary.get("first_blocker", "")).strip()
                 if blocker:
@@ -1547,8 +1550,7 @@ class CliWorkflowRuntimeMixin:
             for item in continuity_rules:
                 lines.append(f"- {item}")
         self._write_workflow_state(project_dir=project_dir, payload=payload)
-        if not recent_snapshots:
-            recent_snapshots = load_recent_workflow_snapshots(project_dir, limit=3)
+        recent_snapshots = load_recent_workflow_snapshots(project_dir, limit=3)
         if recent_snapshots:
             lines.extend(["", "## 最近流程快照"])
             for item in recent_snapshots[:3]:
@@ -1840,6 +1842,10 @@ class CliWorkflowRuntimeMixin:
                 "当前流程可以继续推进",
                 "先打开状态面板确认当前阶段，再继续执行。",
             ),
+            "delivery_ready": (
+                "交付证据已就绪",
+                "当前验证工作已完成，等待用户决定是否合并或发布。",
+            ),
         }
         if status in status_map:
             return status_map[status]
@@ -2010,6 +2016,7 @@ class CliWorkflowRuntimeMixin:
             )
 
         artifact_prefix = resolve_current_artifact_prefix(project_dir)
+        readiness_passed = False
         readiness_path = project_dir / "output" / f"{artifact_prefix}-release-readiness.json"
         if readiness_path.exists():
             try:
@@ -2021,6 +2028,7 @@ class CliWorkflowRuntimeMixin:
                 if isinstance(readiness_payload, dict)
                 else []
             )
+            readiness_passed = bool(readiness_payload.get("passed")) and not failed_checks
             if "Delivery Closure" in failed_checks:
                 return self._finalize_next_step_payload(
                     project_dir=project_dir,
@@ -2051,6 +2059,7 @@ class CliWorkflowRuntimeMixin:
                 )
 
         proof_pack_path = project_dir / "output" / f"{artifact_prefix}-proof-pack.json"
+        proof_pack_status = ""
         if proof_pack_path.exists():
             try:
                 proof_pack_payload = json.loads(proof_pack_path.read_text(encoding="utf-8"))
@@ -2067,6 +2076,32 @@ class CliWorkflowRuntimeMixin:
                         "evidence": f"proof_pack.status={proof_pack_status}",
                     },
                 )
+
+        if readiness_passed and proof_pack_status == "ready":
+            return self._finalize_next_step_payload(
+                project_dir=project_dir,
+                payload={
+                    "status": "delivery_ready",
+                    "reason": (
+                        "当前代码版本的质量门禁、发布就绪检查和交付证据包均已通过；"
+                        "尚未获得合并或发布授权。"
+                    ),
+                    "recommended_command": "等待用户决定是否合并或发布",
+                    "evidence": "release-readiness.passed=true; proof-pack.status=ready",
+                    "workflow_mode": "release",
+                    "action_card": {
+                        "mode": "release",
+                        "title": "交付证据已就绪",
+                        "user_action": "查看验证结果，并决定是否合并或发布。",
+                        "examples": [
+                            "查看验证结果",
+                            "查看交付证据包",
+                            "决定是否合并",
+                            "决定是否发布",
+                        ],
+                    },
+                },
+            )
 
         return self._finalize_next_step_payload(
             project_dir=project_dir,
