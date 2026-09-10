@@ -336,7 +336,7 @@ class ProofPackReport:
         harness_text = ""
         if harnesses:
             harness_text = (
-                f"运行时/恢复类 harness {len(harnesses)} 项已纳入（"
+                f"运行与恢复验证 {len(harnesses)} 项已纳入（"
                 + "、".join(a.name for a in harnesses)
                 + "）。"
             )
@@ -383,8 +383,8 @@ class ProofPackReport:
         if self.status == "ready":
             return (
                 f"当前交付证据包已完成，{self.ready_count}/{self.total_count} 项关键证据就绪，"
-                "可以作为当前 run 的正式交付证明。"
-                " 从管理视角看，当前 run 已具备演示、验收和交付归档所需的基础可信度。"
+                "可以作为当前代码版本的正式交付证据。"
+                " 从管理视角看，当前代码版本已具备演示、验收和交付归档所需的基础可信度。"
                 f"{gov_text}{harness_text}{operational_focus_text}"
                 f"{workflow_text}{baseline_text}{host_runtime_gap_text}{compliance_text}"
                 f"{frontend_governance_text}{framework_text}"
@@ -410,10 +410,10 @@ class ProofPackReport:
             action_text = f" 下一步：{next_action}。" if next_action else ""
             return (
                 f" 当前流程状态为 {status}，入口 gate={gate}。"
-                " 这说明当前 run 还停在正式确认门之前，不能把“已经生成了一批文件”直接当成交付完成。"
+                " 这说明当前代码版本还停在正式确认门之前，不能把“已经生成了一批文件”直接当成交付完成。"
                 + action_text
             )
-        return f" 当前流程状态为 {status}，主入口 gate 已闭环。"
+        return f" 当前流程状态为 {status}，主入口检查已闭环。"
 
     def _baseline_signal_summary(self) -> str:
         baseline = self.baseline_governance if isinstance(self.baseline_governance, dict) else {}

@@ -167,7 +167,7 @@ class ReleaseReadinessReport:
                 " 这说明当前版本还停在正式确认门之前，不能把“已经生成了一些产物”当成“已经可以发布或交付”。"
                 + action_text
             )
-        return f" 当前流程状态为 {status}，主入口 gate 已闭环。"
+        return f" 当前流程状态为 {status}，主入口检查已闭环。"
 
     def _baseline_signal_summary(self) -> str:
         baseline_check = next(

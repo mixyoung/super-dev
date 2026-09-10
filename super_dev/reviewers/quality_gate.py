@@ -914,7 +914,7 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         if gate:
             action_text = f" 下一步：{next_action}。" if next_action else ""
             return f" 当前流程状态为 {status}，入口 gate={gate}。{action_text}"
-        return f" 当前流程状态为 {status}，主入口 gate 已闭环。"
+        return f" 当前流程状态为 {status}，主入口检查已闭环。"
 
     def _baseline_signal_summary(self) -> str:
         baseline = inspect_baseline_governance(self.project_dir)
