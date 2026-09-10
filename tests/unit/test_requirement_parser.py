@@ -167,7 +167,9 @@ class TestDocumentGeneratorIntegration:
 
         contract = generator.generate_ui_contract()
 
-        assert contract["ui_library_preference"]["preferred"] == "shadcn/ui + Radix UI + Tailwind CSS"
+        assert (
+            contract["ui_library_preference"]["preferred"] == "shadcn/ui + Radix UI + Tailwind CSS"
+        )
         assert contract["ui_library_preference"]["strict"] is False
         assert contract["component_stack"]["icons"]
         assert contract["icon_system"] == contract["component_stack"]["icons"]
@@ -322,7 +324,9 @@ class TestFrontendScaffoldBuilder:
                 "architecture": str(temp_project_dir / "output" / "demo-architecture.md"),
                 "uiux": str(temp_project_dir / "output" / "demo-uiux.md"),
                 "plan": str(temp_project_dir / "output" / "demo-plan.md"),
-                "frontend_blueprint": str(temp_project_dir / "output" / "demo-frontend-blueprint.md"),
+                "frontend_blueprint": str(
+                    temp_project_dir / "output" / "demo-frontend-blueprint.md"
+                ),
             },
         )
 

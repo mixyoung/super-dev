@@ -1,4 +1,4 @@
-# Super Dev 宿主能力审计（2.4.0）
+# Super Dev 宿主能力审计（2.5.0）
 
 > 维护者文档。普通用户优先看 `docs/HOST_USAGE_GUIDE.md`，不需要先读这份审计表。
 

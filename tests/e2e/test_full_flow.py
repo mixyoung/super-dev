@@ -6,7 +6,9 @@ import tempfile
 from pathlib import Path
 
 PYTHON = sys.executable
-TIMEOUT = 30
+# 只用于防止子进程失控，不作为性能合格线。Doctor 会执行完整宿主检查，
+# 在 Windows 冷启动和实时安全扫描下可能超过 30 秒。
+TIMEOUT = 120
 
 
 def _run(args: list[str], cwd: str, timeout: int = TIMEOUT) -> subprocess.CompletedProcess:

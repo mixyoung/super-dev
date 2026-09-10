@@ -24,7 +24,11 @@ def inspect_baseline_governance(
 ) -> dict[str, Any]:
     project_dir = Path(project_dir).resolve()
     output_dir = output_dir or (project_dir / "output")
-    payload = workflow_payload if isinstance(workflow_payload, dict) else (load_workflow_state(project_dir) or {})
+    payload = (
+        workflow_payload
+        if isinstance(workflow_payload, dict)
+        else (load_workflow_state(project_dir) or {})
+    )
     project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
     work_mode = detect_work_mode(project_dir, payload)
     required = work_mode_requires_baseline(work_mode)
@@ -86,7 +90,9 @@ def inspect_baseline_governance(
         ready = False
         summary = "baseline confirmation missing"
         blocker = "baseline 已生成，但还没确认当前项目边界、复用面和差量计划。"
-        recommended_command = "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
+        recommended_command = (
+            "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
+        )
     elif confirmation_status == "confirmed":
         baseline_state = "confirmed"
         ready = True
@@ -98,14 +104,18 @@ def inspect_baseline_governance(
         ready = False
         summary = "baseline confirmation revision_requested"
         blocker = "当前项目基线已被要求返工，必须先修正 baseline 审计和差量范围。"
-        recommended_command = "在宿主里继续修正 baseline；确认后直接说“baseline 确认，可以继续当前流程”"
+        recommended_command = (
+            "在宿主里继续修正 baseline；确认后直接说“baseline 确认，可以继续当前流程”"
+        )
     else:
         normalized = confirmation_status or "pending_review"
         baseline_state = "pending_confirmation"
         ready = False
         summary = f"baseline confirmation {normalized}"
         blocker = "已有项目已完成 baseline，但当前必须先确认基线边界、影响范围和差量计划。"
-        recommended_command = "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
+        recommended_command = (
+            "在宿主里先确认 baseline；如果通过，直接说“baseline 确认，可以继续当前流程”"
+        )
 
     if resume_status not in {"clear", "confirmed"}:
         entry_gate = "waiting_resume_gate"

@@ -20,6 +20,7 @@ try:
 
     RICH_AVAILABLE = True
 except ImportError:  # pragma: no cover - rich 在主环境中始终可用
+
     class Console:  # type: ignore[no-redef]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass

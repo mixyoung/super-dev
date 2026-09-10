@@ -8,7 +8,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 REQUIRED_FILES = [
     "knowledge/development/08-catalog/catalog.yaml",
     "knowledge/development/11-ui-excellence/ui-aesthetic-system.md",
@@ -167,7 +166,11 @@ TEMPLATE_FILE_ALTERNATES = {
     "knowledge/development/15-lifecycle-templates/template-catalog.yaml": [
         (
             "knowledge/development/15-lifecycle-templates/project-templates-collection.md",
-            ["## Template Catalog", "| T-01 | Requirement Template |", "| T-10 | Lifecycle Review Board Template |"],
+            [
+                "## Template Catalog",
+                "| T-01 | Requirement Template |",
+                "| T-10 | Lifecycle Review Board Template |",
+            ],
         )
     ],
     "knowledge/development/15-lifecycle-templates/requirement-template.md": [
@@ -282,10 +285,14 @@ def _find_missing_template_files(project_dir: Path) -> list[str]:
 
 
 def _check_scenario_matrix(project_dir: Path) -> list[str]:
-    matrix_path = project_dir / "knowledge/development/13-implementation-assets/scenario-coverage-matrix.yaml"
+    matrix_path = (
+        project_dir / "knowledge/development/13-implementation-assets/scenario-coverage-matrix.yaml"
+    )
     text = _load_text(matrix_path)
     if not text:
-        text = _load_text(project_dir / "knowledge/development/13-implementation-assets/implementation-toolkit.md")
+        text = _load_text(
+            project_dir / "knowledge/development/13-implementation-assets/implementation-toolkit.md"
+        )
     missing = []
     for key in REQUIRED_SCENARIOS:
         if f"  {key}:" not in text:
@@ -294,10 +301,14 @@ def _check_scenario_matrix(project_dir: Path) -> list[str]:
 
 
 def _check_ui_gates(project_dir: Path) -> list[str]:
-    gates_path = project_dir / "knowledge/development/13-implementation-assets/ui-kpi-and-quality-gates.yaml"
+    gates_path = (
+        project_dir / "knowledge/development/13-implementation-assets/ui-kpi-and-quality-gates.yaml"
+    )
     text = _load_text(gates_path)
     if not text:
-        text = _load_text(project_dir / "knowledge/development/13-implementation-assets/implementation-toolkit.md")
+        text = _load_text(
+            project_dir / "knowledge/development/13-implementation-assets/implementation-toolkit.md"
+        )
     missing = []
     for key in REQUIRED_UI_GATES:
         if f"  {key}:" not in text:
@@ -329,7 +340,9 @@ def _check_lifecycle_stages(project_dir: Path) -> list[str]:
     path = project_dir / "knowledge/development/14-full-lifecycle/stage-exit-criteria.yaml"
     text = _load_text(path)
     if not text:
-        text = _load_text(project_dir / "knowledge/development/14-full-lifecycle/software-lifecycle-gates.md")
+        text = _load_text(
+            project_dir / "knowledge/development/14-full-lifecycle/software-lifecycle-gates.md"
+        )
     missing = []
     for stage in REQUIRED_LIFECYCLE_STAGES:
         if f"  {stage}:" not in text:
@@ -342,7 +355,10 @@ def _check_template_catalog_stages(project_dir: Path) -> list[str]:
     text = _load_text(path)
     using_consolidated = False
     if not text:
-        text = _load_text(project_dir / "knowledge/development/15-lifecycle-templates/project-templates-collection.md")
+        text = _load_text(
+            project_dir
+            / "knowledge/development/15-lifecycle-templates/project-templates-collection.md"
+        )
         using_consolidated = True
     missing = []
     for stage in REQUIRED_LIFECYCLE_STAGES:
@@ -580,7 +596,11 @@ def _render_html(report: dict) -> str:
 
 def _render_junit(report: dict) -> str:
     checks = [
-        ("missing_files", len(report["missing_files"]) == 0, json.dumps(report["missing_files"], ensure_ascii=False)),
+        (
+            "missing_files",
+            len(report["missing_files"]) == 0,
+            json.dumps(report["missing_files"], ensure_ascii=False),
+        ),
         (
             "missing_template_files",
             len(report["missing_template_files"]) == 0,

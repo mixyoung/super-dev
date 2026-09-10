@@ -27,7 +27,9 @@ class CliDesignMixin:
         if not base_name:
             base_name = project_dir.name or "my-project"
         project_name = self._sanitize_project_name(base_name)
-        description = str(idea or "").strip() or str(config.description or "").strip() or project_name
+        description = (
+            str(idea or "").strip() or str(config.description or "").strip() or project_name
+        )
         platform_value = str(config.platform or "web").strip() or "web"
         frontend_value = str(frontend or config.frontend or "next").strip() or "next"
         backend_value = str(config.backend or "node").strip() or "node"
@@ -75,7 +77,9 @@ class CliDesignMixin:
             return
         self.console.print(f"[green]设计灵感锚点 ({len(inspirations)} 个):[/green]\n")
         for idx, item in enumerate(inspirations, 1):
-            signals = " / ".join(str(signal) for signal in list(item.get("signals", []))[:3])
+            raw_signals = item.get("signals", [])
+            signal_items = raw_signals if isinstance(raw_signals, list | tuple) else []
+            signals = " / ".join(str(signal) for signal in signal_items[:3])
             self.console.print(
                 f"[cyan]{idx}. {item.get('name', 'N/A')}[/cyan]  [dim]slug={item.get('slug', 'N/A')}[/dim]"
             )
@@ -96,7 +100,8 @@ class CliDesignMixin:
             inspirations = [
                 item.to_dict()
                 for item in advisor.list_design_references(
-                    product_type=str(getattr(args, "product_type", "") or "").strip().lower() or None,
+                    product_type=str(getattr(args, "product_type", "") or "").strip().lower()
+                    or None,
                     industry=str(getattr(args, "industry", "") or "").strip().lower() or None,
                     style=str(getattr(args, "style", "") or "").strip().lower() or None,
                     frontend=str(getattr(args, "frontend", "") or "").strip() or None,
@@ -128,7 +133,9 @@ class CliDesignMixin:
             )
             inspirations = [
                 item
-                for item in list(profile.get("design_references", []))[: max(int(getattr(args, "max_results", 3) or 3), 1)]
+                for item in list(profile.get("design_references", []))[
+                    : max(int(getattr(args, "max_results", 3) or 3), 1)
+                ]
                 if isinstance(item, dict)
             ]
             self.console.print("[cyan]设计灵感推荐[/cyan]")
@@ -138,7 +145,9 @@ class CliDesignMixin:
             self.console.print(
                 f"  行业: {analysis.get('industry', 'general')} | 风格: {analysis.get('style', 'modern')}"
             )
-            self.console.print("  真源: 内部仍以 output/*-uiux.md + output/*-ui-contract.json 为准\n")
+            self.console.print(
+                "  真源: 内部仍以 output/*-uiux.md + output/*-ui-contract.json 为准\n"
+            )
             self._render_design_inspiration_list(inspirations)
             return 0
 
@@ -149,7 +158,9 @@ class CliDesignMixin:
                 self.console.print(f"[red]未知设计灵感 slug: {args.slug}[/red]")
                 self.console.print("[dim]先运行 `super-dev design list` 查看可用 slug[/dim]")
                 return 1
-            context = self._resolve_design_command_context(idea=str(getattr(args, "idea", "") or ""))
+            context = self._resolve_design_command_context(
+                idea=str(getattr(args, "idea", "") or "")
+            )
             config_manager = context["config_manager"]
             if not isinstance(config_manager, ConfigManager):
                 self.console.print("[red]无法加载项目配置管理器[/red]")
@@ -173,7 +184,9 @@ class CliDesignMixin:
 
             output_dir = Path.cwd() / str(updated_config.output_dir or "output")
             output_dir.mkdir(parents=True, exist_ok=True)
-            project_name = self._sanitize_project_name(str(updated_config.name or context["project_name"]))
+            project_name = self._sanitize_project_name(
+                str(updated_config.name or context["project_name"])
+            )
             record_path = output_dir / f"{project_name}-design-inspiration.json"
             record_payload = {
                 "slug": selected.slug,
@@ -189,12 +202,14 @@ class CliDesignMixin:
                 json.dumps(record_payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            self.console.print(f"[green]✓[/green] 已应用设计灵感: {selected.name} ({selected.slug})")
+            self.console.print(
+                f"[green]✓[/green] 已应用设计灵感: {selected.name} ({selected.slug})"
+            )
             self.console.print(f"  来源: {selected.source}")
             self.console.print(f"  已写入配置: design_inspiration_slug = {selected.slug}")
             self.console.print(f"  记录文件: {record_path}")
             if getattr(args, "write_uiux", True):
-                return self._cmd_run_targeted_refresh("uiux")
+                return int(self._cmd_run_targeted_refresh("uiux"))
             return 0
 
         self.console.print("[yellow]请指定 design 子命令: list / recommend / apply[/yellow]")

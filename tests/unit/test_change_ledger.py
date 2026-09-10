@@ -271,14 +271,10 @@ def test_malformed_scope_advisory_is_wrapped_as_change_ledger_error() -> None:
     missing_stage["scope_advisory"]["recommendations"][0].pop("stage")
     malformed_payloads.append(missing_stage)
     missing_approval = copy.deepcopy(base)
-    missing_approval["scope_advisory"]["recommendations"][0].pop(
-        "approval_required"
-    )
+    missing_approval["scope_advisory"]["recommendations"][0].pop("approval_required")
     malformed_payloads.append(missing_approval)
     invalid_resolution = copy.deepcopy(base)
-    invalid_resolution["scope_advisory"]["recommendations"][0][
-        "recommended_resolution"
-    ] = "INVALID"
+    invalid_resolution["scope_advisory"]["recommendations"][0]["recommended_resolution"] = "INVALID"
     malformed_payloads.append(invalid_resolution)
     invalid_recommendations = copy.deepcopy(base)
     invalid_recommendations["scope_advisory"]["recommendations"] = None

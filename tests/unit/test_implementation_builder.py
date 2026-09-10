@@ -43,7 +43,9 @@ class TestImplementationScaffoldBuilder:
         assert (temp_project_dir / "backend" / "src" / "app.test.js").exists()
         assert (temp_project_dir / "backend" / "src" / "routes" / "auth.route.js").exists()
         assert (temp_project_dir / "backend" / "src" / "services" / "auth.service.js").exists()
-        assert (temp_project_dir / "backend" / "src" / "repositories" / "auth.repository.js").exists()
+        assert (
+            temp_project_dir / "backend" / "src" / "repositories" / "auth.repository.js"
+        ).exists()
         assert (temp_project_dir / "backend" / "tests" / "auth.service.test.js").exists()
         assert (temp_project_dir / "backend" / "migrations" / "001_create_auth.sql").exists()
         assert (temp_project_dir / "backend" / "API_CONTRACT.md").exists()
@@ -64,7 +66,9 @@ class TestImplementationScaffoldBuilder:
         assert (temp_project_dir / "backend" / "src" / "app.py").exists()
         assert (temp_project_dir / "backend" / "src" / "routes" / "core_route.py").exists()
         assert (temp_project_dir / "backend" / "src" / "services" / "core_service.py").exists()
-        assert (temp_project_dir / "backend" / "src" / "repositories" / "core_repository.py").exists()
+        assert (
+            temp_project_dir / "backend" / "src" / "repositories" / "core_repository.py"
+        ).exists()
         assert (temp_project_dir / "backend" / "requirements.txt").exists()
         assert (temp_project_dir / "backend" / "tests" / "test_smoke.py").exists()
         assert (temp_project_dir / "backend" / "tests" / "test_core_service.py").exists()
@@ -115,7 +119,9 @@ class TestImplementationScaffoldBuilder:
         result = builder.generate(requirements=[{"spec_name": "mobile", "req_name": "workflow"}])
 
         assert (temp_project_dir / "frontend" / "FRAMEWORK_PLAYBOOK.md").exists()
-        content = (temp_project_dir / "frontend" / "FRAMEWORK_PLAYBOOK.md").read_text(encoding="utf-8")
+        content = (temp_project_dir / "frontend" / "FRAMEWORK_PLAYBOOK.md").read_text(
+            encoding="utf-8"
+        )
         readme = (temp_project_dir / "frontend" / "README.md").read_text(encoding="utf-8")
         assert "React Native" in content
         assert "push notification" in content
@@ -143,14 +149,19 @@ class TestImplementationScaffoldBuilder:
             ("php", ["backend/composer.json", "backend/public/index.php"]),
             ("ruby", ["backend/Gemfile", "backend/app.rb"]),
             ("csharp", ["backend/Program.cs"]),
-            ("kotlin", ["backend/build.gradle.kts", "backend/src/main/kotlin/com/superdev/Application.kt"]),
+            (
+                "kotlin",
+                ["backend/build.gradle.kts", "backend/src/main/kotlin/com/superdev/Application.kt"],
+            ),
             ("swift", ["backend/Package.swift", "backend/Sources/App/main.swift"]),
             ("elixir", ["backend/mix.exs", "backend/lib/super_dev_backend.ex"]),
             ("scala", ["backend/build.sbt", "backend/src/main/scala/Main.scala"]),
             ("dart", ["backend/pubspec.yaml", "backend/bin/server.dart"]),
         ],
     )
-    def test_generate_extended_backend_scaffold(self, temp_project_dir: Path, backend: str, expected_files: list[str]):
+    def test_generate_extended_backend_scaffold(
+        self, temp_project_dir: Path, backend: str, expected_files: list[str]
+    ):
         builder = ImplementationScaffoldBuilder(
             project_dir=temp_project_dir,
             name="demo",

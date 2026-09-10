@@ -58,7 +58,8 @@ def test_knowledge_gates_pass_with_required_assets(temp_project_dir: Path):
         _write(temp_project_dir / rel, required_md)
 
     _write(
-        temp_project_dir / "knowledge/development/13-implementation-assets/scenario-coverage-matrix.yaml",
+        temp_project_dir
+        / "knowledge/development/13-implementation-assets/scenario-coverage-matrix.yaml",
         "\n".join(
             [
                 "coverage_matrix:",
@@ -74,7 +75,8 @@ def test_knowledge_gates_pass_with_required_assets(temp_project_dir: Path):
         ),
     )
     _write(
-        temp_project_dir / "knowledge/development/13-implementation-assets/ui-kpi-and-quality-gates.yaml",
+        temp_project_dir
+        / "knowledge/development/13-implementation-assets/ui-kpi-and-quality-gates.yaml",
         "\n".join(
             [
                 "ui_quality_gates:",

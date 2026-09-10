@@ -20,6 +20,7 @@ from super_dev.metrics.pipeline_metrics import (
 # PipelineRunMetrics
 # ---------------------------------------------------------------------------
 
+
 class TestPipelineRunMetrics:
     def test_default_values(self):
         m = PipelineRunMetrics(run_id="r1", project_name="p", timestamp="2026-01-01T00:00:00")
@@ -30,22 +31,31 @@ class TestPipelineRunMetrics:
 
     def test_requirement_coverage(self):
         m = PipelineRunMetrics(
-            run_id="r1", project_name="p", timestamp="t",
-            spec_requirements_count=10, spec_requirements_covered=8,
+            run_id="r1",
+            project_name="p",
+            timestamp="t",
+            spec_requirements_count=10,
+            spec_requirements_covered=8,
         )
         assert m.requirement_coverage == pytest.approx(0.8)
 
     def test_validation_pass_rate(self):
         m = PipelineRunMetrics(
-            run_id="r1", project_name="p", timestamp="t",
-            validation_rules_total=20, validation_rules_passed=15,
+            run_id="r1",
+            project_name="p",
+            timestamp="t",
+            validation_rules_total=20,
+            validation_rules_passed=15,
         )
         assert m.validation_pass_rate == pytest.approx(0.75)
 
     def test_roundtrip_dict(self):
         m = PipelineRunMetrics(
-            run_id="r1", project_name="test-proj", timestamp="2026-01-01T00:00:00",
-            quality_gate_score=90, quality_gate_passed=True,
+            run_id="r1",
+            project_name="test-proj",
+            timestamp="2026-01-01T00:00:00",
+            quality_gate_score=90,
+            quality_gate_passed=True,
             phase_durations={"research": 10.5, "docs": 20.3},
         )
         d = m.to_dict()
@@ -63,6 +73,7 @@ class TestPipelineRunMetrics:
 # ---------------------------------------------------------------------------
 # PipelineMetricsCollector
 # ---------------------------------------------------------------------------
+
 
 class TestPipelineMetricsCollector:
     def test_start_and_finish_run(self, tmp_path: Path):
@@ -179,6 +190,7 @@ class TestPipelineMetricsCollector:
 # PipelineMetricsAnalyzer
 # ---------------------------------------------------------------------------
 
+
 def _write_sample_metrics(metrics_dir: Path, entries: list[dict]) -> None:
     """Helper to write sample metrics JSON files."""
     metrics_dir.mkdir(parents=True, exist_ok=True)
@@ -193,20 +205,26 @@ class TestPipelineMetricsAnalyzer:
         assert analyzer.load_history() == []
 
     def test_load_history_basic(self, tmp_path: Path):
-        _write_sample_metrics(tmp_path, [
-            {"run_id": "r1", "project_name": "proj", "timestamp": "2026-01-01T00:00:00"},
-            {"run_id": "r2", "project_name": "proj", "timestamp": "2026-01-02T00:00:00"},
-        ])
+        _write_sample_metrics(
+            tmp_path,
+            [
+                {"run_id": "r1", "project_name": "proj", "timestamp": "2026-01-01T00:00:00"},
+                {"run_id": "r2", "project_name": "proj", "timestamp": "2026-01-02T00:00:00"},
+            ],
+        )
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path))
         history = analyzer.load_history()
         assert len(history) == 2
         assert history[0].run_id == "r1"  # sorted by timestamp
 
     def test_load_history_project_filter(self, tmp_path: Path):
-        _write_sample_metrics(tmp_path, [
-            {"run_id": "r1", "project_name": "alpha", "timestamp": "2026-01-01T00:00:00"},
-            {"run_id": "r2", "project_name": "beta", "timestamp": "2026-01-02T00:00:00"},
-        ])
+        _write_sample_metrics(
+            tmp_path,
+            [
+                {"run_id": "r1", "project_name": "alpha", "timestamp": "2026-01-01T00:00:00"},
+                {"run_id": "r2", "project_name": "beta", "timestamp": "2026-01-02T00:00:00"},
+            ],
+        )
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path))
         assert len(analyzer.load_history("alpha")) == 1
         assert len(analyzer.load_history("beta")) == 1
@@ -226,23 +244,35 @@ class TestPipelineMetricsAnalyzer:
         assert trend["quality_trend"] == []
 
     def test_get_trend_with_data(self, tmp_path: Path):
-        _write_sample_metrics(tmp_path, [
-            {
-                "run_id": "r1", "project_name": "p", "timestamp": "2026-01-01T00:00:00",
-                "quality_gate_score": 80, "total_duration_seconds": 600,
-                "knowledge_hit_rate": 0.3,
-            },
-            {
-                "run_id": "r2", "project_name": "p", "timestamp": "2026-01-02T00:00:00",
-                "quality_gate_score": 92, "total_duration_seconds": 420,
-                "knowledge_hit_rate": 0.72,
-            },
-        ])
+        _write_sample_metrics(
+            tmp_path,
+            [
+                {
+                    "run_id": "r1",
+                    "project_name": "p",
+                    "timestamp": "2026-01-01T00:00:00",
+                    "quality_gate_score": 80,
+                    "total_duration_seconds": 600,
+                    "knowledge_hit_rate": 0.3,
+                },
+                {
+                    "run_id": "r2",
+                    "project_name": "p",
+                    "timestamp": "2026-01-02T00:00:00",
+                    "quality_gate_score": 92,
+                    "total_duration_seconds": 420,
+                    "knowledge_hit_rate": 0.72,
+                },
+            ],
+        )
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path))
         trend = analyzer.get_trend()
         assert trend["quality_trend"] == [80, 92]
         assert trend["duration_trend"] == [600, 420]
-        assert "improved" in trend["improvement_summary"].lower() or "reduced" in trend["improvement_summary"].lower()
+        assert (
+            "improved" in trend["improvement_summary"].lower()
+            or "reduced" in trend["improvement_summary"].lower()
+        )
 
     def test_get_dora_metrics_empty(self, tmp_path: Path):
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path / "none"))
@@ -250,23 +280,35 @@ class TestPipelineMetricsAnalyzer:
         assert dora["total_runs"] == 0
 
     def test_get_dora_metrics_with_data(self, tmp_path: Path):
-        _write_sample_metrics(tmp_path, [
-            {
-                "run_id": "r1", "project_name": "p", "timestamp": "2026-01-01T00:00:00+00:00",
-                "quality_gate_score": 70, "quality_gate_passed": False,
-                "total_duration_seconds": 500,
-            },
-            {
-                "run_id": "r2", "project_name": "p", "timestamp": "2026-01-02T00:00:00+00:00",
-                "quality_gate_score": 90, "quality_gate_passed": True,
-                "total_duration_seconds": 400,
-            },
-            {
-                "run_id": "r3", "project_name": "p", "timestamp": "2026-01-08T00:00:00+00:00",
-                "quality_gate_score": 95, "quality_gate_passed": True,
-                "total_duration_seconds": 350,
-            },
-        ])
+        _write_sample_metrics(
+            tmp_path,
+            [
+                {
+                    "run_id": "r1",
+                    "project_name": "p",
+                    "timestamp": "2026-01-01T00:00:00+00:00",
+                    "quality_gate_score": 70,
+                    "quality_gate_passed": False,
+                    "total_duration_seconds": 500,
+                },
+                {
+                    "run_id": "r2",
+                    "project_name": "p",
+                    "timestamp": "2026-01-02T00:00:00+00:00",
+                    "quality_gate_score": 90,
+                    "quality_gate_passed": True,
+                    "total_duration_seconds": 400,
+                },
+                {
+                    "run_id": "r3",
+                    "project_name": "p",
+                    "timestamp": "2026-01-08T00:00:00+00:00",
+                    "quality_gate_score": 95,
+                    "quality_gate_passed": True,
+                    "total_duration_seconds": 350,
+                },
+            ],
+        )
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path))
         dora = analyzer.get_dora_metrics()
         assert dora["total_runs"] == 3
@@ -282,16 +324,24 @@ class TestPipelineMetricsAnalyzer:
         assert "No historical data" in report
 
     def test_generate_report_with_data(self, tmp_path: Path):
-        _write_sample_metrics(tmp_path, [
-            {
-                "run_id": "r1", "project_name": "demo", "timestamp": "2026-01-01T00:00:00+00:00",
-                "quality_gate_score": 75, "quality_gate_passed": True,
-                "total_duration_seconds": 600, "knowledge_hit_rate": 0.2,
-                "phase_durations": {"research": 120, "docs": 300, "qa": 180},
-                "redteam_critical_count": 2,
-                "spec_requirements_count": 10, "spec_requirements_covered": 6,
-            },
-        ])
+        _write_sample_metrics(
+            tmp_path,
+            [
+                {
+                    "run_id": "r1",
+                    "project_name": "demo",
+                    "timestamp": "2026-01-01T00:00:00+00:00",
+                    "quality_gate_score": 75,
+                    "quality_gate_passed": True,
+                    "total_duration_seconds": 600,
+                    "knowledge_hit_rate": 0.2,
+                    "phase_durations": {"research": 120, "docs": 300, "qa": 180},
+                    "redteam_critical_count": 2,
+                    "spec_requirements_count": 10,
+                    "spec_requirements_covered": 6,
+                },
+            ],
+        )
         analyzer = PipelineMetricsAnalyzer(metrics_dir=str(tmp_path))
         report = analyzer.generate_report("demo")
         assert "DORA" in report
@@ -305,6 +355,7 @@ class TestPipelineMetricsAnalyzer:
 # ---------------------------------------------------------------------------
 # Utility functions
 # ---------------------------------------------------------------------------
+
 
 class TestFormatDuration:
     def test_seconds(self):

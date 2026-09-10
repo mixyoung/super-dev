@@ -188,7 +188,11 @@ def migrate_project(project_dir: Path) -> list[str]:
                 global_protocol = mgr.resolve_global_protocol_path(target)
                 if global_protocol is not None and global_protocol.exists():
                     manifest_paths.append(str(global_protocol))
-                global_slash = mgr.resolve_global_slash_command_path(target)
+                global_slash = (
+                    mgr.resolve_slash_command_path(target=target, scope="global")
+                    if mgr.supports_slash(target)
+                    else None
+                )
                 if global_slash is not None and global_slash.exists():
                     manifest_paths.append(str(global_slash))
                 record_install_manifest(

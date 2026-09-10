@@ -241,7 +241,7 @@ def extract_summary(content: str) -> str:
     if has_frontmatter(text):
         end = text.find("\n---", 3)
         if end > 0:
-            text = text[end + 4:]
+            text = text[end + 4 :]
 
     lines = text.split("\n")
     paragraphs: list[str] = []
@@ -295,7 +295,7 @@ def extract_title(content: str) -> str:
     if has_frontmatter(text):
         end = text.find("\n---", 3)
         if end > 0:
-            text = text[end + 4:]
+            text = text[end + 4 :]
 
     for line in text.split("\n"):
         stripped = line.strip()
@@ -356,7 +356,7 @@ def build_frontmatter(
     """构建 YAML frontmatter 字符串"""
     lines = ["---"]
     lines.append(f"id: {file_id}")
-    lines.append(f"title: \"{title}\"" if title else f"id: {file_id}")
+    lines.append(f'title: "{title}"' if title else f"id: {file_id}")
     lines.append(f"domain: {domain}")
     lines.append(f"category: {category}")
     lines.append(f"phase_trigger: [{', '.join(phase_trigger)}]")
@@ -458,7 +458,7 @@ def process_knowledge_dir(
         if has_frontmatter(content):
             end = content.find("\n---", 3)
             if end > 0:
-                content = content[end + 4:].lstrip("\n")
+                content = content[end + 4 :].lstrip("\n")
 
         new_content = fm + "\n" + content
         try:
@@ -473,9 +473,7 @@ def process_knowledge_dir(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="为知识库文件添加 YAML frontmatter 摘要头"
-    )
+    parser = argparse.ArgumentParser(description="为知识库文件添加 YAML frontmatter 摘要头")
     parser.add_argument(
         "--knowledge-dir",
         type=Path,

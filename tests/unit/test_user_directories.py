@@ -25,6 +25,19 @@ def test_context_supports_codex_home_outside_user_home(tmp_path: Path):
     assert context.codex_home.parent != context.home
 
 
+def test_current_context_prefers_explicit_home_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    explicit_home = tmp_path / "explicit-home"
+    explicit_home.mkdir()
+    monkeypatch.setenv("HOME", str(explicit_home))
+
+    context = UserDirectoryContext.current()
+
+    assert context.home == explicit_home.resolve()
+
+
 def test_context_builds_consistent_windows_environment(tmp_path: Path):
     context = UserDirectoryContext.from_home(tmp_path / "isolated-home")
     env = context.environment({"KEEP": "yes"})
@@ -69,9 +82,7 @@ def test_integration_manager_uses_injected_user_directories(tmp_path: Path):
     assert manager.resolve_global_protocol_path("claude-code") == (
         context.home / ".claude" / "CLAUDE.md"
     )
-    assert manager.resolve_global_protocol_path("codex-cli") == (
-        context.codex_home / "AGENTS.md"
-    )
+    assert manager.resolve_global_protocol_path("codex-cli") == (context.codex_home / "AGENTS.md")
     assert manager.resolve_compatibility_protocol_path("trae") == (
         context.home / ".trae" / "rules.md"
     )

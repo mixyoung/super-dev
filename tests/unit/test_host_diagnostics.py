@@ -3,7 +3,9 @@ from pathlib import Path
 from super_dev.host_diagnostics import build_host_injection_closure
 
 
-def _surface_sets(*, default_paths: list[Path], optional_user_paths: list[Path]) -> dict[str, list[Path]]:
+def _surface_sets(
+    *, default_paths: list[Path], optional_user_paths: list[Path]
+) -> dict[str, list[Path]]:
     return {
         "official_project": default_paths,
         "official_user": [],

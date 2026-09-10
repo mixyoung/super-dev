@@ -556,7 +556,7 @@ HOST_SPECIAL_ADAPTERS: dict[str, HostSpecialAdapter] = {
                 "先用 `/super-dev` 触发一次，确认进入标准 Super Dev research，而不是直接编码。",
                 "再用 `/super-dev-seeai` 或 `super-dev-seeai:` 触发一次，确认进入 30 分钟比赛链路，并保留 compact docs confirm gate。",
                 "在 SEEAI 模式里继续说“继续做 / 做最终 polish / 补一个 wow 点”，确认 Droid 不会切回普通聊天或重新开题。",
-                "确认如需 headless 恢复，可通过 `droid exec --session-id <id> \"continue with next steps\"` 继续当前冲刺。",
+                '确认如需 headless 恢复，可通过 `droid exec --session-id <id> "continue with next steps"` 继续当前冲刺。',
                 "确认 SEEAI 不会卡在初始化；若当前栈起不来，会主动降级到更轻的回退栈并继续交付主路径。",
             ),
             "success_signal": "Droid CLI 的标准入口和 SEEAI 入口都能在当前项目 session 里稳定进入对应 Super Dev 合同，并保持比赛冲刺连续性。",

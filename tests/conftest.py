@@ -58,6 +58,7 @@ def isolated_user_directories(
 def reset_global_config_manager():
     """重置全局配置管理器（每个测试前）"""
     from super_dev.config import manager
+
     manager._global_config_managers.clear()
     yield
     manager._global_config_managers.clear()
@@ -86,7 +87,7 @@ def sample_config(temp_project_dir: Path) -> ProjectConfig:
         platform="web",
         frontend="react",
         backend="node",
-        domain="ecommerce"
+        domain="ecommerce",
     )
 
 
@@ -107,7 +108,4 @@ def workflow_engine(temp_project_dir: Path) -> WorkflowEngine:
 @pytest.fixture
 def workflow_context(temp_project_dir: Path, config_manager: ConfigManager) -> WorkflowContext:
     """工作流上下文"""
-    return WorkflowContext(
-        project_dir=temp_project_dir,
-        config=config_manager
-    )
+    return WorkflowContext(project_dir=temp_project_dir, config=config_manager)

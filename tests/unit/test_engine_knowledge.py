@@ -4,7 +4,9 @@ from pathlib import Path
 from super_dev.orchestrator.engine import WorkflowContext, WorkflowEngine
 
 
-def test_phase_discovery_prefers_cached_knowledge_bundle(temp_project_dir: Path, config_manager, monkeypatch):
+def test_phase_discovery_prefers_cached_knowledge_bundle(
+    temp_project_dir: Path, config_manager, monkeypatch
+):
     engine = WorkflowEngine(temp_project_dir)
     context = WorkflowContext(project_dir=temp_project_dir, config=config_manager)
     context.user_input = {
@@ -59,7 +61,9 @@ def test_phase_discovery_prefers_cached_knowledge_bundle(temp_project_dir: Path,
     assert context.user_input["knowledge_enhanced"] is True
 
 
-def test_phase_discovery_saves_bundle_when_cache_miss(temp_project_dir: Path, config_manager, monkeypatch):
+def test_phase_discovery_saves_bundle_when_cache_miss(
+    temp_project_dir: Path, config_manager, monkeypatch
+):
     engine = WorkflowEngine(temp_project_dir)
     context = WorkflowContext(project_dir=temp_project_dir, config=config_manager)
     context.user_input = {

@@ -150,9 +150,7 @@ def test_reused_evidence_requires_expiry_and_is_invalidated_after_expiry() -> No
 
     assert ledger.get_stage("quality").status == StageStatus.SATISFIED
     assert ledger.get_stage("quality").invalidation_triggers == ["source-changed"]
-    assert invalidate_expired_reuse(
-        ledger, now=now + timedelta(minutes=10)
-    ) == ["quality"]
+    assert invalidate_expired_reuse(ledger, now=now + timedelta(minutes=10)) == ["quality"]
     assert ledger.get_stage("quality").status == StageStatus.INVALIDATED
 
 

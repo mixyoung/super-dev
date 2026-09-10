@@ -34,11 +34,31 @@ def project_with_knowledge(tmp_path):
 
     # Create a few knowledge files
     for domain, category, filename, content in [
-        ("security", "01-standards", "web-security.md", "# Web Security\nUse HTTPS everywhere.\n## Agent Checklist\n- [ ] Use HTTPS\n- [ ] Sanitize input\n"),
+        (
+            "security",
+            "01-standards",
+            "web-security.md",
+            "# Web Security\nUse HTTPS everywhere.\n## Agent Checklist\n- [ ] Use HTTPS\n- [ ] Sanitize input\n",
+        ),
         ("security", "03-checklists", "owasp-top10.md", "# OWASP Top 10\nCheck all OWASP items.\n"),
-        ("design", "01-standards", "ui-design.md", "# UI Design Standards\nFollow design system tokens.\n"),
-        ("development", "01-standards", "python-best-practices.md", "# Python Best Practices\nUse type hints everywhere.\n"),
-        ("testing", "04-antipatterns", "testing-antipatterns.md", "# Testing Anti-patterns\n### Flaky Tests\nAvoid flaky tests.\n### No Assertions\nAlways assert.\n"),
+        (
+            "design",
+            "01-standards",
+            "ui-design.md",
+            "# UI Design Standards\nFollow design system tokens.\n",
+        ),
+        (
+            "development",
+            "01-standards",
+            "python-best-practices.md",
+            "# Python Best Practices\nUse type hints everywhere.\n",
+        ),
+        (
+            "testing",
+            "04-antipatterns",
+            "testing-antipatterns.md",
+            "# Testing Anti-patterns\n### Flaky Tests\nAvoid flaky tests.\n### No Assertions\nAlways assert.\n",
+        ),
     ]:
         d = knowledge_dir / domain / category
         d.mkdir(parents=True, exist_ok=True)
@@ -394,9 +414,7 @@ class TestEvolutionReport:
                 )
             ],
             never_used=["knowledge/unused/file.md"],
-            suggestions=[
-                EvolutionSuggestion("boost", "good.md", "Very effective", 3)
-            ],
+            suggestions=[EvolutionSuggestion("boost", "good.md", "Very effective", 3)],
             weight_adjustments={"good.md": 1.5, "bad.md": 0.5},
         )
         md = report.to_markdown()

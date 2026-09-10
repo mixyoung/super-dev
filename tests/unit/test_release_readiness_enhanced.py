@@ -571,11 +571,11 @@ def test_release_delivery_closure_rejects_missing_or_failed_current_fresh_eviden
 ) -> None:
     _write_fresh_scope_config(tmp_path)
     monkeypatch.setattr(
-        "super_dev.reviewers.quality_gate.EvidenceStore.latest_result",
+        "super_dev.reviewers.fresh_verification_evidence.EvidenceStore.latest_result",
         lambda self, *, extension_id: payload,
     )
     monkeypatch.setattr(
-        "super_dev.reviewers.quality_gate.build_candidate_identity",
+        "super_dev.reviewers.fresh_verification_evidence.build_candidate_identity",
         lambda project_dir: SimpleNamespace(candidate_digest="candidate-current"),
     )
 

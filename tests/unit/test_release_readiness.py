@@ -36,7 +36,12 @@ from super_dev.workflow_guard import (
 )
 
 
-def _prepare_release_ready_project(project_dir: Path) -> None:
+def _prepare_release_ready_project(
+    project_dir: Path,
+    *,
+    artifact_prefix: str | None = None,
+) -> None:
+    project_name = artifact_prefix or project_dir.name
     (project_dir / "super_dev").mkdir(parents=True, exist_ok=True)
     (project_dir / "docs").mkdir(parents=True, exist_ok=True)
     (project_dir / "output").mkdir(parents=True, exist_ok=True)
@@ -125,10 +130,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
             "ok\n",
             encoding="utf-8",
         )
-    (project_dir / "output" / f"{project_dir.name}-redteam.json").write_text(
+    (project_dir / "output" / f"{project_name}-redteam.json").write_text(
         (
             "{\n"
-            f'  "project_name": "{project_dir.name}",\n'
+            f'  "project_name": "{project_name}",\n'
             '  "pass_threshold": 70,\n'
             '  "critical_count": 0,\n'
             '  "high_count": 0,\n'
@@ -142,11 +147,11 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-quality-gate.md").write_text(
+    (project_dir / "output" / f"{project_name}-quality-gate.md").write_text(
         "# 质量门禁报告\n\n**状态**: <span style='color:green'>通过</span>\n**总分**: 90/100\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-task-execution.md").write_text(
+    (project_dir / "output" / f"{project_name}-task-execution.md").write_text(
         (
             "# Spec 任务执行报告\n\n"
             "## 执行期验证摘要\n\n"
@@ -156,11 +161,11 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-product-audit.json").write_text(
+    (project_dir / "output" / f"{project_name}-product-audit.json").write_text(
         '{\n  "status": "ready",\n  "score": 90\n}\n',
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-ui-contract.json").write_text(
+    (project_dir / "output" / f"{project_name}-ui-contract.json").write_text(
         (
             "{\n"
             '  "style_direction": "Editorial workspace",\n'
@@ -181,7 +186,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-ui-contract-alignment.json").write_text(
+    (project_dir / "output" / f"{project_name}-ui-contract-alignment.json").write_text(
         json.dumps(
             {
                 "theme_entry": {"passed": True},
@@ -195,16 +200,14 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-ui-review.json").write_text(
+    (project_dir / "output" / f"{project_name}-ui-review.json").write_text(
         json.dumps({"score": 92, "critical_count": 0}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-uiux.md").write_text(
-        "# UIUX\n", encoding="utf-8"
-    )
+    (project_dir / "output" / f"{project_name}-uiux.md").write_text("# UIUX\n", encoding="utf-8")
     quality_deps = quality_evidence_dependency_paths(
         project_dir,
-        project_name=project_dir.name,
+        project_name=project_name,
         frontend_required=True,
     )
     quality_gate_identity = build_evidence_identity(
@@ -212,7 +215,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         artifact_name="quality-gate",
         dependencies=quality_deps,
     )
-    (project_dir / "output" / f"{project_dir.name}-quality-gate.json").write_text(
+    (project_dir / "output" / f"{project_name}-quality-gate.json").write_text(
         json.dumps(
             {
                 "passed": True,
@@ -229,8 +232,8 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         project_dir,
         artifact_name="frontend-runtime",
         dependencies=[
-            project_dir / "output" / f"{project_dir.name}-ui-contract.json",
-            project_dir / "output" / f"{project_dir.name}-ui-contract-alignment.json",
+            project_dir / "output" / f"{project_name}-ui-contract.json",
+            project_dir / "output" / f"{project_name}-ui-contract-alignment.json",
         ],
     )
     (project_dir / "output" / "frontend").mkdir(parents=True, exist_ok=True)
@@ -238,7 +241,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ":root { --color-primary: #0f172a; }\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-frontend-runtime.json").write_text(
+    (project_dir / "output" / f"{project_name}-frontend-runtime.json").write_text(
         (
             "{\n"
             '  "passed": true,\n'
@@ -269,15 +272,15 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         "# Pipeline 治理报告\n\n**状态**: PASSED\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-knowledge-references.json").write_text(
+    (project_dir / "output" / f"{project_name}-knowledge-references.json").write_text(
         '{"referenced_files": 5, "hit_rate": 0.65}\n',
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-metrics.json").write_text(
+    (project_dir / "output" / f"{project_name}-metrics.json").write_text(
         '{"quality_gate_score": 90}\n',
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-validation-results.json").write_text(
+    (project_dir / "output" / f"{project_name}-validation-results.json").write_text(
         '{"passed": true, "score": 95}\n',
         encoding="utf-8",
     )
@@ -286,19 +289,19 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         "# ADR-001: 选择 PostgreSQL\n\n## 决策\n使用 PostgreSQL。\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-research.md").write_text(
+    (project_dir / "output" / f"{project_name}-research.md").write_text(
         "# Research\n\n- similar products\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-prd.md").write_text(
+    (project_dir / "output" / f"{project_name}-prd.md").write_text(
         "# PRD\n\n- delivery workflow\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-architecture.md").write_text(
+    (project_dir / "output" / f"{project_name}-architecture.md").write_text(
         "# Architecture\n\n- host-governed pipeline\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-uiux.md").write_text(
+    (project_dir / "output" / f"{project_name}-uiux.md").write_text(
         "# UIUX\n\n- frozen shell\n",
         encoding="utf-8",
     )
@@ -311,7 +314,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     record_stage_progress(project_dir, stage="backend", status="completed")
     record_stage_progress(project_dir, stage="quality", status="completed")
 
-    ui_contract_path = project_dir / "output" / f"{project_dir.name}-ui-contract.json"
+    ui_contract_path = project_dir / "output" / f"{project_name}-ui-contract.json"
     ui_contract_payload = json.loads(ui_contract_path.read_text(encoding="utf-8"))
     ui_contract_path.write_text(
         json.dumps(ui_contract_payload, ensure_ascii=False, indent=2),
@@ -320,7 +323,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
 
     quality_deps = quality_evidence_dependency_paths(
         project_dir,
-        project_name=project_dir.name,
+        project_name=project_name,
         frontend_required=True,
     )
     quality_gate_identity = build_evidence_identity(
@@ -328,7 +331,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         artifact_name="quality-gate",
         dependencies=quality_deps,
     )
-    (project_dir / "output" / f"{project_dir.name}-quality-gate.json").write_text(
+    (project_dir / "output" / f"{project_name}-quality-gate.json").write_text(
         json.dumps(
             {
                 "passed": True,
@@ -345,11 +348,11 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         project_dir,
         artifact_name="frontend-runtime",
         dependencies=[
-            project_dir / "output" / f"{project_dir.name}-ui-contract.json",
-            project_dir / "output" / f"{project_dir.name}-ui-contract-alignment.json",
+            project_dir / "output" / f"{project_name}-ui-contract.json",
+            project_dir / "output" / f"{project_name}-ui-contract-alignment.json",
         ],
     )
-    runtime_path = project_dir / "output" / f"{project_dir.name}-frontend-runtime.json"
+    runtime_path = project_dir / "output" / f"{project_name}-frontend-runtime.json"
     runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
     runtime_payload["evidence_identity"] = frontend_identity
     runtime_path.write_text(
@@ -362,10 +365,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         artifact_name="spec-compliance",
         dependencies=_spec_compliance_dependencies(project_dir, project_dir / "output"),
     )
-    (project_dir / "output" / f"{project_dir.name}-spec-compliance.json").write_text(
+    (project_dir / "output" / f"{project_name}-spec-compliance.json").write_text(
         json.dumps(
             {
-                "project_name": project_dir.name,
+                "project_name": project_name,
                 "total_requirements": 0,
                 "found": 0,
                 "partial": 0,
@@ -385,10 +388,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         artifact_name="architecture-drift",
         dependencies=_architecture_drift_dependencies(project_dir, project_dir / "output"),
     )
-    (project_dir / "output" / f"{project_dir.name}-architecture-drift.json").write_text(
+    (project_dir / "output" / f"{project_name}-architecture-drift.json").write_text(
         json.dumps(
             {
-                "project_name": project_dir.name,
+                "project_name": project_name,
                 "declared_modules": [],
                 "actual_modules": [],
                 "declared_tech_stack": [],
@@ -407,10 +410,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         artifact_name="uiux-compliance",
         dependencies=_uiux_compliance_dependencies(project_dir, project_dir / "output"),
     )
-    (project_dir / "output" / f"{project_dir.name}-uiux-compliance.json").write_text(
+    (project_dir / "output" / f"{project_name}-uiux-compliance.json").write_text(
         json.dumps(
             {
-                "project_name": project_dir.name,
+                "project_name": project_name,
                 "declared_icon_library": "lucide",
                 "declared_typography": ["Space Grotesk", "Inter"],
                 "declared_tokens": [],
@@ -448,12 +451,11 @@ def test_release_readiness_detects_missing_docs(temp_project_dir: Path) -> None:
 
 
 def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir: Path) -> None:
-    _prepare_release_ready_project(temp_project_dir)
     _prepare_spec_quality_change(temp_project_dir)
+    save_workflow_state(temp_project_dir, {"active_change_id": "add-proof-ready"})
+    _prepare_release_ready_project(temp_project_dir, artifact_prefix="add-proof-ready")
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    # This fixture explicitly selects the change it created, not a legacy directory.
-    evaluator.active_change_id = "add-proof-ready"
     report = evaluator.evaluate(verify_tests=False)
     files = evaluator.write(report)
 
@@ -468,8 +470,9 @@ def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir
     )
     assert operational_check.passed is True
     assert operational_check.detail in {
-        "operational harness clean across 3/3 enabled harnesses",
-        "no operational harness evidence required",
+        "已启用的运行验证中 1/1 项通过",
+        "已启用的运行验证中 3/3 项通过",
+        "当前项目不需要运行验证记录（Operational Harness）",
     }
 
 

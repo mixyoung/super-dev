@@ -138,8 +138,7 @@ def build_host_repair_action(
         return f"{action}{repair_guidance}" if repair_guidance else action
     if phase == "runtime":
         action = (
-            f"先在 {host_label} 当前会话重新完成真人验收；"
-            f"通过后优先用 {resume} 继续当前流程。"
+            f"先在 {host_label} 当前会话重新完成真人验收；" f"通过后优先用 {resume} 继续当前流程。"
         )
         return f"{action}{repair_guidance}" if repair_guidance else action
     if phase == "validation":
@@ -181,7 +180,9 @@ def rank_host_targets(*, integration_manager: Any, targets: list[str]) -> list[s
 def host_selection_reason(*, integration_manager: Any, target: str) -> str:
     profile = integration_manager.get_adapter_profile(target)
     experience = build_host_experience_profile(target)
-    flagship = isinstance(experience, dict) and str(experience.get("tier", "")).strip() == "flagship"
+    flagship = (
+        isinstance(experience, dict) and str(experience.get("tier", "")).strip() == "flagship"
+    )
     best_for = str(experience.get("best_for", "")).strip() if isinstance(experience, dict) else ""
     protocol_mode = str(getattr(profile, "host_protocol_mode", "") or "").strip()
     fit_suffix = f" 更适合做“{best_for}”这类工作。" if best_for else ""
@@ -356,11 +357,15 @@ def build_detected_host_decision_card(
                 "usage_mode": usage.get("usage_mode", ""),
                 "primary_entry": usage.get("primary_entry", ""),
                 "precondition_label": usage.get("precondition_label", ""),
-                "experience_profile": dict(usage.get("experience_profile", {}))
-                if isinstance(usage.get("experience_profile", {}), dict)
-                else {},
+                "experience_profile": (
+                    dict(usage.get("experience_profile", {}))
+                    if isinstance(usage.get("experience_profile", {}), dict)
+                    else {}
+                ),
                 "injection_closure": candidate_closure,
-                "ready_for_standard_flow": bool(candidate_closure.get("standard_flow_ready", False)),
+                "ready_for_standard_flow": bool(
+                    candidate_closure.get("standard_flow_ready", False)
+                ),
                 "ready_for_competition_flow": bool(
                     candidate_closure.get("competition_flow_ready", False)
                 ),
@@ -377,26 +382,28 @@ def build_detected_host_decision_card(
                 "repair_playbook": build_host_repair_guidance(target).strip(),
                 "standard_flow_first_prompt": build_host_standard_first_prompt(target),
                 "competition_flow_first_prompt": build_host_competition_first_prompt(target),
-                "adaptation_contract": dict(usage.get("adaptation_contract", {}))
-                if isinstance(usage.get("adaptation_contract", {}), dict)
-                else {},
-                "official_alignment": dict(
-                    usage.get("adaptation_contract", {}).get("official_alignment", {})
-                )
-                if isinstance(usage.get("adaptation_contract", {}), dict)
-                and isinstance(
-                    usage.get("adaptation_contract", {}).get("official_alignment", {}),
-                    dict,
-                )
-                else {},
+                "adaptation_contract": (
+                    dict(usage.get("adaptation_contract", {}))
+                    if isinstance(usage.get("adaptation_contract", {}), dict)
+                    else {}
+                ),
+                "official_alignment": (
+                    dict(usage.get("adaptation_contract", {}).get("official_alignment", {}))
+                    if isinstance(usage.get("adaptation_contract", {}), dict)
+                    and isinstance(
+                        usage.get("adaptation_contract", {}).get("official_alignment", {}),
+                        dict,
+                    )
+                    else {}
+                ),
                 "recommended": target == selected_host,
                 "recommended_reason": host_selection_reason(
                     integration_manager=integration_manager,
                     target=target,
                 ),
-                "reasons": explain_detection_details_fn({target: detected_meta.get(target, [])}).get(
-                    target, []
-                ),
+                "reasons": explain_detection_details_fn(
+                    {target: detected_meta.get(target, [])}
+                ).get(target, []),
                 "trigger": candidate_trigger_fn(target, usage, profile),
                 "path_override": usage["path_override"],
             }
@@ -642,12 +649,15 @@ def build_primary_repair_action(
         if not isinstance(usage, dict):
             usage = {"host": host_label_fn(target), "trigger_command": ""}
         host_name = host_label_fn(target)
-        command = build_host_repair_action(
-            target=target,
-            usage=usage,
-            phase="surface",
-            host_name=host_name,
-        ) or command
+        command = (
+            build_host_repair_action(
+                target=target,
+                usage=usage,
+                phase="surface",
+                host_name=host_name,
+            )
+            or command
+        )
         if not command:
             continue
         reason = str(diagnosis.get("blocker_summary", "")).strip()

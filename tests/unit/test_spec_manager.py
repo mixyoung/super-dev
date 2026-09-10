@@ -57,7 +57,9 @@ class TestSpecManager:
         assert loaded is not None
         assert loaded.spec_deltas
         assert loaded.spec_deltas[0].requirements
-        assert any(req.name == "secure-authentication" for req in loaded.spec_deltas[0].requirements)
+        assert any(
+            req.name == "secure-authentication" for req in loaded.spec_deltas[0].requirements
+        )
 
         # 模拟后续任务更新再次保存，需求不应丢失
         manager.save_change(loaded)

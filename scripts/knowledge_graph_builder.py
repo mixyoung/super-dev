@@ -15,15 +15,14 @@ import json
 import os
 import re
 import sys
-import hashlib
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
 class KnowledgeNode:
     """知识节点"""
+
     id: str
     title: str
     domain: str
@@ -40,6 +39,7 @@ class KnowledgeNode:
 @dataclass
 class KnowledgeEdge:
     """知识关系"""
+
     source: str
     target: str
     relation: str  # prerequisite, related, alternative, applies_to, contains
@@ -48,6 +48,7 @@ class KnowledgeEdge:
 @dataclass
 class KnowledgeGraph:
     """知识图谱"""
+
     nodes: dict[str, KnowledgeNode] = field(default_factory=dict)
     edges: list[KnowledgeEdge] = field(default_factory=list)
     _adjacency: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
@@ -141,7 +142,6 @@ PREREQUISITE_MAP = {
     "pytest-complete": ["python-complete"],
     "fastapi-complete": ["python-complete", "python-async-programming"],
     "django-complete": ["python-complete"],
-
     # JavaScript/TypeScript 生态
     "javascript-typescript-complete": [],
     "typescript-advanced-types": ["javascript-typescript-complete"],
@@ -149,30 +149,24 @@ PREREQUISITE_MAP = {
     "react-hooks-complete": ["react-complete"],
     "vue3-complete": ["javascript-typescript-complete"],
     "nestjs-complete": ["typescript-advanced-types"],
-
     # 数据库
     "postgresql-complete": [],
     "redis-complete": [],
     "elasticsearch-complete": [],
     "mongodb-complete": [],
-
     # DevOps
     "docker-complete": [],
     "kubernetes-complete": ["docker-complete"],
     "k8s-troubleshooting-playbook": ["kubernetes-complete"],
     "github-actions-complete": ["git-complete"],
     "terraform-complete": ["docker-complete"],
-
     # 架构
     "microservices-patterns": ["docker-complete"],
     "kafka-complete": ["microservices-patterns"],
-
     # 安全
     "owasp-top10-complete": [],
-
     # AI
     "llm-application-complete": ["python-complete"],
-
     # Go/Rust
     "golang-complete": [],
     "rust-complete": [],
@@ -255,9 +249,26 @@ class KnowledgeGraphBuilder:
             # 提取标签
             tags = list(DOMAIN_TAGS.get(domain, []))
             # 从内容中提取更多标签
-            for keyword in ["python", "javascript", "typescript", "react", "vue", "docker",
-                           "kubernetes", "postgresql", "redis", "kafka", "fastapi", "django",
-                           "go", "rust", "java", "security", "performance", "testing"]:
+            for keyword in [
+                "python",
+                "javascript",
+                "typescript",
+                "react",
+                "vue",
+                "docker",
+                "kubernetes",
+                "postgresql",
+                "redis",
+                "kafka",
+                "fastapi",
+                "django",
+                "go",
+                "rust",
+                "java",
+                "security",
+                "performance",
+                "testing",
+            ]:
                 if keyword in content.lower() and keyword not in tags:
                     tags.append(keyword)
 
@@ -321,7 +332,7 @@ class KnowledgeGraphBuilder:
         for domain, node_ids in by_domain.items():
             if len(node_ids) <= 10:
                 for i, a in enumerate(node_ids):
-                    for b in node_ids[i+1:]:
+                    for b in node_ids[i + 1 :]:
                         if not any(e.source == a and e.target == b for e in self.graph.edges):
                             self.graph.add_edge(KnowledgeEdge(a, b, "related"))
 
@@ -350,10 +361,10 @@ def main():
 
     if command == "build":
         stats = graph.get_stats()
-        print(f"知识图谱构建完成!")
+        print("知识图谱构建完成!")
         print(f"  节点数: {stats['total_nodes']}")
         print(f"  关系数: {stats['total_edges']}")
-        print(f"\n  领域分布:")
+        print("\n  领域分布:")
         for domain, count in stats["domains"].items():
             print(f"    {domain}: {count}")
 

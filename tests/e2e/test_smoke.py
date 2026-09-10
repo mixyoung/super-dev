@@ -16,9 +16,7 @@ def _subprocess_env() -> dict[str, str]:
     env = os.environ.copy()
     existing = env.get("PYTHONPATH", "").strip()
     repo_path = str(REPO_ROOT)
-    env["PYTHONPATH"] = (
-        repo_path if not existing else os.pathsep.join([repo_path, existing])
-    )
+    env["PYTHONPATH"] = repo_path if not existing else os.pathsep.join([repo_path, existing])
     return env
 
 
@@ -111,7 +109,9 @@ def test_root_help_all_exposes_internal_command_index():
         assert result.returncode == 0
         assert "Super Dev Internal Command Index" in result.stdout
         assert "内部维护命令索引" in result.stdout
-        assert "普通用户公开终端入口仍然只有 super-dev / super-dev update / super-dev" in result.stdout
+        assert (
+            "普通用户公开终端入口仍然只有 super-dev / super-dev update / super-dev" in result.stdout
+        )
         assert "uninstall" in result.stdout
         assert "onboard             内部维护：首次接入向导" in result.stdout
         assert "resume              回到当前仓库的 Super Dev 流程" in result.stdout

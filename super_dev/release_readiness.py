@@ -167,7 +167,7 @@ class ReleaseReadinessReport:
                 " 这说明当前版本还停在正式确认门之前，不能把“已经生成了一些产物”当成“已经可以发布或交付”。"
                 + action_text
             )
-        return f" 当前流程状态为 {status}，主入口 gate 已闭环。"
+        return f" 当前流程状态为 {status}，主入口检查已闭环。"
 
     def _baseline_signal_summary(self) -> str:
         baseline_check = next(
@@ -1698,23 +1698,23 @@ class ReleaseReadinessEvaluator:
             return ReleaseReadinessCheck(
                 name="Operational Harness Trail",
                 passed=True,
-                detail="no operational harness evidence required",
+                detail="当前项目不需要运行验证记录（Operational Harness）",
                 severity="low",
-                recommendation="如当前 run 依赖 workflow / framework / hook harness，建议保留统一 operational harness 证据。",
+                recommendation="如果当前流程依赖工作流、框架或 Hook，请保留统一的运行验证记录。",
             )
 
         passed = harness.passed
         detail = (
-            f"operational harness clean across {harness.passed_count}/{harness.enabled_count} enabled harnesses"
+            f"已启用的运行验证中 {harness.passed_count}/{harness.enabled_count} 项通过"
             if passed
             else str(focus.get("summary", "")).strip()
-            or f"operational harness has {len(harness.blockers)} blockers across {harness.enabled_count} enabled harnesses"
+            or f"{harness.enabled_count} 项运行验证中有 {len(harness.blockers)} 个阻断问题"
         )
         focus_recommendation = str(focus.get("recommended_action", "")).strip()
         recommendation = focus_recommendation or (
             harness.next_actions[0]
             if harness.next_actions
-            else "补齐 workflow / framework / hook harness 后重新生成 operational harness。"
+            else "补齐工作流、框架和 Hook 的运行验证后，再重新生成汇总记录。"
         )
         return ReleaseReadinessCheck(
             name="Operational Harness Trail",

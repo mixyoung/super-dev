@@ -18,6 +18,7 @@ from super_dev.knowledge_tracker import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def knowledge_tree(tmp_path: Path) -> Path:
     """创建模拟知识目录结构"""
@@ -70,6 +71,7 @@ def tracker(knowledge_tree: Path) -> KnowledgeTracker:
 # 索引构建
 # ---------------------------------------------------------------------------
 
+
 class TestBuildIndex:
     def test_index_counts_all_files(self, tracker: KnowledgeTracker) -> None:
         assert len(tracker._knowledge_index) == 6  # 5 domain files + 1 root README
@@ -104,6 +106,7 @@ class TestBuildIndex:
 # 引用追踪
 # ---------------------------------------------------------------------------
 
+
 class TestTrackReference:
     def test_basic_tracking(self, tracker: KnowledgeTracker) -> None:
         ref = tracker.track_reference(
@@ -128,10 +131,14 @@ class TestTrackReference:
             tracker.track_reference("some/file.md", phase="backend", usage_type="invalid")
 
     def test_score_clamping(self, tracker: KnowledgeTracker) -> None:
-        ref = tracker.track_reference("f.md", phase="docs", usage_type="reference", relevance_score=5.0)
+        ref = tracker.track_reference(
+            "f.md", phase="docs", usage_type="reference", relevance_score=5.0
+        )
         assert ref.relevance_score == 1.0
 
-        ref2 = tracker.track_reference("f.md", phase="docs", usage_type="reference", relevance_score=-1.0)
+        ref2 = tracker.track_reference(
+            "f.md", phase="docs", usage_type="reference", relevance_score=-1.0
+        )
         assert ref2.relevance_score == 0.0
 
     def test_auto_tags(self, tracker: KnowledgeTracker) -> None:
@@ -156,6 +163,7 @@ class TestTrackReference:
 # ---------------------------------------------------------------------------
 # 知识查找
 # ---------------------------------------------------------------------------
+
 
 class TestFindRelevantKnowledge:
     def test_finds_matching_knowledge(self, tracker: KnowledgeTracker) -> None:
@@ -188,6 +196,7 @@ class TestFindRelevantKnowledge:
 # ---------------------------------------------------------------------------
 # 报告生成
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateReport:
     def test_report_structure(self, tracker: KnowledgeTracker) -> None:
@@ -237,6 +246,7 @@ class TestGenerateReport:
 # 报告保存
 # ---------------------------------------------------------------------------
 
+
 class TestSaveReport:
     def test_saves_md_and_json(self, tracker: KnowledgeTracker, tmp_path: Path) -> None:
         tracker.track_reference("f.md", phase="docs", usage_type="reference")
@@ -257,6 +267,7 @@ class TestSaveReport:
 # ---------------------------------------------------------------------------
 # 覆盖率
 # ---------------------------------------------------------------------------
+
 
 class TestKnowledgeCoverage:
     def test_coverage_by_domain(self, tracker: KnowledgeTracker) -> None:
@@ -281,6 +292,7 @@ class TestKnowledgeCoverage:
 # KnowledgeReference dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestKnowledgeReference:
     def test_to_dict(self) -> None:
         ref = KnowledgeReference(
@@ -301,6 +313,7 @@ class TestKnowledgeReference:
 # ---------------------------------------------------------------------------
 # 常量验证
 # ---------------------------------------------------------------------------
+
 
 class TestConstants:
     def test_valid_phases(self) -> None:

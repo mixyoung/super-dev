@@ -18,6 +18,7 @@ from super_dev.deployers.delivery import ArtifactSpec, DeliveryPackager
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def empty_project(tmp_path):
     (tmp_path / "super-dev.yaml").write_text("name: test\nversion: '1.0.0'\n")
@@ -95,6 +96,7 @@ def ready_project(tmp_path):
 # ArtifactSpec 数据类
 # ---------------------------------------------------------------------------
 
+
 class TestArtifactSpec:
     def test_frozen_dataclass(self, tmp_path):
         spec = ArtifactSpec(path=tmp_path / "file.md", required=True, reason="test")
@@ -112,6 +114,7 @@ class TestArtifactSpec:
 # ---------------------------------------------------------------------------
 # DeliveryPackager 初始化
 # ---------------------------------------------------------------------------
+
 
 class TestDeliveryPackagerInit:
     def test_project_dir_resolved(self, tmp_path):
@@ -131,17 +134,22 @@ class TestDeliveryPackagerInit:
 # _artifact_specs - 必需产物规则
 # ---------------------------------------------------------------------------
 
+
 class TestArtifactSpecs:
     def test_all_platform_returns_all_cicd_files(self, empty_project):
         packager = DeliveryPackager(empty_project, "test")
         specs = packager._artifact_specs(cicd_platform="all")
-        cicd_paths = [str(s.path) for s in specs if "ci.yml" in str(s.path) or "Jenkinsfile" in str(s.path)]
+        cicd_paths = [
+            str(s.path) for s in specs if "ci.yml" in str(s.path) or "Jenkinsfile" in str(s.path)
+        ]
         assert len(cicd_paths) >= 2
 
     def test_github_platform_returns_github_files(self, empty_project):
         packager = DeliveryPackager(empty_project, "test")
         specs = packager._artifact_specs(cicd_platform="github")
-        cicd_names = [s.path.name for s in specs if "github" in str(s.path).lower() or "ci.yml" in s.path.name]
+        cicd_names = [
+            s.path.name for s in specs if "github" in str(s.path).lower() or "ci.yml" in s.path.name
+        ]
         assert any("ci.yml" in n for n in cicd_names)
 
     def test_gitlab_platform_returns_gitlab_file(self, empty_project):
@@ -171,7 +179,9 @@ class TestArtifactSpecs:
     def test_unknown_platform_defaults_to_github(self, empty_project):
         packager = DeliveryPackager(empty_project, "test")
         specs = packager._artifact_specs(cicd_platform="unknown")
-        cicd_names = [s.path.name for s in specs if "ci.yml" in s.path.name or "cd.yml" in s.path.name]
+        cicd_names = [
+            s.path.name for s in specs if "ci.yml" in s.path.name or "cd.yml" in s.path.name
+        ]
         assert len(cicd_names) >= 1
 
     def test_all_specs_are_required(self, empty_project):
@@ -185,6 +195,7 @@ class TestArtifactSpecs:
 # ---------------------------------------------------------------------------
 # _collect_migration_files
 # ---------------------------------------------------------------------------
+
 
 class TestMigrationCollection:
     def test_detects_prisma_migrations(self, tmp_path):
@@ -228,6 +239,7 @@ class TestMigrationCollection:
 # ---------------------------------------------------------------------------
 # _collect_spec_task_summary
 # ---------------------------------------------------------------------------
+
 
 class TestSpecTaskSummary:
     def test_no_changes_dir_returns_zero(self, empty_project):
@@ -276,6 +288,7 @@ class TestSpecTaskSummary:
 # ---------------------------------------------------------------------------
 # package() 完整流程
 # ---------------------------------------------------------------------------
+
 
 class TestPackageIntegration:
     def test_ready_project_produces_ready_status(self, ready_project):
@@ -336,6 +349,7 @@ class TestPackageIntegration:
 # _to_markdown
 # ---------------------------------------------------------------------------
 
+
 class TestToMarkdown:
     def test_markdown_includes_project_info(self, empty_project):
         packager = DeliveryPackager(empty_project, "myproject", version="1.5.0")
@@ -392,6 +406,7 @@ class TestToMarkdown:
 # _relative
 # ---------------------------------------------------------------------------
 
+
 class TestRelativePath:
     def test_relative_path_inside_project(self, empty_project):
         packager = DeliveryPackager(empty_project, "test")
@@ -409,6 +424,7 @@ class TestRelativePath:
 # ---------------------------------------------------------------------------
 # CI/CD 配置生成相关
 # ---------------------------------------------------------------------------
+
 
 class TestCICDSpecs:
     def test_cicd_specs_github(self, empty_project):
@@ -432,6 +448,7 @@ class TestCICDSpecs:
 # ---------------------------------------------------------------------------
 # Archive 构建
 # ---------------------------------------------------------------------------
+
 
 class TestBuildArchive:
     def test_archive_includes_existing_files(self, tmp_path):
@@ -480,6 +497,7 @@ class TestBuildArchive:
 # CI/CD 平台全覆盖
 # ---------------------------------------------------------------------------
 
+
 class TestAllCICDPlatforms:
     """验证所有 CI/CD 平台的配置生成正确性"""
 
@@ -490,7 +508,11 @@ class TestAllCICDPlatforms:
     def test_artifact_specs_include_cicd(self, empty_project, platform):
         packager = DeliveryPackager(empty_project, "test")
         specs = packager._artifact_specs(cicd_platform=platform)
-        cicd_specs = [s for s in specs if "CI/CD" in s.reason or "ci" in str(s.path).lower() or "Jenkinsfile" in str(s.path)]
+        cicd_specs = [
+            s
+            for s in specs
+            if "CI/CD" in s.reason or "ci" in str(s.path).lower() or "Jenkinsfile" in str(s.path)
+        ]
         assert len(cicd_specs) >= 1
 
     def test_package_reports_missing_cicd(self, empty_project, platform):
@@ -503,6 +525,7 @@ class TestAllCICDPlatforms:
 # ---------------------------------------------------------------------------
 # 交付包完整性 - 边界情况
 # ---------------------------------------------------------------------------
+
 
 class TestPackageEdgeCases:
     def test_package_with_no_output_dir(self, tmp_path):
@@ -567,6 +590,7 @@ class TestPackageEdgeCases:
 # Spec 任务摘要边界
 # ---------------------------------------------------------------------------
 
+
 class TestSpecTaskSummaryEdgeCases:
     def test_empty_tasks_file(self, tmp_path):
         changes = tmp_path / ".super-dev" / "changes" / "test"
@@ -610,6 +634,7 @@ class TestSpecTaskSummaryEdgeCases:
 
     def test_multiple_changes_uses_latest(self, tmp_path):
         import time
+
         for name in ["old-change", "new-change"]:
             changes = tmp_path / ".super-dev" / "changes" / name
             changes.mkdir(parents=True)
@@ -624,6 +649,7 @@ class TestSpecTaskSummaryEdgeCases:
 # ---------------------------------------------------------------------------
 # Markdown 报告格式验证
 # ---------------------------------------------------------------------------
+
 
 class TestMarkdownReportFormat:
     def test_report_has_all_sections(self, empty_project):

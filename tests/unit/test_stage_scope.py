@@ -69,17 +69,18 @@ def test_new_or_commercial_change_requires_research_docs_and_confirmation(
         governance_depth=governance_depth,
     )
 
-    assert {"research", "docs", "docs_confirm", "spec", "quality", "delivery"}.issubset(
-        stages
-    )
+    assert {"research", "docs", "docs_confirm", "spec", "quality", "delivery"}.issubset(stages)
 
 
 def test_commercial_cross_stack_change_keeps_all_nine_stages() -> None:
-    assert required_stages_for(
-        changed_surfaces={"product", "frontend", "backend", "api", "data"},
-        work_mode="evolve",
-        governance_depth="commercial",
-    ) == CANONICAL_NINE_STAGE_IDS
+    assert (
+        required_stages_for(
+            changed_surfaces={"product", "frontend", "backend", "api", "data"},
+            work_mode="evolve",
+            governance_depth="commercial",
+        )
+        == CANONICAL_NINE_STAGE_IDS
+    )
 
 
 def test_unknown_governance_depth_is_rejected() -> None:

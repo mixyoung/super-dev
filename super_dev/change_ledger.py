@@ -83,11 +83,15 @@ class StageScopeRecommendation:
             )
         if not isinstance(self.approval_required, bool):
             raise ChangeLedgerError("approval_required must be a boolean")
-        if self.recommended_resolution in {
-            StageResolution.REUSE,
-            StageResolution.NOT_APPLICABLE,
-            StageResolution.WAIVE,
-        } and not self.approval_required:
+        if (
+            self.recommended_resolution
+            in {
+                StageResolution.REUSE,
+                StageResolution.NOT_APPLICABLE,
+                StageResolution.WAIVE,
+            }
+            and not self.approval_required
+        ):
             raise ChangeLedgerError("Advisory reductions and reuse require approval")
         if not self.reason.strip():
             raise ChangeLedgerError("Scope recommendation reason is required")
@@ -107,13 +111,9 @@ class StageScopeRecommendation:
             return cls(
                 stage=str(payload["stage"]),
                 kind=str(payload["kind"]),
-                recommended_resolution=StageResolution(
-                    str(payload["recommended_resolution"])
-                ),
+                recommended_resolution=StageResolution(str(payload["recommended_resolution"])),
                 reason=str(payload["reason"]),
-                approval_required=_strict_bool(
-                    payload["approval_required"], "approval_required"
-                ),
+                approval_required=_strict_bool(payload["approval_required"], "approval_required"),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ChangeLedgerError("Invalid stage scope recommendation payload") from exc
@@ -144,9 +144,7 @@ class ScopeAdvisory:
             raise ChangeLedgerError("Scope advisory surfaces must be sorted and unique")
         unknown_surfaces = set(self.changed_surfaces) - KNOWN_CHANGE_SURFACES
         if unknown_surfaces:
-            raise ChangeLedgerError(
-                f"Unsupported advisory surfaces: {sorted(unknown_surfaces)}"
-            )
+            raise ChangeLedgerError(f"Unsupported advisory surfaces: {sorted(unknown_surfaces)}")
         stage_ids = tuple(item.stage for item in self.recommendations)
         if stage_ids != CANONICAL_NINE_STAGE_IDS:
             raise ChangeLedgerError(
@@ -158,9 +156,7 @@ class ScopeAdvisory:
                 raise ChangeLedgerError(f"Incorrect advisory kind for stage {item.stage}")
             if not self.scope_complete:
                 expected = (
-                    StageResolution.REQUIRE
-                    if item.kind == "gate"
-                    else StageResolution.EXECUTE
+                    StageResolution.REQUIRE if item.kind == "gate" else StageResolution.EXECUTE
                 )
                 if item.recommended_resolution != expected:
                     raise ChangeLedgerError(
@@ -189,14 +185,11 @@ class ScopeAdvisory:
             return cls(
                 source=str(payload["source"]),
                 generated_at=str(payload["generated_at"]),
-                scope_complete=_strict_bool(
-                    payload["scope_complete"], "scope_complete"
-                ),
+                scope_complete=_strict_bool(payload["scope_complete"], "scope_complete"),
                 changed_surfaces=[str(item) for item in changed_surfaces],
                 control_authority=str(payload["control_authority"]),
                 recommendations=[
-                    StageScopeRecommendation.from_dict(dict(item))
-                    for item in recommendations
+                    StageScopeRecommendation.from_dict(dict(item)) for item in recommendations
                 ],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -233,9 +226,7 @@ class EvidenceReference:
             candidate_scope=str(payload.get("candidate_scope", "")),
             digest=str(payload.get("digest", "")),
             expires_at=str(payload.get("expires_at", "")),
-            invalidation_triggers=[
-                str(item) for item in payload.get("invalidation_triggers", [])
-            ],
+            invalidation_triggers=[str(item) for item in payload.get("invalidation_triggers", [])],
         )
 
 
@@ -277,9 +268,7 @@ class StageLedgerEntry:
             evidence=[
                 EvidenceReference.from_dict(dict(item)) for item in payload.get("evidence", [])
             ],
-            invalidation_triggers=[
-                str(item) for item in payload.get("invalidation_triggers", [])
-            ],
+            invalidation_triggers=[str(item) for item in payload.get("invalidation_triggers", [])],
         )
 
 
@@ -332,7 +321,9 @@ class ChangeLedger:
         work_mode: str,
         shadow_only: bool = True,
     ) -> ChangeLedger:
-        normalized_intent = intent if isinstance(intent, ChangeIntent) else ChangeIntent(str(intent))
+        normalized_intent = (
+            intent if isinstance(intent, ChangeIntent) else ChangeIntent(str(intent))
+        )
         if not should_create_change_ledger(normalized_intent):
             raise ChangeLedgerError("Chat and explain intents do not create a change ledger")
         phase_kinds = get_phase_kinds("standard")
@@ -405,9 +396,7 @@ class ChangeLedger:
         except (KeyError, ValueError) as exc:
             raise ChangeLedgerError("Unknown or missing intent") from exc
         try:
-            stages = [
-                StageLedgerEntry.from_dict(dict(item)) for item in payload["stages"]
-            ]
+            stages = [StageLedgerEntry.from_dict(dict(item)) for item in payload["stages"]]
         except (KeyError, TypeError, ValueError) as exc:
             raise ChangeLedgerError("Invalid stage payload") from exc
         advisory_payload = payload.get("scope_advisory")

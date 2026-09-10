@@ -70,8 +70,10 @@ def build_host_runtime_probe(
     recommended_command = str(pipeline_summary.get("recommended_command", "")).strip()
     baseline_governance = inspect_baseline_governance(project_dir, output_dir=output_dir)
 
-    docs_present = bool(artifacts.get("prd")) and bool(artifacts.get("architecture")) and bool(
-        artifacts.get("uiux")
+    docs_present = (
+        bool(artifacts.get("prd"))
+        and bool(artifacts.get("architecture"))
+        and bool(artifacts.get("uiux"))
     )
     spec_present = bool(artifacts.get("spec"))
     frontend_runtime_state = artifacts.get("frontend_runtime_state", {})
@@ -101,9 +103,11 @@ def build_host_runtime_probe(
         except Exception:
             frontend_runtime_payload = {}
     missing_protocol_checks = missing_claude_design_runtime_checks(
-        frontend_runtime_payload.get("checks", {})
-        if isinstance(frontend_runtime_payload.get("checks"), dict)
-        else {},
+        (
+            frontend_runtime_payload.get("checks", {})
+            if isinstance(frontend_runtime_payload.get("checks"), dict)
+            else {}
+        ),
         ui_contract_payload,
     )
     ui_execution_protocol_current = not missing_protocol_checks
@@ -142,7 +146,11 @@ def build_host_runtime_probe(
         "surface_ready": surface_ready,
         "session_brief_present": session_brief_path.exists(),
         "workflow_state_present": workflow_state_path.exists(),
-        "baseline_ready": True if not baseline_governance.get("required") else bool(baseline_governance.get("ready")),
+        "baseline_ready": (
+            True
+            if not baseline_governance.get("required")
+            else bool(baseline_governance.get("ready"))
+        ),
         "core_docs_present": docs_present,
         "spec_present": True if workflow_status not in _SPEC_REQUIRED_STATUSES else spec_present,
         "frontend_runtime_current": (
@@ -156,7 +164,9 @@ def build_host_runtime_probe(
             else ui_execution_protocol_current
         ),
         "workflow_harness_passed": True if not active_context else workflow_harness.passed,
-        "framework_harness_passed": True if not framework_harness.enabled else framework_harness.passed,
+        "framework_harness_passed": (
+            True if not framework_harness.enabled else framework_harness.passed
+        ),
         "operational_harness_passed": (
             True if not operational_harness.enabled else operational_harness.passed
         ),
@@ -170,13 +180,19 @@ def build_host_runtime_probe(
         if not checks["workflow_state_present"]:
             blockers.append("workflow-state.json 缺失，宿主恢复缺少机器可读状态")
         if baseline_governance.get("required") and not checks["baseline_ready"]:
-            blockers.append(str(baseline_governance.get("blocker", "")).strip() or "baseline governance 未闭环")
+            blockers.append(
+                str(baseline_governance.get("blocker", "")).strip() or "baseline governance 未闭环"
+            )
             if str(baseline_governance.get("recommended_command", "")).strip():
                 next_actions.append(str(baseline_governance.get("recommended_command", "")).strip())
         if not checks["workflow_harness_passed"]:
             blockers.extend(workflow_harness.blockers[:2] or ["workflow continuity harness 未通过"])
             next_actions.extend(workflow_harness.next_actions[:2])
-        if workflow_status not in {"missing_research", "missing_core_docs", "waiting_docs_confirmation"}:
+        if workflow_status not in {
+            "missing_research",
+            "missing_core_docs",
+            "waiting_docs_confirmation",
+        }:
             if not checks["core_docs_present"]:
                 blockers.append("当前活动流程缺少完整三文档真源")
         if workflow_status in _SPEC_REQUIRED_STATUSES and not checks["spec_present"]:
@@ -213,7 +229,9 @@ def build_host_runtime_probe(
             next_actions.append(recommended_command)
     else:
         status = "passed"
-        summary = f"{current_stage_name or workflow_status or target} 的仓库级连续性证据已满足恢复要求"
+        summary = (
+            f"{current_stage_name or workflow_status or target} 的仓库级连续性证据已满足恢复要求"
+        )
 
     deduped_actions: list[str] = []
     for item in next_actions:

@@ -55,7 +55,21 @@ _CHANGE_BRANCH_PREFIXES = {
 
 
 def sanitize_artifact_name(name: str) -> str:
-    return str(name).strip().lower().replace(" ", "-").replace("_", "-")
+    raw = str(name).strip()
+    if not raw:
+        return ""
+    value = raw.lower()
+    value = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", value)
+    value = re.sub(r"[\s_]+", "-", value)
+    value = re.sub(r"-+", "-", value).strip(" .-")
+    return value or "project"
+
+
+def _artifact_prefix_variants(prefix: str) -> set[str]:
+    """返回当前格式和旧格式的产物前缀，兼容已有报告。"""
+
+    raw = str(prefix).strip().lower()
+    return {value for value in (raw, sanitize_artifact_name(raw)) if value}
 
 
 def ui_contract_filename(name: str) -> str:
@@ -232,10 +246,11 @@ def latest_artifact(
     if not candidates:
         return None
     if preferred_prefix:
+        prefix_variants = _artifact_prefix_variants(preferred_prefix)
         prefixed = [
             path
             for path in candidates
-            if path.name.startswith(f"{sanitize_artifact_name(preferred_prefix)}-")
+            if any(path.name.lower().startswith(f"{prefix}-") for prefix in prefix_variants)
         ]
         if prefixed:
             candidates = prefixed

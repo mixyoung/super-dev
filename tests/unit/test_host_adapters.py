@@ -134,7 +134,6 @@ def test_runtime_validation_payload_is_present_in_usage_profiles():
     assert runtime_validation["pass_criteria"]
     assert runtime_validation["resume_checklist"]
     assert any(
-        "12 分钟内先跑出第一个可见界面" in item
-        for item in runtime_validation["runtime_checklist"]
+        "12 分钟内先跑出第一个可见界面" in item for item in runtime_validation["runtime_checklist"]
     )
     assert any("droid exec --session-id" in item for item in runtime_validation["resume_checklist"])

@@ -36,24 +36,29 @@ def build_host_workflow_context(
         if bool(baseline.get("audit_exists", False))
         else ("not_required" if not baseline_required else "missing")
     )
-    baseline_confirmation_status = (
-        str(baseline.get("confirmation_status", "")).strip()
-        or ("not_required" if not baseline_required else "missing")
+    baseline_confirmation_status = str(baseline.get("confirmation_status", "")).strip() or (
+        "not_required" if not baseline_required else "missing"
     )
     resume_gate_status = str(baseline.get("resume_state", "")).strip() or "clear"
-    blocking_gate = workflow_status if workflow_status in {
-        "missing_baseline",
-        "waiting_baseline_confirmation",
-        "waiting_resume_gate",
-        "waiting_docs_confirmation",
-        "waiting_preview_confirmation",
-        "waiting_ui_revision",
-        "waiting_architecture_revision",
-        "waiting_quality_revision",
-    } else ""
-    blocking_reason = str(resolved_summary.get("blocker", "")).strip() or str(
-        baseline.get("blocking_reason", "")
-    ).strip()
+    blocking_gate = (
+        workflow_status
+        if workflow_status
+        in {
+            "missing_baseline",
+            "waiting_baseline_confirmation",
+            "waiting_resume_gate",
+            "waiting_docs_confirmation",
+            "waiting_preview_confirmation",
+            "waiting_ui_revision",
+            "waiting_architecture_revision",
+            "waiting_quality_revision",
+        }
+        else ""
+    )
+    blocking_reason = (
+        str(resolved_summary.get("blocker", "")).strip()
+        or str(baseline.get("blocking_reason", "")).strip()
+    )
     next_action = (
         str(recommended_host_action).strip()
         or str(baseline.get("next_host_action", "")).strip()

@@ -89,6 +89,7 @@ def phase_complete(phase: str, success: bool = True, score: float = 0.0) -> str:
         line += f" (质量: {score:.1f}分)"
     return f"\n{icon} {line}"
 
+
 def progress_bar(current: int, total: int, label: str = "") -> str:
     """简单的文本进度条。"""
     width = 30

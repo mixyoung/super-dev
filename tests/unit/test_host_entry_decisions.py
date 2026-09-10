@@ -112,9 +112,15 @@ def test_build_detected_host_decision_card_mentions_competition_project_suppleme
             "optional_slash": [],
             "compatibility_slash": [],
         },
-        managed_competition_project_surfaces=lambda _target: [".kimi/skills/super-dev-seeai/SKILL.md"],
-        managed_competition_user_surfaces=lambda _target: ["~/.kimi/skills/super-dev-seeai/SKILL.md"],
-        _resolve_surface_declaration=lambda **kwargs: Path(str(kwargs["surface"]).replace("~/", "/tmp/home/")),
+        managed_competition_project_surfaces=lambda _target: [
+            ".kimi/skills/super-dev-seeai/SKILL.md"
+        ],
+        managed_competition_user_surfaces=lambda _target: [
+            "~/.kimi/skills/super-dev-seeai/SKILL.md"
+        ],
+        _resolve_surface_declaration=lambda **kwargs: Path(
+            str(kwargs["surface"]).replace("~/", "/tmp/home/")
+        ),
         project_dir=project_dir,
     )
     usage = {

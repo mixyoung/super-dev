@@ -448,4 +448,6 @@ class MemoryExtractor:
             if label == "reference":
                 entries.extend(fn(phase, context))
         return entries
+
+
 ExtractorFn = Callable[[str, dict[str, Any]], list[MemoryEntry]]

@@ -18,10 +18,10 @@ from super_dev.specs.models import (
     TaskStatus,
 )
 
-
 # ---------------------------------------------------------------------------
 # Scenario
 # ---------------------------------------------------------------------------
+
 
 class TestScenarioModel:
     def test_default_values(self):
@@ -69,6 +69,7 @@ class TestScenarioModel:
 # Requirement
 # ---------------------------------------------------------------------------
 
+
 class TestRequirementModel:
     def test_default_keyword_is_shall(self):
         r = Requirement(name="R1")
@@ -86,7 +87,9 @@ class TestRequirementModel:
 
     def test_to_markdown_with_scenarios(self):
         r = Requirement(
-            name="Login", keyword="MUST", description="support login",
+            name="Login",
+            keyword="MUST",
+            description="support login",
             scenarios=[
                 Scenario(given="valid creds", when="submit", then="success"),
                 Scenario(given="invalid creds", when="submit", then="401"),
@@ -108,7 +111,9 @@ class TestRequirementModel:
 
     def test_to_dict(self):
         r = Requirement(
-            name="Test", keyword="MAY", description="optional",
+            name="Test",
+            keyword="MAY",
+            description="optional",
             scenarios=[Scenario(given="A", when="B", then="C")],
         )
         d = r.to_dict()
@@ -131,6 +136,7 @@ class TestRequirementModel:
 # ---------------------------------------------------------------------------
 # Spec
 # ---------------------------------------------------------------------------
+
 
 class TestSpecModel:
     def test_default_values(self):
@@ -169,6 +175,7 @@ class TestSpecModel:
 # ---------------------------------------------------------------------------
 # Task
 # ---------------------------------------------------------------------------
+
 
 class TestTaskModel:
     def test_default_status(self):
@@ -222,6 +229,7 @@ class TestTaskModel:
 # Proposal
 # ---------------------------------------------------------------------------
 
+
 class TestProposalModel:
     def test_default_values(self):
         p = Proposal(title="Test", description="Desc")
@@ -250,6 +258,7 @@ class TestProposalModel:
 # ---------------------------------------------------------------------------
 # Change
 # ---------------------------------------------------------------------------
+
 
 class TestChangeModel:
     def test_default_status(self):
@@ -283,10 +292,13 @@ class TestChangeModel:
 # SpecDelta
 # ---------------------------------------------------------------------------
 
+
 class TestSpecDeltaModel:
     def test_added_delta(self):
         d = SpecDelta(
-            spec_name="auth", delta_type=DeltaType.ADDED, description="Add login",
+            spec_name="auth",
+            delta_type=DeltaType.ADDED,
+            description="Add login",
             requirements=[Requirement(name="Login", keyword="SHALL", description="login")],
         )
         assert d.spec_name == "auth"
@@ -303,7 +315,9 @@ class TestSpecDeltaModel:
 
     def test_to_markdown(self):
         d = SpecDelta(
-            spec_name="auth", delta_type=DeltaType.ADDED, description="Add",
+            spec_name="auth",
+            delta_type=DeltaType.ADDED,
+            description="Add",
             requirements=[Requirement(name="R1", keyword="SHALL", description="do")],
         )
         md = d.to_markdown()
@@ -317,6 +331,7 @@ class TestSpecDeltaModel:
 # ---------------------------------------------------------------------------
 # Enum values
 # ---------------------------------------------------------------------------
+
 
 class TestEnumValues:
     def test_change_status_all_values(self):
@@ -351,6 +366,7 @@ class TestEnumValues:
 # Spec - to_markdown 全面测试
 # ---------------------------------------------------------------------------
 
+
 class TestSpecToMarkdown:
     def test_minimal_spec(self):
         s = Spec(name="minimal")
@@ -362,14 +378,18 @@ class TestSpecToMarkdown:
         s.purpose = "Complete test"
         s.requirements = [
             Requirement(
-                name="R1", keyword="SHALL", description="first requirement",
+                name="R1",
+                keyword="SHALL",
+                description="first requirement",
                 scenarios=[
                     Scenario(given="A", when="B", then="C"),
                     Scenario(given="D", when="E", then="F"),
                 ],
             ),
             Requirement(
-                name="R2", keyword="MUST", description="second requirement",
+                name="R2",
+                keyword="MUST",
+                description="second requirement",
                 scenarios=[Scenario(given="X", when="Y", then="Z")],
             ),
             Requirement(name="R3", keyword="SHOULD", description="third"),
@@ -391,6 +411,7 @@ class TestSpecToMarkdown:
 # ---------------------------------------------------------------------------
 # Task - to_markdown 全面测试
 # ---------------------------------------------------------------------------
+
 
 class TestTaskToMarkdown:
     def test_pending_task(self):
@@ -432,6 +453,7 @@ class TestTaskToMarkdown:
 # Proposal - to_markdown 全面测试
 # ---------------------------------------------------------------------------
 
+
 class TestProposalToMarkdown:
     def test_minimal_proposal(self):
         p = Proposal(title="Test", description="Desc")
@@ -454,10 +476,13 @@ class TestProposalToMarkdown:
 # SpecDelta - to_markdown
 # ---------------------------------------------------------------------------
 
+
 class TestSpecDeltaToMarkdown:
     def test_added_delta_to_markdown(self):
         d = SpecDelta(
-            spec_name="auth", delta_type=DeltaType.ADDED, description="Add auth",
+            spec_name="auth",
+            delta_type=DeltaType.ADDED,
+            description="Add auth",
             requirements=[Requirement(name="Login", keyword="SHALL", description="login")],
         )
         md = d.to_markdown()
@@ -465,7 +490,9 @@ class TestSpecDeltaToMarkdown:
 
     def test_modified_delta_to_markdown(self):
         d = SpecDelta(
-            spec_name="auth", delta_type=DeltaType.MODIFIED, description="Update",
+            spec_name="auth",
+            delta_type=DeltaType.MODIFIED,
+            description="Update",
             requirements=[Requirement(name="Login", keyword="MUST", description="login v2")],
         )
         md = d.to_markdown()
@@ -473,7 +500,9 @@ class TestSpecDeltaToMarkdown:
 
     def test_removed_delta_to_markdown(self):
         d = SpecDelta(
-            spec_name="auth", delta_type=DeltaType.REMOVED, description="Remove",
+            spec_name="auth",
+            delta_type=DeltaType.REMOVED,
+            description="Remove",
             requirements=[Requirement(name="Legacy", keyword="SHALL", description="legacy")],
         )
         md = d.to_markdown()
@@ -488,6 +517,7 @@ class TestSpecDeltaToMarkdown:
 # ---------------------------------------------------------------------------
 # Change - 全面属性测试
 # ---------------------------------------------------------------------------
+
 
 class TestChangeModelComprehensive:
     def test_change_all_statuses(self):
@@ -531,7 +561,9 @@ class TestRequirementKeywords:
 
     def test_requirement_with_many_scenarios(self):
         scenarios = [Scenario(given=f"G{i}", when=f"W{i}", then=f"T{i}") for i in range(10)]
-        r = Requirement(name="many", keyword="SHALL", description="many scenarios", scenarios=scenarios)
+        r = Requirement(
+            name="many", keyword="SHALL", description="many scenarios", scenarios=scenarios
+        )
         md = r.to_markdown()
         assert "Scenario 10" in md
         assert "G0" in md
@@ -539,7 +571,9 @@ class TestRequirementKeywords:
 
     def test_requirement_to_dict_preserves_all(self):
         r = Requirement(
-            name="full", keyword="MUST", description="full desc",
+            name="full",
+            keyword="MUST",
+            description="full desc",
             scenarios=[
                 Scenario(given="A", when="B", then="C"),
                 Scenario(given="D", when="E", then="F"),
@@ -556,14 +590,18 @@ class TestRequirementKeywords:
 
 class TestScenarioEdgeCases:
     def test_scenario_with_special_chars(self):
-        s = Scenario(given="user has <admin> role", when='clicks "delete"', then="item & children removed")
+        s = Scenario(
+            given="user has <admin> role", when='clicks "delete"', then="item & children removed"
+        )
         md = s.to_markdown()
         assert "<admin>" in md
         assert '"delete"' in md
         assert "&" in md
 
     def test_scenario_with_unicode(self):
-        s = Scenario(given="user logged in", when="clicks save button", then="data is persisted to DB")
+        s = Scenario(
+            given="user logged in", when="clicks save button", then="data is persisted to DB"
+        )
         md = s.to_markdown()
         assert "user logged in" in md
         assert "clicks save button" in md
@@ -592,9 +630,13 @@ class TestTaskEdgeCases:
 
     def test_task_with_all_optional_fields(self):
         t = Task(
-            id="1.1", title="Full Task", status=TaskStatus.IN_PROGRESS,
-            description="Detailed description", spec_refs=["spec-a", "spec-b"],
-            dependencies=["0.1", "0.2"], assigned_to="Bob",
+            id="1.1",
+            title="Full Task",
+            status=TaskStatus.IN_PROGRESS,
+            description="Detailed description",
+            spec_refs=["spec-a", "spec-b"],
+            dependencies=["0.1", "0.2"],
+            assigned_to="Bob",
         )
         assert t.description == "Detailed description"
         assert len(t.spec_refs) == 2

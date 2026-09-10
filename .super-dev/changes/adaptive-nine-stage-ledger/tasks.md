@@ -37,7 +37,7 @@
 
 - [x] E1. Extend `super_dev/workflow_contract.py` without changing the canonical nine stage names.
 - [x] E2. Make `super_dev/workflow_stage_truth.py` consume the same canonical roster.
-- [ ] E3. Defer `super_dev/orchestrator/contracts.py` wiring until promotion; the shadow slice must not change existing pipeline-contract output.
+- [x] E3. Record the decision to defer `super_dev/orchestrator/contracts.py` wiring until promotion; the shadow slice must not change existing pipeline-contract output.
 - [x] E4. Keep `new/evolve/variant/patch/resume` in `super_dev/work_mode.py` orthogonal to governance depth.
 - [x] E5. Update existing workflow-contract and stage-truth tests.
 

@@ -8,6 +8,7 @@ CODEX_SKILL = ROOT / "plugins" / "super-dev-codex" / "skills" / "super-dev" / "S
 CLAUDE_SKILL = ROOT / "plugins" / "super-dev-claude" / "skills" / "super-dev" / "SKILL.md"
 MAINLAND_CHINESE_CONTRACT = """## 面向中国大陆用户的语言与术语契约（强制）
 - 面向中国大陆用户的用户界面、聊天、确认问题、错误提示和报告，优先使用自然、直接、符合中国大陆语言习惯的中文。
+- 优先使用中国大陆日常开发和产品沟通中的常见说法；避免生僻词、直译腔、翻译软件式句子和不必要的中英混杂。
 - 技术概念第一次出现时，使用“中文名称（英文代码名）”；后续优先只用中文名称，仅在精确核对时再次显示英文代码名。
 - 状态统一显示为通过（`PASS`）、失败（`FAIL`）、受阻（`BLOCKED`）；不得面向用户只显示裸英文状态。
 - `candidate` 面向用户统一称“当前代码版本”，只在证据详情中显示字段（`candidate_digest`）。
@@ -24,6 +25,7 @@ def test_host_skills_adapt_language_and_environment() -> None:
         skill = SkillTemplate.for_builtin("super-dev", host).render(host)
         assert "## 沟通与环境适配（强制）" in skill
         assert "自然、直接、符合中国大陆语言习惯的中文" in skill
+        assert "避免生僻词、直译腔、翻译软件式句子和不必要的中英混杂" in skill
         assert "中文名称（英文代码名）" in skill
         assert "后续优先只用中文名称" in skill
         assert "通过（`PASS`）、失败（`FAIL`）、受阻（`BLOCKED`）" in skill

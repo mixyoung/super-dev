@@ -64,7 +64,11 @@ def test_review_state_updates_append_semantic_events(temp_project_dir: Path) -> 
     )
 
     event_log = workflow_event_log_file(temp_project_dir)
-    events = [json.loads(line) for line in event_log.read_text(encoding="utf-8").splitlines() if line.strip()]
+    events = [
+        json.loads(line)
+        for line in event_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
     assert [item["event"] for item in events[-4:]] == [
         "baseline_confirmation_saved",

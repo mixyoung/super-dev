@@ -95,9 +95,7 @@ class TestSkillManager:
         removed = manager.uninstall("super-dev", target)
         assert not removed.exists()
 
-    def test_codex_builtin_skill_no_duplicate_mirrors(
-        self, temp_project_dir: Path, monkeypatch
-    ):
+    def test_codex_builtin_skill_no_duplicate_mirrors(self, temp_project_dir: Path, monkeypatch):
         fake_home = Path.home()
         manager = SkillManager(temp_project_dir)
 
@@ -150,7 +148,10 @@ class TestSkillManager:
         assert "# 作品目标" in seeai_content
         assert "官网类" in seeai_content
         assert "默认技术栈：React/Vite 或 Next.js + Tailwind + Framer Motion" in seeai_content
-        assert "默认 sprint：主循环可玩 -> 积分/胜负反馈 -> 特效/音效 -> 复玩和 polish" in seeai_content
+        assert (
+            "默认 sprint：主循环可玩 -> 积分/胜负反馈 -> 特效/音效 -> 复玩和 polish"
+            in seeai_content
+        )
         assert "题型识别提示" in seeai_content
         assert "品牌、官网、落地页、活动宣传、首屏" in seeai_content
         assert "时间不够时优先删功能，不要删完成度、动效记忆点和演示闭环" in seeai_content

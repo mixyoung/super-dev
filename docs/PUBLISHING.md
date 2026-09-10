@@ -42,4 +42,4 @@ export PYPI_API_TOKEN="<your-token>"
 ## 详细文档
 
 - 发布作战手册：[`docs/RELEASE_RUNBOOK.md`](./RELEASE_RUNBOOK.md)
-- 当前版本说明：[`docs/releases/2.4.0.md`](./releases/2.4.0.md)
+- 当前版本说明：[`docs/releases/2.5.0.md`](./releases/2.5.0.md)

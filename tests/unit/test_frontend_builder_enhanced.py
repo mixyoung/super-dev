@@ -10,10 +10,10 @@ import json
 import pytest
 from super_dev.creators.frontend_builder import FrontendScaffoldBuilder
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def builder(tmp_path):
@@ -28,8 +28,10 @@ def builder(tmp_path):
 @pytest.fixture()
 def vue_builder(tmp_path):
     return FrontendScaffoldBuilder(
-        project_dir=tmp_path, name="vue-app",
-        description="Vue test app", frontend="vue",
+        project_dir=tmp_path,
+        name="vue-app",
+        description="Vue test app",
+        frontend="vue",
     )
 
 
@@ -64,6 +66,7 @@ def sample_docs():
 # 初始化
 # ---------------------------------------------------------------------------
 
+
 class TestFrontendScaffoldBuilderInit:
     def test_creates_with_valid_dir(self, tmp_path):
         b = FrontendScaffoldBuilder(tmp_path, "test", "desc")
@@ -87,6 +90,7 @@ class TestFrontendScaffoldBuilderInit:
 # ---------------------------------------------------------------------------
 # generate() 集成
 # ---------------------------------------------------------------------------
+
 
 class TestGenerate:
     def test_generates_files(self, builder, sample_requirements, sample_phases, sample_docs):
@@ -120,7 +124,9 @@ class TestGenerate:
         js = builder.project_dir / "output" / "frontend" / "app.js"
         assert js.exists()
 
-    def test_html_contains_project_name(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_html_contains_project_name(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         index = builder.project_dir / "output" / "frontend" / "index.html"
         content = index.read_text(encoding="utf-8")
@@ -154,75 +160,106 @@ class TestGenerate:
 # 不同前端栈
 # ---------------------------------------------------------------------------
 
+
 class TestDifferentFrontends:
     @pytest.fixture(params=["react", "vue", "angular", "svelte", "next"])
     def stack_builder(self, tmp_path, request):
         return FrontendScaffoldBuilder(
-            tmp_path, "test", "description", frontend=request.param,
+            tmp_path,
+            "test",
+            "description",
+            frontend=request.param,
         )
 
-    def test_all_stacks_generate(self, stack_builder, sample_requirements, sample_phases, sample_docs):
+    def test_all_stacks_generate(
+        self, stack_builder, sample_requirements, sample_phases, sample_docs
+    ):
         result = stack_builder.generate(sample_requirements, sample_phases, sample_docs)
         assert isinstance(result, dict)
         assert "framework_scaffold" in result
 
-    def test_all_stacks_create_html(self, stack_builder, sample_requirements, sample_phases, sample_docs):
+    def test_all_stacks_create_html(
+        self, stack_builder, sample_requirements, sample_phases, sample_docs
+    ):
         stack_builder.generate(sample_requirements, sample_phases, sample_docs)
         index = stack_builder.project_dir / "output" / "frontend" / "index.html"
         assert index.exists()
 
-    def test_next_stack_generates_nextjs_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_next_stack_generates_nextjs_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "next-app", "Next app", frontend="next")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "nextjs-app-router"
         assert (tmp_path / "output" / "nextjs-scaffold" / "app" / "page.tsx").exists()
 
-    def test_nuxt_stack_reuses_vue_scaffold_family(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_nuxt_stack_reuses_vue_scaffold_family(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "nuxt-app", "Nuxt app", frontend="nuxt")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "vue3-vite"
         assert (tmp_path / "output" / "frontend-vue3" / "src" / "views" / "HomeView.vue").exists()
 
-    def test_remix_stack_reuses_react_scaffold_family(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_remix_stack_reuses_react_scaffold_family(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "remix-app", "Remix app", frontend="remix")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "remix-family-preview"
         assert (tmp_path / "output" / "frontend-react" / "src" / "App.tsx").exists()
 
-    def test_expo_stack_generates_mobile_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_expo_stack_generates_mobile_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "expo-app", "Expo app", frontend="expo")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "expo-managed"
         assert (tmp_path / "output" / "frontend-expo" / "app" / "index.tsx").exists()
 
-    def test_flutter_stack_generates_flutter_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
-        builder = FrontendScaffoldBuilder(tmp_path, "flutter-app", "Flutter app", frontend="flutter")
+    def test_flutter_stack_generates_flutter_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
+        builder = FrontendScaffoldBuilder(
+            tmp_path, "flutter-app", "Flutter app", frontend="flutter"
+        )
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "flutter"
         assert (tmp_path / "output" / "frontend-flutter" / "lib" / "main.dart").exists()
 
-    def test_uniapp_stack_generates_miniapp_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_uniapp_stack_generates_miniapp_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "miniapp", "Miniapp", frontend="uni-app")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "uni-app"
         assert (tmp_path / "output" / "frontend-miniapp" / "pages.json").exists()
 
-    def test_tauri_stack_generates_desktop_shell_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_tauri_stack_generates_desktop_shell_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "desktop-app", "Desktop app", frontend="tauri")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "tauri-desktop-shell"
-        assert (tmp_path / "output" / "frontend-desktop-shell" / "tauri" / "tauri.conf.json").exists()
+        assert (
+            tmp_path / "output" / "frontend-desktop-shell" / "tauri" / "tauri.conf.json"
+        ).exists()
 
-    def test_ionic_stack_generates_hybrid_shell_scaffold(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_ionic_stack_generates_hybrid_shell_scaffold(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "hybrid-app", "Hybrid app", frontend="ionic")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert result["framework_scaffold"]["kind"] == "ionic-hybrid-shell"
-        assert (tmp_path / "output" / "frontend-hybrid-shell" / "ionic" / "capacitor.config.ts").exists()
+        assert (
+            tmp_path / "output" / "frontend-hybrid-shell" / "ionic" / "capacitor.config.ts"
+        ).exists()
 
 
 # ---------------------------------------------------------------------------
 # 边界情况
 # ---------------------------------------------------------------------------
+
 
 class TestFrontendBuilderEdgeCases:
     def test_special_chars_in_name(self, tmp_path, sample_requirements, sample_phases, sample_docs):
@@ -234,7 +271,9 @@ class TestFrontendBuilderEdgeCases:
         content = index.read_text(encoding="utf-8")
         assert "<script>" not in content or "&lt;script&gt;" in content
 
-    def test_unicode_in_description(self, tmp_path, sample_requirements, sample_phases, sample_docs):
+    def test_unicode_in_description(
+        self, tmp_path, sample_requirements, sample_phases, sample_docs
+    ):
         builder = FrontendScaffoldBuilder(tmp_path, "中文项目", "这是一个测试")
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         assert isinstance(result, dict)
@@ -261,8 +300,11 @@ class TestFrontendBuilderEdgeCases:
 # 生成文件内容验证
 # ---------------------------------------------------------------------------
 
+
 class TestGeneratedFileContent:
-    def test_html_is_valid_structure(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_html_is_valid_structure(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         html_path = builder.project_dir / "output" / "frontend" / "index.html"
         content = html_path.read_text(encoding="utf-8")
@@ -278,7 +320,9 @@ class TestGeneratedFileContent:
         assert len(content) > 50
         assert "{" in content  # Has CSS rules
 
-    def test_design_tokens_has_variables(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_design_tokens_has_variables(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         tokens_path = builder.project_dir / "output" / "frontend" / "design-tokens.css"
         content = tokens_path.read_text(encoding="utf-8")
@@ -304,7 +348,9 @@ class TestGeneratedFileContent:
         content = html_path.read_text(encoding="utf-8")
         assert "app.js" in content or "script" in content.lower()
 
-    def test_html_references_design_tokens(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_html_references_design_tokens(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         html_path = builder.project_dir / "output" / "frontend" / "index.html"
         content = html_path.read_text(encoding="utf-8")
@@ -362,7 +408,11 @@ class TestGeneratedFileContent:
                         "forbidden_motifs": ["purple neon", "gradient sphere"],
                     },
                     "critique_rubric": [
-                        {"label": "哲学一致性", "dimension": "philosophy_alignment", "pass_threshold": 8},
+                        {
+                            "label": "哲学一致性",
+                            "dimension": "philosophy_alignment",
+                            "pass_threshold": 8,
+                        },
                         {"label": "原创度", "dimension": "originality", "pass_threshold": 8},
                     ],
                     "screen_recipes": [
@@ -467,7 +517,9 @@ class TestGeneratedFileContent:
         content = html_path.read_text(encoding="utf-8")
         assert "viewport" in content.lower()
 
-    def test_requirements_reflected_in_html(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_requirements_reflected_in_html(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         builder.generate(sample_requirements, sample_phases, sample_docs)
         html_path = builder.project_dir / "output" / "frontend" / "index.html"
         content = html_path.read_text(encoding="utf-8")
@@ -475,7 +527,9 @@ class TestGeneratedFileContent:
         found = any(req["name"].lower() in content.lower() for req in sample_requirements)
         assert found or len(content) > 500  # Either reflected or page is substantial
 
-    def test_generate_return_value_has_paths(self, builder, sample_requirements, sample_phases, sample_docs):
+    def test_generate_return_value_has_paths(
+        self, builder, sample_requirements, sample_phases, sample_docs
+    ):
         result = builder.generate(sample_requirements, sample_phases, sample_docs)
         # Result should contain file paths or counts
         assert len(result) >= 1
@@ -515,8 +569,12 @@ class TestGeneratedFileContent:
 
         builder.generate(sample_requirements, sample_phases, sample_docs)
 
-        html_content = (builder.project_dir / "output" / "frontend" / "index.html").read_text(encoding="utf-8")
-        js_content = (builder.project_dir / "output" / "frontend" / "app.js").read_text(encoding="utf-8")
+        html_content = (builder.project_dir / "output" / "frontend" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        js_content = (builder.project_dir / "output" / "frontend" / "app.js").read_text(
+            encoding="utf-8"
+        )
         assert "跨平台框架执行护栏" in html_content
         assert "uni-app" in html_content
         assert "framework_playbook" in js_content

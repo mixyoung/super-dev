@@ -11,15 +11,13 @@ Super Dev 知识库质量评分器
     python scripts/knowledge_scorer.py --output results   # 输出 results.tsv
 """
 
+import argparse
 import os
 import re
 import sys
-import json
-import argparse
-from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional
+from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 
 @dataclass
@@ -28,17 +26,17 @@ class KnowledgeScore:
     domain: str
     category: str
     total_score: float
-    completeness: float      # 内容完整性 (0-100)
-    executability: float     # 可执行性/代码示例 (0-100)
-    structure: float         # 结构清晰度 (0-100)
-    depth: float             # 内容深度 (0-100)
-    agent_ready: float       # Agent 可用性 (0-100)
-    status: str              # keep / improve / discard
+    completeness: float  # 内容完整性 (0-100)
+    executability: float  # 可执行性/代码示例 (0-100)
+    structure: float  # 结构清晰度 (0-100)
+    depth: float  # 内容深度 (0-100)
+    agent_ready: float  # Agent 可用性 (0-100)
+    status: str  # keep / improve / discard
     line_count: int
     code_blocks: int
     sections: int
     has_agent_checklist: bool
-    issues: List[str]
+    issues: list[str]
 
 
 class KnowledgeScorer:
@@ -131,7 +129,9 @@ class KnowledgeScorer:
             issues=issues,
         )
 
-    def _score_completeness(self, content: str, lines: list, line_count: int, issues: list) -> float:
+    def _score_completeness(
+        self, content: str, lines: list, line_count: int, issues: list
+    ) -> float:
         score = 0.0
         # 行数基础分
         if line_count >= 500:
@@ -184,7 +184,13 @@ class KnowledgeScorer:
             issues.append("缺少代码示例")
 
         # 代码语言标注
-        annotated = len(re.findall(r"```(python|javascript|typescript|go|rust|java|sql|bash|yaml|dockerfile)", content, re.IGNORECASE))
+        annotated = len(
+            re.findall(
+                r"```(python|javascript|typescript|go|rust|java|sql|bash|yaml|dockerfile)",
+                content,
+                re.IGNORECASE,
+            )
+        )
         if annotated >= 5:
             score += 20
         elif annotated >= 2:
@@ -238,7 +244,9 @@ class KnowledgeScorer:
 
         return min(score, 100)
 
-    def _score_depth(self, content: str, line_count: int, sections: int, code_blocks: int, issues: list) -> float:
+    def _score_depth(
+        self, content: str, line_count: int, sections: int, code_blocks: int, issues: list
+    ) -> float:
         score = 0.0
 
         # 字数评估
@@ -304,12 +312,14 @@ class KnowledgeScorer:
             score += 10
 
         # 分层标记 (immutable/iterable/strategy)
-        if re.search(r"(immutable|不可变|固定标准|iterable|可迭代|strategy|策略)", content, re.IGNORECASE):
+        if re.search(
+            r"(immutable|不可变|固定标准|iterable|可迭代|strategy|策略)", content, re.IGNORECASE
+        ):
             score += 15
 
         return min(score, 100)
 
-    def score_all(self, domain_filter: Optional[str] = None) -> List[KnowledgeScore]:
+    def score_all(self, domain_filter: str | None = None) -> list[KnowledgeScore]:
         """评估所有知识文件"""
         scores = []
         for md_file in sorted(self.knowledge_dir.rglob("*.md")):
@@ -324,7 +334,7 @@ class KnowledgeScorer:
                 print(f"Error scoring {md_file}: {e}", file=sys.stderr)
         return scores
 
-    def generate_report(self, scores: List[KnowledgeScore]) -> str:
+    def generate_report(self, scores: list[KnowledgeScore]) -> str:
         """生成质量报告"""
         keep = [s for s in scores if s.status == "keep"]
         improve = [s for s in scores if s.status == "improve"]
@@ -335,23 +345,35 @@ class KnowledgeScorer:
 
         lines = [
             "# 知识库质量评分报告",
-            f"",
+            "",
             f"**评估时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             f"**评估文件数**: {total}",
             f"**平均质量分**: {avg_score:.1f}/100",
-            f"",
-            f"## 质量分布",
-            f"",
-            f"| 状态 | 数量 | 占比 | 阈值 |",
-            f"|------|------|------|------|",
-            f"| ✅ Keep (生产可用) | {len(keep)} | {len(keep)/total*100:.0f}% | >= {self.THRESHOLD_KEEP} |" if total > 0 else "",
-            f"| ⚠️ Improve (需改进) | {len(improve)} | {len(improve)/total*100:.0f}% | {self.THRESHOLD_IMPROVE}-{self.THRESHOLD_KEEP-1} |" if total > 0 else "",
-            f"| ❌ Discard (需重写) | {len(discard)} | {len(discard)/total*100:.0f}% | < {self.THRESHOLD_IMPROVE} |" if total > 0 else "",
-            f"",
+            "",
+            "## 质量分布",
+            "",
+            "| 状态 | 数量 | 占比 | 阈值 |",
+            "|------|------|------|------|",
+            (
+                f"| ✅ Keep (生产可用) | {len(keep)} | {len(keep)/total*100:.0f}% | >= {self.THRESHOLD_KEEP} |"
+                if total > 0
+                else ""
+            ),
+            (
+                f"| ⚠️ Improve (需改进) | {len(improve)} | {len(improve)/total*100:.0f}% | {self.THRESHOLD_IMPROVE}-{self.THRESHOLD_KEEP-1} |"
+                if total > 0
+                else ""
+            ),
+            (
+                f"| ❌ Discard (需重写) | {len(discard)} | {len(discard)/total*100:.0f}% | < {self.THRESHOLD_IMPROVE} |"
+                if total > 0
+                else ""
+            ),
+            "",
         ]
 
         # 各领域评分
-        domain_scores: Dict[str, list] = {}
+        domain_scores: dict[str, list] = {}
         for s in scores:
             domain_scores.setdefault(s.domain, []).append(s)
 
@@ -365,7 +387,9 @@ class KnowledgeScorer:
             d_keep = sum(1 for s in ds if s.status == "keep")
             d_improve = sum(1 for s in ds if s.status == "improve")
             d_discard = sum(1 for s in ds if s.status == "discard")
-            lines.append(f"| {domain} | {len(ds)} | {d_avg:.1f} | {d_keep} | {d_improve} | {d_discard} |")
+            lines.append(
+                f"| {domain} | {len(ds)} | {d_avg:.1f} | {d_keep} | {d_improve} | {d_discard} |"
+            )
 
         # 需要改进的文件列表
         lines.append("")
@@ -378,7 +402,7 @@ class KnowledgeScorer:
 
         return "\n".join(lines)
 
-    def generate_tsv(self, scores: List[KnowledgeScore]) -> str:
+    def generate_tsv(self, scores: list[KnowledgeScore]) -> str:
         """生成 results.tsv"""
         header = "file\ttotal\tcompleteness\texecutability\tstructure\tdepth\tagent_ready\tstatus\tlines\tcode_blocks\tissues"
         rows = [header]
@@ -423,7 +447,7 @@ def main():
     # 输出报告
     if args.report:
         report = scorer.generate_report(scores)
-        report_path = f"output/knowledge-quality-report.md"
+        report_path = "output/knowledge-quality-report.md"
         os.makedirs("output", exist_ok=True)
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(report)
@@ -437,7 +461,7 @@ def main():
     avg = sum(s.total_score for s in scores) / total if total > 0 else 0
 
     print(f"\n{'='*60}")
-    print(f" 知识库质量评分摘要")
+    print(" 知识库质量评分摘要")
     print(f"{'='*60}")
     print(f" 评估文件: {total}")
     print(f" 平均分数: {avg:.1f}/100")
@@ -448,13 +472,13 @@ def main():
 
     # 显示 Top 10 最高分
     top10 = sorted(scores, key=lambda x: -x.total_score)[:10]
-    print(f"\n Top 10 最高质量:")
+    print("\n Top 10 最高质量:")
     for s in top10:
         print(f"  {s.total_score:5.1f}  {s.status:8s}  {s.file_path}")
 
     # 显示 Bottom 10 最低分
     bottom10 = sorted(scores, key=lambda x: x.total_score)[:10]
-    print(f"\n Bottom 10 最低质量:")
+    print("\n Bottom 10 最低质量:")
     for s in bottom10:
         issues_str = "; ".join(s.issues[:2]) if s.issues else ""
         print(f"  {s.total_score:5.1f}  {s.status:8s}  {s.file_path}  [{issues_str}]")

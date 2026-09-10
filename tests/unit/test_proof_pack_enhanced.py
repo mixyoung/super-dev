@@ -189,6 +189,7 @@ class TestProofPackReport:
         assert report.total_count == 20
         assert report.status == "ready"
         assert report.completion_percent == 100
+        assert "仍需用户明确授权" in report.next_actions[0]
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +301,7 @@ class TestProofPackReportStatusCombinations:
                 ProofPackArtifact(name="Hook Audit Trail", status="ready", summary="hooks ok"),
             ],
         )
-        assert "运行时/恢复类 harness" in report.executive_summary
+        assert "运行与恢复验证" in report.executive_summary
         assert "Operational Harness" in report.executive_summary
         assert "Workflow Continuity" in report.executive_summary
 

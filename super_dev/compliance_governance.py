@@ -38,7 +38,10 @@ def collect_compliance_governance_signal(
             "artifact_status": str(architecture_inspection.get("status", "")).strip() or "missing",
             "score": architecture_report.score,
             "content_ready": (
-                (not architecture_report.declared_tech_stack and architecture_report.total_drifts == 0)
+                (
+                    not architecture_report.declared_tech_stack
+                    and architecture_report.total_drifts == 0
+                )
                 or architecture_report.score >= 80
             ),
         },

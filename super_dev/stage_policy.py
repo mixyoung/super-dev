@@ -153,8 +153,7 @@ def validate_stage_resolution(
         if resolution != StageResolution.REQUIRE:
             raise StagePolicyError("Contract changes require docs confirmation")
     if entry.stage == "preview_confirm" and (
-        "frontend" in context.executed_stages
-        or "preview_confirm" in required_stages
+        "frontend" in context.executed_stages or "preview_confirm" in required_stages
     ):
         if resolution != StageResolution.REQUIRE:
             raise StagePolicyError("User-visible frontend changes require preview confirmation")
@@ -204,9 +203,7 @@ def apply_stage_resolution(
         }
     )
     entry.status = (
-        StageStatus.SATISFIED
-        if resolution in SKIP_LIKE_RESOLUTIONS
-        else StageStatus.PENDING
+        StageStatus.SATISFIED if resolution in SKIP_LIKE_RESOLUTIONS else StageStatus.PENDING
     )
 
 

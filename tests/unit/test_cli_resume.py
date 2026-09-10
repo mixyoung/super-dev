@@ -1,6 +1,7 @@
 import json
 from types import SimpleNamespace
 
+import super_dev.cli_workflow_runtime_mixin as workflow_runtime
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
@@ -80,7 +81,9 @@ def test_adjust_resume_stage_keeps_stage_when_docs_complete(temp_project_dir) ->
     required = cli._stage_one_artifact_paths(output_dir=output_dir, project_name="resume-demo")
     for path in required.values():
         path.write_text("ok", encoding="utf-8")
-    (output_dir / "resume-demo-frontend-runtime.json").write_text('{"passed": true}', encoding="utf-8")
+    (output_dir / "resume-demo-frontend-runtime.json").write_text(
+        '{"passed": true}', encoding="utf-8"
+    )
     change_dir = temp_project_dir / ".super-dev" / "changes" / "resume-change"
     change_dir.mkdir(parents=True, exist_ok=True)
     (change_dir / "proposal.md").write_text("# proposal", encoding="utf-8")
@@ -129,10 +132,13 @@ def test_write_resume_audit_outputs_json_and_markdown(temp_project_dir) -> None:
 def test_public_host_targets_prioritize_primary_product_scope() -> None:
     cli = SuperDevCLI()
     integration_manager = SimpleNamespace(
-        list_targets=lambda: [SimpleNamespace(name=host_id) for host_id in (
-            *PRIMARY_HOST_TOOL_IDS,
-            "legacy-host",
-        )]
+        list_targets=lambda: [
+            SimpleNamespace(name=host_id)
+            for host_id in (
+                *PRIMARY_HOST_TOOL_IDS,
+                "legacy-host",
+            )
+        ]
     )
 
     targets = cli._public_host_targets(integration_manager=integration_manager)
@@ -179,7 +185,9 @@ def test_stage_jump_impact_includes_core_messages() -> None:
     assert any("质量" in item or "交付" in item for item in quality_impact)
 
 
-def test_run_confirm_phase_updates_run_state_for_generic_phase(temp_project_dir, monkeypatch) -> None:
+def test_run_confirm_phase_updates_run_state_for_generic_phase(
+    temp_project_dir, monkeypatch
+) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
     cli._write_pipeline_run_state(
@@ -234,9 +242,7 @@ def test_run_status_recommendation_treats_missing_scope_status_as_unknown() -> N
     assert recommendation == "在宿主里继续当前流程，并优先补齐缺失范围与高优先级功能项"
 
 
-def test_run_status_not_initialized_json_is_valid(
-    temp_project_dir, monkeypatch, capsys
-) -> None:
+def test_run_status_not_initialized_json_is_valid(temp_project_dir, monkeypatch, capsys) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
 
@@ -308,9 +314,7 @@ def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
     assert payload["shadow_ledger"]["approval_required_count"] == 5
 
 
-def test_finalized_next_step_payload_includes_shadow_ledger(
-    temp_project_dir, monkeypatch
-) -> None:
+def test_finalized_next_step_payload_includes_shadow_ledger(temp_project_dir, monkeypatch) -> None:
     cli = SuperDevCLI()
     ledger = ChangeLedger.create(
         change_id="next-ledger",
@@ -341,6 +345,56 @@ def test_finalized_next_step_payload_includes_shadow_ledger(
 
     assert payload["shadow_ledger"]["active_change_id"] == "next-ledger"
     assert payload["shadow_ledger"]["control_authority"] == "none"
+
+
+def test_next_step_uses_active_artifact_prefix_when_repo_name_differs(
+    temp_project_dir, monkeypatch
+) -> None:
+    cli = SuperDevCLI()
+    output_dir = temp_project_dir / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    change_id = "completion-verification"
+    change_dir = temp_project_dir / ".super-dev" / "changes" / change_id
+    change_dir.mkdir(parents=True, exist_ok=True)
+    workflow_state_path = temp_project_dir / ".super-dev" / "workflow-state.json"
+    workflow_state_path.write_text(
+        json.dumps({"active_change_id": change_id}),
+        encoding="utf-8",
+    )
+    (output_dir / f"{change_id}-prd.md").write_text("# PRD", encoding="utf-8")
+    (output_dir / f"{change_id}-release-readiness.json").write_text(
+        json.dumps({"failed_checks": ["Delivery Closure"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "_project_has_super_dev_context", lambda _path: True)
+    monkeypatch.setattr(
+        workflow_runtime,
+        "detect_pipeline_summary",
+        lambda *_args, **_kwargs: {
+            "workflow_status": "ready",
+            "recommended_command": "继续",
+        },
+    )
+
+    payload = cli._build_next_step_payload(temp_project_dir)
+
+    assert payload["artifact_prefix"] == change_id
+    assert payload["status"] == "delivery_closure_incomplete"
+
+    (output_dir / f"{change_id}-release-readiness.json").write_text(
+        json.dumps({"passed": True, "failed_checks": []}),
+        encoding="utf-8",
+    )
+    (output_dir / f"{change_id}-proof-pack.json").write_text(
+        json.dumps({"status": "ready"}),
+        encoding="utf-8",
+    )
+
+    ready_payload = cli._build_next_step_payload(temp_project_dir)
+
+    assert ready_payload["status"] == "delivery_ready"
+    assert ready_payload["current_step_label"] == "交付证据已就绪"
+    assert "合并或发布授权" in ready_payload["reason"]
 
 
 def test_status_alias_routes_to_run_status(monkeypatch) -> None:

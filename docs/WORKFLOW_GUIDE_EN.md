@@ -1,4 +1,4 @@
-# Super Dev Workflow Guide (2.4.0)
+# Super Dev Workflow Guide (2.5.0)
 
 > End users should start with:
 > - [README.md](/Users/weiyou/Documents/kaifa/super-dev/README.md)

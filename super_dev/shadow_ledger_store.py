@@ -174,9 +174,7 @@ def build_shadow_ledger_summary(project_dir: Path) -> dict[str, Any]:
         errors=errors,
     )
     if discovery_truncated:
-        summary.summary = (
-            f"只读观察不完整：目录条目超过上限{MAX_LEDGER_FILES}；未选择当前账本"
-        )
+        summary.summary = f"只读观察不完整：目录条目超过上限{MAX_LEDGER_FILES}；未选择当前账本"
         return summary.to_dict()
     if not records:
         if errors:
@@ -227,9 +225,7 @@ def build_shadow_ledger_summary(project_dir: Path) -> dict[str, Any]:
                 f"建议缩减{reduction_count}个阶段；缩减必须审批"
             )
         else:
-            summary.scope_advisory_summary = (
-                "范围信息不完整：暂时建议保留完整九阶段，不自动缩减"
-            )
+            summary.scope_advisory_summary = "范围信息不完整：暂时建议保留完整九阶段，不自动缩减"
     return summary.to_dict()
 
 

@@ -73,18 +73,14 @@ def test_registry_helpers_return_expected_host_metadata():
     assert get_install_mode("codex") == HostInstallMode.HYBRID
     assert get_protocol_mode("codex") == "official-skill"
     assert (
-        get_protocol_summary("codex")
-        == "官方 AGENTS.md + Skills + App/Desktop enabled Skill entry"
+        get_protocol_summary("codex") == "官方 AGENTS.md + Skills + App/Desktop enabled Skill entry"
     )
     assert supports_slash("codex") is False
 
     codex = get_host_definition("codex-cli")
     assert codex is not None
     assert get_protocol_mode("codex-cli") == "official-skill"
-    assert (
-        get_protocol_summary("codex-cli")
-        == "官方 AGENTS.md + Skills + CLI $skill entry"
-    )
+    assert get_protocol_summary("codex-cli") == "官方 AGENTS.md + Skills + CLI $skill entry"
     assert supports_slash("codex-cli") is False
 
     codebuddy = get_host_definition("codebuddy")
@@ -123,8 +119,9 @@ def test_registry_helpers_return_expected_host_metadata():
     )
     assert supports_slash("kimi-code") is False
     assert "Project root `AGENTS.md`" in get_docs("kimi-code")
-    assert "Current explicit entries used by this integration: `/skill:super-dev` and `/flow:super-dev`" in get_docs(
-        "kimi-code"
+    assert (
+        "Current explicit entries used by this integration: `/skill:super-dev` and `/flow:super-dev`"
+        in get_docs("kimi-code")
     )
 
     copilot_cli = get_host_definition("copilot-cli")
@@ -164,7 +161,9 @@ def test_registry_helpers_return_expected_host_metadata():
 
     opencode = get_host_definition("opencode")
     assert opencode is not None
-    assert get_protocol_summary("opencode") == "官方 AGENTS.md + commands + skills (+ optional agents)"
+    assert (
+        get_protocol_summary("opencode") == "官方 AGENTS.md + commands + skills (+ optional agents)"
+    )
     assert "Optional project-level `.opencode/agents/`" in get_docs("opencode")
     assert "Optional user-level `~/.config/opencode/agents/`" in get_docs("opencode")
 
@@ -220,7 +219,10 @@ def test_registry_helpers_return_expected_host_metadata():
     assert get_display_name("workbuddy") == "WorkBuddy"
     assert get_install_mode("workbuddy") == HostInstallMode.HYBRID
     assert get_protocol_mode("workbuddy") == "manual-task-workbench-mcp"
-    assert get_protocol_summary("workbuddy") == "当前推荐任务工作台模型: Skills + MCP + task continuity"
+    assert (
+        get_protocol_summary("workbuddy")
+        == "当前推荐任务工作台模型: Skills + MCP + task continuity"
+    )
     assert supports_slash("workbuddy") is False
     assert "super-dev-seeai:" in get_triggers("workbuddy")
     assert "WorkBuddy 技能市场 / 技能导入" in get_docs("workbuddy")

@@ -1,4 +1,4 @@
-# Super Dev 详细使用指南（2.4.0）
+# Super Dev 详细使用指南（2.5.0）
 
 > 宿主详细试用方式、是否支持 `/super-dev`、各宿主正确入口，请优先查看：
 > [HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
@@ -210,7 +210,7 @@ uv tool install super-dev
 指定版本：
 
 ```bash
-uv tool install super-dev==2.4.0
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
 ```
 
 ### 2.2 Bootstrap（推荐）

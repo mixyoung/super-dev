@@ -143,7 +143,7 @@ class CliGovernanceMixin:
                 table.add_row(label, indicator)
             self.console.print(table)
         else:
-            self.console.print(f"Host: {status.get('host', 'unknown')}")
+            self.console.print(f"宿主: {status.get('host', '未知')}")
             for key, val in status.items():
                 if key == "host":
                     continue

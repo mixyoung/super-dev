@@ -162,8 +162,8 @@ def _hydrate_release_governance_artifacts(project_dir: Path) -> None:
             "export default function Page() {\n"
             "  return (\n"
             "    <main style={{ color: 'var(--color-primary)' }}>\n"
-            "      <header><nav><a href=\"#hero\">Hero</a></nav></header>\n"
-            "      <section id=\"hero\"><Sparkles />Launch</section>\n"
+            '      <header><nav><a href="#hero">Hero</a></nav></header>\n'
+            '      <section id="hero"><Sparkles />Launch</section>\n'
             "    </main>\n"
             "  );\n"
             "}\n"
@@ -213,9 +213,7 @@ def _hydrate_release_governance_artifacts(project_dir: Path) -> None:
     quality_gate_payload = {
         "passed": True,
         "total_score": 92,
-        "summary": {
-            "executive_summary": "当前质量门禁已通过，UI 阶段与合规链证据当前均已闭环。"
-        },
+        "summary": {"executive_summary": "当前质量门禁已通过，UI 阶段与合规链证据当前均已闭环。"},
         "evidence_identity": build_evidence_identity(
             project_dir,
             artifact_name="quality-gate",
@@ -776,10 +774,10 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
     base_time = time.time() + 1
     for index, artifact_name in enumerate(
         (
-        f"{project_dir.name}-ui-review.json",
-        f"{project_dir.name}-ui-contract-alignment.json",
-        f"{project_dir.name}-frontend-runtime.json",
-        f"{project_dir.name}-quality-gate.md",
+            f"{project_dir.name}-ui-review.json",
+            f"{project_dir.name}-ui-contract-alignment.json",
+            f"{project_dir.name}-frontend-runtime.json",
+            f"{project_dir.name}-quality-gate.md",
         )
     ):
         ts = base_time + index
@@ -2143,7 +2141,9 @@ class TestWebAPI:
         assert run_resp.status_code == 200
         run_id = run_resp.json()["run_id"]
 
-        status_resp = client.get(f"/api/workflow/status/{run_id}", params={"project_dir": str(temp_project_dir)})
+        status_resp = client.get(
+            f"/api/workflow/status/{run_id}", params={"project_dir": str(temp_project_dir)}
+        )
         assert status_resp.status_code == 200
         payload = status_resp.json()
         assert payload["status"] in {
@@ -3070,12 +3070,13 @@ class TestWebAPI:
             payload["primary_repair_action"]["secondary_actions"]
             == payload["decision_card"]["secondary_actions"]
         )
-        assert payload["decision_card"]["next_actions"][0] == payload["decision_card"][
-            "first_action"
-        ]
-        assert payload["decision_card"]["secondary_actions"] == payload["decision_card"][
-            "next_actions"
-        ][1:]
+        assert (
+            payload["decision_card"]["next_actions"][0] == payload["decision_card"]["first_action"]
+        )
+        assert (
+            payload["decision_card"]["secondary_actions"]
+            == payload["decision_card"]["next_actions"][1:]
+        )
         assert payload["decision_card"]["path_override_examples"][0]["env_key"]
 
     def test_hosts_validate_exposes_human_detection_details(
@@ -3273,19 +3274,20 @@ class TestWebAPI:
         assert codex_host["supports_slash"] is False
         assert codex_host["adaptation_contract"]["supports_slash"] is False
         assert codex_host["adaptation_contract"]["supports_slash_entry"] is False
-        assert codex_host["adaptation_contract"]["dimensions"]["entry_experience"]["status"] == "ready"
+        assert (
+            codex_host["adaptation_contract"]["dimensions"]["entry_experience"]["status"] == "ready"
+        )
         assert codex_host["slash_command_file"] == ""
         assert codex_host["certification_level"] == "certified"
         assert codex_host["certification_label"] == "Certified"
         assert codex_host["usage_mode"] == "agents-and-skill"
         assert codex_host["host_protocol_mode"] == "official-skill"
-        assert (
-            codex_host["host_protocol_summary"]
-            == "官方 AGENTS.md + Skills + CLI $skill entry"
-        )
+        assert codex_host["host_protocol_summary"] == "官方 AGENTS.md + Skills + CLI $skill entry"
         assert "$super-dev" in codex_host["primary_entry"]
         assert any(item["entry"] == "$super-dev" for item in codex_host["entry_variants"])
-        assert any(item["entry"] == "super-dev: <需求描述>" for item in codex_host["entry_variants"])
+        assert any(
+            item["entry"] == "super-dev: <需求描述>" for item in codex_host["entry_variants"]
+        )
         assert codex_host["usage_location"]
         assert codex_host["usage_notes"]
         assert codex_host["requires_restart_after_onboard"] is True
@@ -3312,14 +3314,8 @@ class TestWebAPI:
             in codex_host["optional_project_surfaces"]
         )
         assert "~/.codex/skills/super-dev/SKILL.md" in codex_host["observed_compatibility_surfaces"]
-        assert (
-            codex_host["commands"]["trigger"]
-            == "CLI: $super-dev | 回退: super-dev: 你的需求"
-        )
-        assert (
-            codex_host["final_trigger"]
-            == "CLI: $super-dev | 回退: super-dev: 你的需求"
-        )
+        assert codex_host["commands"]["trigger"] == "CLI: $super-dev | 回退: super-dev: 你的需求"
+        assert codex_host["final_trigger"] == "CLI: $super-dev | 回退: super-dev: 你的需求"
         assert "SMOKE_OK" in codex_host["smoke_test_prompt"]
 
     def test_claude_host_catalog_uses_official_subagent_surfaces(self):
@@ -3475,7 +3471,9 @@ class TestWebAPI:
         assert droid_host["adaptation_contract"]["dimensions"]["competition"]["status"] == "ready"
         assert droid_host["competition_mode"]["enabled"] is True
         assert droid_host["competition_mode"]["trigger"] == "/super-dev-seeai 比赛需求"
-        assert any("droid exec --session-id" in tip for tip in droid_host["competition_mode"]["host_tips"])
+        assert any(
+            "droid exec --session-id" in tip for tip in droid_host["competition_mode"]["host_tips"]
+        )
         assert "SEEAI_SMOKE_OK" in droid_host["competition_smoke_test_prompt"]
         assert any(
             "/super-dev-seeai" in item for item in droid_host["competition_smoke_test_steps"]
@@ -3531,7 +3529,9 @@ class TestWebAPI:
         payload = resp.json()
         host = next(item for item in payload["host_tools"] if item["id"] == "cursor")
         assert host["host_protocol_mode"] == "official-context"
-        assert host["host_protocol_summary"] == "官方 Agent Chat + AGENTS.md + rules (+ beta commands)"
+        assert (
+            host["host_protocol_summary"] == "官方 Agent Chat + AGENTS.md + rules (+ beta commands)"
+        )
         assert "AGENTS.md" in host["official_project_surfaces"]
         assert "CLAUDE.md" in host["optional_project_surfaces"]
 
@@ -3571,7 +3571,10 @@ class TestWebAPI:
         payload = resp.json()
         host = next(item for item in payload["host_tools"] if item["id"] == "copilot-cli")
         assert host["host_protocol_mode"] == "official-context"
-        assert host["host_protocol_summary"] == "官方 copilot-instructions + AGENTS.md + skills + agents"
+        assert (
+            host["host_protocol_summary"]
+            == "官方 copilot-instructions + AGENTS.md + skills + agents"
+        )
         assert "AGENTS.md" in host["official_project_surfaces"]
         assert ".github/copilot-instructions.md" in host["official_project_surfaces"]
         assert ".github/agents/super-dev.md" in host["official_project_surfaces"]
@@ -3586,7 +3589,10 @@ class TestWebAPI:
         payload = resp.json()
         host = next(item for item in payload["host_tools"] if item["id"] == "qwen-code")
         assert host["host_protocol_mode"] == "official-context"
-        assert host["host_protocol_summary"] == "官方 QWEN.md + settings + commands + skills + agents + /resume"
+        assert (
+            host["host_protocol_summary"]
+            == "官方 QWEN.md + settings + commands + skills + agents + /resume"
+        )
         assert "QWEN.md" in host["official_project_surfaces"]
         assert ".qwen/agents/super-dev.md" in host["official_project_surfaces"]
         assert "~/.qwen/QWEN.md" in host["official_user_surfaces"]
@@ -3625,7 +3631,10 @@ class TestWebAPI:
         assert kiro_host["supports_slash"] is True
         assert kiro_host["usage_mode"] == "native-slash"
         assert kiro_host["host_protocol_mode"] == "official-steering"
-        assert kiro_host["host_protocol_summary"] == "官方 AGENTS.md + steering + skills + agent continuity"
+        assert (
+            kiro_host["host_protocol_summary"]
+            == "官方 AGENTS.md + steering + skills + agent continuity"
+        )
         assert kiro_host["slash_command_file"] == ".kiro/steering/super-dev.md"
         assert kiro_host["commands"]["trigger"] == "/super-dev 你的需求"
         assert kiro_host["final_trigger"] == "/super-dev 你的需求"
@@ -4025,9 +4034,10 @@ class TestWebAPI:
         assert decision_card["selected_host"] == "opencode"
         assert decision_card["workflow_mode"] == "continue"
         assert decision_card["session_resume_card"]["enabled"] is True
-        assert decision_card["session_resume_card"]["host_first_sentence"] == resume_card[
-            "host_first_sentence"
-        ]
+        assert (
+            decision_card["session_resume_card"]["host_first_sentence"]
+            == resume_card["host_first_sentence"]
+        )
         assert decision_card["action_title"] == resume_card["action_title"]
         assert decision_card["action_examples"] == resume_card["action_examples"]
         assert decision_card["first_action"].endswith(resume_card["host_first_sentence"])
@@ -4048,15 +4058,14 @@ class TestWebAPI:
         assert all("super-dev fix" not in item for item in resume_card["action_examples"])
         assert all("super-dev workflow" not in item for item in resume_card["action_examples"])
         baseline_card = next(
-            item for item in resume_card["scenario_cards"] if item["id"] == "existing_project_baseline"
+            item
+            for item in resume_card["scenario_cards"]
+            if item["id"] == "existing_project_baseline"
         )
         assert baseline_card["title"] == "当前项目不是从零开始，先做 baseline"
         assert "1-N+1" in baseline_card["when"]
         assert "建立 baseline" in baseline_card["cli_command"]
-        assert (
-            ".super-dev/SESSION_BRIEF.md"
-            in resume_card["session_brief_path"]
-        )
+        assert ".super-dev/SESSION_BRIEF.md" in resume_card["session_brief_path"]
         assert resume_card["recommended_workflow_command"]
         assert workflow_context == payload["decision_card"]["workflow_context"]
         assert workflow_context["baseline_required"] is False
@@ -4106,9 +4115,10 @@ class TestWebAPI:
         assert decision_card["selected_host"] == "codex-cli"
         assert decision_card["workflow_mode"] == "continue"
         assert decision_card["session_resume_card"]["enabled"] is True
-        assert decision_card["session_resume_card"]["host_first_sentence"] == card[
-            "host_first_sentence"
-        ]
+        assert (
+            decision_card["session_resume_card"]["host_first_sentence"]
+            == card["host_first_sentence"]
+        )
         assert decision_card["action_title"] == card["action_title"]
         assert decision_card["action_examples"] == card["action_examples"]
         assert decision_card["first_action"].endswith(card["host_first_sentence"])
@@ -4149,7 +4159,7 @@ class TestWebAPI:
         if card["recent_hook_events"]:
             assert any("最近 Hook:" in line for line in card["lines"])
         assert any("关键时间线:" in line for line in card["lines"])
-        assert any("Workflow Continuity:" in line for line in card["lines"])
+        assert any("工作流连续性:" in line for line in card["lines"])
         assert any("当前治理焦点:" in line for line in card["lines"])
         assert any("建议先做:" in line for line in card["lines"])
         assert ".super-dev/SESSION_BRIEF.md" in card["session_brief_path"]
@@ -4500,7 +4510,9 @@ class TestWebAPI:
         assert stored_host["comment"] == "补齐比赛验收证据"
         assert stored_host["competition_evidence_ready"] is True
         assert stored_host["competition_evidence_missing"] == []
-        assert stored_host["competition_evidence"]["demo_path"]["summary"].startswith("30-60 秒主演示路径")
+        assert stored_host["competition_evidence"]["demo_path"]["summary"].startswith(
+            "30-60 秒主演示路径"
+        )
 
         ready_resp = client.get(
             "/api/hosts/runtime-validation",
@@ -4569,7 +4581,10 @@ class TestWebAPI:
         assert host["repo_probe"]["status"] == "failed"
         assert host["ready_for_delivery"] is False
         assert "所需仓库级连续性证据不完整" in host["blocking_reason"]
-        assert "确认三文档" in host["recommended_action"] or "review docs" in host["recommended_action"]
+        assert (
+            "确认三文档" in host["recommended_action"]
+            or "review docs" in host["recommended_action"]
+        )
         assert payload["report"]["summary"]["repo_probe_failed_count"] == 1
         assert payload["report"]["summary"]["fully_ready_count"] == 0
         assert payload["report"]["blockers"][0]["type"] == "repo_probe"

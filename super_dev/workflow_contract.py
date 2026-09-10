@@ -129,9 +129,7 @@ STANDARD_PHASE_CHAIN: tuple[WorkflowPhase, ...] = (
     ),
 )
 
-CANONICAL_NINE_STAGE_IDS: tuple[str, ...] = tuple(
-    phase.key for phase in STANDARD_PHASE_CHAIN
-)
+CANONICAL_NINE_STAGE_IDS: tuple[str, ...] = tuple(phase.key for phase in STANDARD_PHASE_CHAIN)
 CANONICAL_STAGE_KINDS: dict[str, StageKind] = {
     stage: (
         "gate"
