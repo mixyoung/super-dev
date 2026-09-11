@@ -83,10 +83,14 @@ class TestSkillManager:
         assert "Runtime Contract（强制）" in skill_content
         assert "首轮响应契约（强制）" in skill_content
         assert "当前阶段是 `research`" in skill_content
-        assert "三份核心文档完成后暂停等待确认" in skill_content
+        assert "三份核心文档完成后暂停等待确认；未经确认不创建 Spec 也不编码。" in skill_content
         assert "本地知识库契约（强制）" in skill_content
         assert "output/knowledge-cache/*-knowledge-bundle.json" in skill_content
-        assert "未经用户确认禁止创建 `.super-dev/changes/*`" in skill_content
+        assert "必须真实写入项目文件" in skill_content
+        assert "不能只在聊天中口头描述" in skill_content
+        assert "文档确认后，Spec 与任务分别写入" in skill_content
+        assert ".super-dev/changes/<id>/proposal.md" in skill_content
+        assert ".super-dev/changes/<id>/tasks.md" in skill_content
         assert "super-dev：" in skill_content
         assert ".super-dev/SESSION_BRIEF.md" in skill_content
         assert "确认门/返工门" in skill_content

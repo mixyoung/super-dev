@@ -21,9 +21,9 @@
 
 参与本项目开发或让模型修改仓库前，请先读 [贡献指南](CONTRIBUTING.md) 与 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md)。这两份规则只约束 Super Dev 本身的维护，不改变普通用户使用方式。
 
-当前版本：`2.5.0`（mixyoung/super-dev 分支发行版）
+当前仓库版本：`2.5.1`（尚未发布；最新已发布版本为 `2.5.0`）
 
-- 发布说明：[v2.5.0 更新内容](docs/releases/2.5.0.md)
+- 版本说明：[v2.5.1 修正内容](docs/releases/2.5.1.md)；已发布版本：[v2.5.0](docs/releases/2.5.0.md)
 - 官网更新历史：[superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## 安装
@@ -546,7 +546,7 @@ super-dev bootstrap --name my-project --platform web --frontend next --backend n
 
 ## 架构概览
 
-Super Dev 2.5.0 架构由四层组成：**宿主接入层**（统一宿主矩阵，按 CLI / IDE / 桌面助手分组）、**知识治理层**（306 索引 / 渐进式加载 / 自演化）、**编排引擎层**（9 阶段流水线 / 11 专家 + Overseer / 验证规则引擎）、**交付审计层**（DORA 度量 / ADR / 一致性检测 / proof-pack）。
+Super Dev 2.5.1 架构由四层组成：**宿主接入层**（统一宿主矩阵，按 CLI / IDE / 桌面助手分组）、**知识治理层**（306 索引 / 渐进式加载 / 自演化）、**编排引擎层**（9 阶段流水线 / 11 专家 + Overseer / 验证规则引擎）、**交付审计层**（DORA 度量 / ADR / 一致性检测 / proof-pack）。
 
 ### 一、系统高阶流转架构
 

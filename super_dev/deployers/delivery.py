@@ -46,7 +46,7 @@ def derive_delivery_applicability(config: object) -> dict[str, str | bool]:
 class DeliveryPackager:
     """交付包生成器"""
 
-    def __init__(self, project_dir: Path, name: str, version: str = "2.5.0"):
+    def __init__(self, project_dir: Path, name: str, version: str = "2.5.1"):
         self.project_dir = Path(project_dir).resolve()
         self.name = name
         self.version = version

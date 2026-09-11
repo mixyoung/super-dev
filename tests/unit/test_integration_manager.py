@@ -1062,7 +1062,7 @@ class TestIntegrationManager:
 
         assert "super-dev：" in content
         assert (
-            "first natural-language requirement in a new session must also continue Super Dev"
+            "A read-only explanation, analysis or review does not authorize implementation"
             in content
         )
         assert "project workspace" in content
@@ -1083,13 +1083,14 @@ class TestIntegrationManager:
         workflow = manager._antigravity_workflow_rules()
 
         assert "super-dev:" in embedded or "super-dev：" in embedded
-        assert "必须真实写入项目文件" in embedded
+        assert "Write the required artifacts into the repository workspace." in embedded
+        assert "Chat-only summaries do not count as completion." in embedded
         assert "SESSION_BRIEF" in embedded
         assert "Chat-only summaries do not count" in antigravity
         assert "write them as project files" in antigravity
         assert "workspace files" in claude_agent
         assert "chat-only summaries" in claude_agent
-        assert "first natural-language requirement" in claude_agent
+        assert "Keep existing state unchanged" in claude_agent
         assert "continue Super Dev" in claude_agent
         assert "workspace files" in codebuddy_agent
         assert "chat-only explanations" in codebuddy_agent
@@ -1134,7 +1135,7 @@ class TestIntegrationManager:
         assert "Treat Super Dev as a local Python CLI plus host-side rules/skills" in cli_rules
         assert "First-Response Contract" in cli_rules
         assert (
-            "the first natural-language requirement in a new host session must also default to continuing Super Dev"
+            "A read-only explanation, analysis or review does not authorize implementation"
             in cli_rules
         )
         assert "current phase is `research`" in cli_rules
@@ -1154,7 +1155,7 @@ class TestIntegrationManager:
         )
         assert "First-Response Contract" in ide_rules
         assert (
-            "the first natural-language requirement in a new host session must also default to continuing Super Dev"
+            "A read-only explanation, analysis or review does not authorize implementation"
             in ide_rules
         )
         assert "current phase is `research`" in ide_rules
@@ -1165,8 +1166,8 @@ class TestIntegrationManager:
             in claude_rules
         )
         assert "First-Response Contract" in claude_rules
-        assert "first natural-language requirement" in claude_rules
-        assert "continuing Super Dev" in claude_rules
+        assert "Keep existing state unchanged" in claude_rules
+        assert "continue Super Dev" in claude_rules
         assert "stop after the three core documents and wait for approval" in claude_rules
         assert "wait for explicit confirmation before creating Spec or coding" in claude_rules
         assert ".super-dev/SESSION_BRIEF.md" in claude_rules

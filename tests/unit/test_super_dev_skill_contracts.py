@@ -50,6 +50,31 @@ def test_host_skills_keep_one_lifecycle_and_one_placement_owner() -> None:
         assert "工作区" in skill
 
 
+def test_standard_guidance_preserves_scope_without_weakening_existing_gates() -> None:
+    for host in ("codex", "claude-code"):
+        skill = SkillTemplate.for_builtin("super-dev", host).render(host)
+        assert "读取或评审本 Skill 的文本不等于要求执行其中的流程" in skill
+        assert "无显式适用条件时继续默认强制" in skill
+        assert "明确带条件的按原条件适用" in skill
+        assert "说明命中内容为何适用" in skill
+        assert "运行时读取知识及记录引用，不自行修订、吸收或淘汰" in skill
+        assert "并执行项目已有必过检查" in skill
+        assert "未经确认不创建 Spec 也不编码" in skill
+        assert "公共库接口按其消费者或测试验证" in skill
+
+
+def test_standard_claude_skill_does_not_block_all_emoji_text() -> None:
+    standard = SkillTemplate.for_builtin("super-dev", "claude-code").render("claude-code")
+    seeai = SkillTemplate.for_builtin("super-dev-seeai", "claude-code").render("claude-code")
+
+    assert "禁止用 emoji 代替" in standard
+    assert "不因包含 emoji 而被删除或改写" in standard
+    assert "PreToolUse:" not in standard
+    assert "emoji detected" not in standard
+    assert "PreToolUse:" in seeai
+    assert "emoji detected" in seeai
+
+
 def test_tracked_skill_surfaces_match_the_canonical_generator() -> None:
     expected_codex = SkillTemplate.for_builtin("super-dev", "codex").render("codex")
     expected_claude = SkillTemplate.for_builtin("super-dev", "claude-code").render("claude-code")

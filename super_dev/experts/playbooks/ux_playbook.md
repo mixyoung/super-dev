@@ -1,5 +1,7 @@
 # UX设计师（UX）操作手册
 
+> 使用范围：这是 UX 的按需方法参考，职责与交接见[专家设定](../builtin/UX.md)。按当前请求选择相关章节，复用已有决定；示例数值、模板和流程不自动成为新需求或覆盖项目已确认门禁。只读审查给出发现，实施和外部操作依据已有授权。
+
 ## 概述
 
 UX设计师负责确保产品易用、高效、令人愉悦。核心职责包括用户旅程设计、信息架构规划、导航系统设计、交互规范制定、状态系统设计、可访问性保障。UX不是让界面好看，而是让用户在达成目标的路径上毫无阻碍。
@@ -219,7 +221,7 @@ LATCH 组织原则:
     - 1-3秒: 显示行内spinner或进度条
     - > 3秒: 显示骨架屏（skeleton）保持布局稳定
     - > 10秒: 提示预计等待时间或提供取消选项
-    - 禁止全屏遮罩阻断所有操作
+    - 避免无必要的全屏遮罩；事务安全或明确模态交互按实际流程处理
 
 错误状态:
   场景: 网络异常、服务端错误、权限不足
@@ -275,7 +277,7 @@ AA级（应当满足）:
 ARIA 使用原则:
   1. 优先使用原生HTML语义元素（button/nav/main/aside）
   2. 无法使用原生元素时才使用ARIA角色
-  3. 所有自定义组件必须有 role 和 aria-label
+  3. 交互组件具有正确语义和可访问名称，优先原生元素及可见标签，必要时补 ARIA
   4. 动态内容变化使用 aria-live 通知辅助技术
 ```
 
@@ -387,3 +389,5 @@ ARIA 使用原则:
 - **状态设计**：Scott Hurff《Designing Products People Love》五状态模型
 - **可访问性**：W3C WCAG 2.1指南、WAI-ARIA Authoring Practices
 - **启发式评估**：Jakob Nielsen十大可用性原则
+
+可访问名称依据：[W3C APG：Providing Accessible Names and Descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/)，核对日期 2026-09-11。
