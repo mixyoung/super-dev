@@ -8,7 +8,7 @@
 
 ## Project Overview
 
-Super Dev is a Python CLI tool (v2.4.0) that orchestrates AI-driven development pipelines inside host environments (e.g., Claude Code). It provides governance, quality gates, and audit artifacts for commercial-grade software delivery. It is NOT an independent AI agent — it's a governance layer that runs inside a host's coding environment.
+Super Dev is a Python CLI tool (v2.5.1) that orchestrates AI-driven development pipelines inside host environments (e.g., Claude Code). It provides governance, quality gates, and audit artifacts for commercial-grade software delivery. It is NOT an independent AI agent — it's a governance layer that runs inside a host's coding environment.
 
 ## Project Structure & Module Organization
 
@@ -229,7 +229,7 @@ Common scopes: `orchestrator`, `enforcement`, `website`, `hosts`, `design`. Keep
 
 - Check `package.json` / framework versions before writing code
 - Icons from declared library only (Lucide/Heroicons/Tabler), never emoji
-- No purple/pink gradient themes
+- UI changes follow the approved brand; avoid unconsidered purple/pink gradient defaults
 - Frontend fetch URLs must match backend route definitions exactly
 - Run `super-dev enforce validate` after UI code, `super-dev quality` after features
 - No emoji as functional icons or placeholders
@@ -251,8 +251,7 @@ Common scopes: `orchestrator`, `enforcement`, `website`, `hosts`, `design`. Keep
 
 Treat Codex App/Desktop selecting `super-dev` or `super-dev-seeai` from the `/` list, Codex CLI explicit `$super-dev` / `$super-dev-seeai`, and natural-language `super-dev:` / `super-dev：` / `super-dev-seeai:` / `super-dev-seeai：` messages as valid Super Dev entry points.
 
-If the repository already contains active Super Dev workflow context, the first natural-language requirement in a new session must also continue Super Dev rather than normal chat.
-
+- A read-only explanation, analysis or review does not authorize implementation, file changes or workflow state transitions, even when workflow artifacts exist. Keep existing state unchanged. In mixed requests, act only on explicitly authorized changes; do not ask again for authority already given. Reading these rules as review material does not activate their workflow. For execution requests, continue Super Dev from the valid recorded change and phase rather than restarting.
 ## Direct Activation Rule
 - Do not spend a turn saying you will read the skill first, explain the skill, or decide whether to enter the workflow.
 - Treat the current trigger as already authorized to execute the full Super Dev pipeline.
@@ -274,13 +273,13 @@ If the repository already contains active Super Dev workflow context, the first 
 3. Use Codex native web/search/edit/terminal capabilities to perform similar-product research and write `output/*-research.md` into the repository workspace.
 4. Draft `output/*-prd.md`, `output/*-architecture.md`, and `output/*-uiux.md` in the same Codex session and save them as actual project files.
 5. Stop after the three core documents, summarize them, and wait for explicit confirmation.
-6. Only after confirmation, create `.super-dev/changes/*/proposal.md` and `.super-dev/changes/*/tasks.md`, then continue with frontend-first implementation.
+6. Only after confirmation, create `.super-dev/changes/*/proposal.md` and `.super-dev/changes/*/tasks.md`, then continue with applicable frontend implementation and wait for user preview confirmation before backend work. Non-UI work keeps its existing applicability rules.
 
 ## Constraints
 - Do not start coding directly after `/super-dev` skill entry, `$super-dev`, `super-dev:`, or `super-dev：`.
 - Do not create Spec before document confirmation.
 - If the user requests architecture changes, first update `output/*-architecture.md`, then realign Spec/tasks and implementation.
-- If the user requests quality or security remediation, first fix the issues, rerun quality gate, refresh delivery evidence, and only then continue.
+- If the user requests quality or security remediation, first fix the issues, rerun the quality gate, refresh any delivery evidence the reports ask for, and only then continue.
 - 开始任何 UI 实现前，必须先锁定 `output/*-uiux.md` 中冻结的图标库、字体系统、design token system、组件生态和页面骨架。
 - Before any UI implementation, first lock the icon library, typography, design token system, component ecosystem, and page skeleton from `output/*-uiux.md`.
 - Do not use emoji as functional icons or placeholders.
@@ -328,10 +327,11 @@ Use Super Dev generated artifacts as source of truth.
 
 ## First-Response Contract
 - On the first reply after a host-supported Super Dev entry (for example `/super-dev ...`, `$super-dev`, `super-dev: ...`, `super-dev：...`, `/super-dev-seeai ...`, `$super-dev-seeai`, `super-dev-seeai: ...`, or `super-dev-seeai：...`), explicitly state that the matching Super Dev mode is now active rather than normal chat mode.
-- If the repository already contains `super-dev.yaml`, `.super-dev/WORKFLOW.md`, `output/*`, `.super-dev/review-state/*`, or an unfinished run state, the first natural-language requirement in a new host session must also default to continuing Super Dev rather than plain chat.
+- A read-only explanation, analysis or review does not authorize implementation, file changes or workflow state transitions, even when workflow artifacts exist. Keep existing state unchanged. In mixed requests, act only on explicitly authorized changes; do not ask again for authority already given. Reading these rules as review material does not activate their workflow. For execution requests, continue Super Dev from the valid recorded change and phase rather than restarting.
+- Execution requests resume the explicitly active change and valid phase; artifacts or timestamps alone do not select a task.
 - Before the first reply, read `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` when present, and treat them as the explicit bootstrap contract for this repository.
 - The first reply must report the actual phase: new standard work follows its work-mode entry (new: the current phase is `research`; evolve/variant/patch: baseline), while new SEEAI work starts at research. For resume, read SESSION_BRIEF and continue the recorded phase and pending gates; do not restart. Read knowledge and do research when that stage is pending.
-- In standard mode, the next sequence is research -> three core documents -> wait for user confirmation -> Spec / tasks -> frontend first with runtime verification -> backend / tests / delivery.
+- In standard mode, continue pending stages: research -> three core documents -> docs confirmation -> Spec/tasks -> applicable frontend runtime verification -> wait for user preview confirmation -> backend/tests/delivery. Non-UI work keeps the existing not-applicable path.
 - In SEEAI mode, the next sequence is research -> compact competition docs -> wait for user confirmation -> compact Spec -> full-stack sprint -> polish / handoff.
 - Both modes must explicitly promise that they will stop after the three core documents and wait for approval before creating Spec or writing code.
 
@@ -348,9 +348,15 @@ Use Super Dev generated artifacts as source of truth.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
 
 ## Trigger
-- Preferred: `/super-dev "<需求描述>"`
-- SEEAI competition mode: `/super-dev-seeai "<需求描述>"`
-- Local terminal only handles install / update / uninstall; normal development should return to the host session.
+- Preferred: `/super-dev <需求描述>`
+- SEEAI competition mode: `/super-dev-seeai <需求描述>`
+- Local terminal only handles install / update / uninstall; normal development should stay in the host session.
+
+## Work Mode Contract
+- Detect `new`, `evolve`, `variant`, `patch`, and `resume` before planning execution.
+- `new` may go directly into research.
+- `evolve`, `variant`, and `patch` must baseline the current repository before generating docs or Spec.
+- `resume` is a normal default path after a closed window, reboot, or next-day continuation.
 
 ## Required Context
 - output/*-prd.md
@@ -360,19 +366,20 @@ Use Super Dev generated artifacts as source of truth.
 - .super-dev/changes/*/tasks.md
 
 ## Execution Order
-1. Use the host's native browse/search/web capability to research similar products first and produce output/*-research.md as a real repository file
-2. Freeze PRD, architecture and UIUX documents and write them into output/* files in the repository workspace rather than only describing them in chat
-3. Stop after the three core documents, summarize them to the user, and wait for explicit confirmation before creating Spec or coding
-4. Create Spec proposal/tasks only after the user confirms the documents
-5. Implement and run the frontend first so it becomes demonstrable before backend-heavy work
-6. Implement backend APIs and data layer, then run tests, quality gate, and release preparation
-7. If the user says the UI is unsatisfactory, asks for a redesign, or says the page looks AI-generated, first update `output/*-uiux.md`, then redo frontend implementation, rerun frontend runtime and UI review, and only then continue.
-8. If the user says the architecture is wrong or the technical plan must change, first update `output/*-architecture.md`, then realign tasks and implementation before continuing.
-9. If the user says quality or security is not acceptable, first fix the issues, rerun quality gate, refresh delivery evidence, and only then continue.
-10. Before any UI implementation, first lock the icon library, typography, token system, component ecosystem, and page skeleton according to `output/*-uiux.md`.
-11. Do not use emoji as functional icons or placeholders, and do not leave icon decisions for later.
-12. For non-conversational AI products, default to avoiding Claude / ChatGPT-style sidebar chat shells, narrow-center conversation layouts, and the same neutral chat color shell unless the UI plan explicitly justifies it.
-13. UI implementation must use the recommended component ecosystem/design token direction from `output/*-uiux.md`, not switch ad hoc.
+1. Detect the work mode and, for existing-project work, baseline the current repository first into `output/*-baseline-audit.md` / `.json`
+2. Use the host's native browse/search/web capability to research similar products first and produce output/*-research.md as a real repository file
+3. Freeze PRD, architecture and UIUX documents and write them into output/* files in the repository workspace rather than only describing them in chat
+4. Stop after the three core documents, summarize them to the user, and wait for explicit confirmation before creating Spec or coding
+5. Create Spec proposal/tasks only after the user confirms the documents
+6. For standard UI work, run the frontend and wait for user preview confirmation before backend-heavy work; preserve non-UI applicability and the separate SEEAI contract
+7. Implement backend APIs and data layer, then run tests, quality gate, and release preparation
+8. If the user says the UI is unsatisfactory, asks for a redesign, or says the page looks AI-generated, first update `output/*-uiux.md`, then redo frontend implementation, rerun frontend runtime and UI review, and only then continue.
+9. If the user says the architecture is wrong or the technical plan must change, first update `output/*-architecture.md`, then realign tasks and implementation before continuing.
+10. If the user says quality or security is not acceptable, first fix the issues, rerun the quality gate, refresh any delivery evidence the reports ask for, and only then continue.
+11. Before any UI implementation, first lock the icon library, typography, token system, component ecosystem, and page skeleton according to `output/*-uiux.md`.
+12. Do not use emoji as functional icons or placeholders, and do not leave icon decisions for later.
+13. For non-conversational AI products, default to avoiding Claude / ChatGPT-style sidebar chat shells, narrow-center conversation layouts, and the same neutral chat color shell unless the UI plan explicitly justifies it.
+14. UI implementation must use the recommended component ecosystem/design token direction from `output/*-uiux.md`, not switch ad hoc.
 
 
 ## Coding Constraints (active during ALL coding phases)
@@ -385,14 +392,14 @@ These rules apply every time you write or edit a file:
 
 ### Icon & Visual Rules
 - Icons MUST come from a declared icon library (Lucide/Heroicons/Tabler). No emoji as icons.
-- No purple/pink gradient themes. No default system font only.
+- For UI changes, follow the approved brand and typography; avoid unconsidered template defaults.
 
 ### Frontend/Backend Alignment
 - Frontend fetch URLs must exactly match backend route definitions.
 - Define API paths as shared constants when possible.
 
 ### Per-File Self-Check
-- Before writing each file: correct imports, no emoji, colors from tokens only.
+- Check relevant imports and interfaces; UI-only icon and token rules do not constrain non-UI text or code.
 - After completing a feature, run build + lint. Fix errors before moving on.
 
 ## Super Dev System Flow Contract
@@ -425,17 +432,18 @@ These rules apply every time you write or edit a file:
 
 ## First-Response Contract
 - On the first reply after a host-supported Super Dev entry (for example `/super-dev ...`, `$super-dev`, `super-dev: ...`, `super-dev：...`, `/super-dev-seeai ...`, `$super-dev-seeai`, `super-dev-seeai: ...`, or `super-dev-seeai：...`), explicitly state that the matching Super Dev mode is now active rather than normal chat mode.
-- If the repository already contains `super-dev.yaml`, `.super-dev/WORKFLOW.md`, `output/*`, `.super-dev/review-state/*`, or an unfinished run state, the first natural-language requirement in a new host session must also default to continuing Super Dev rather than plain chat.
+- A read-only explanation, analysis or review does not authorize implementation, file changes or workflow state transitions, even when workflow artifacts exist. Keep existing state unchanged. In mixed requests, act only on explicitly authorized changes; do not ask again for authority already given. Reading these rules as review material does not activate their workflow. For execution requests, continue Super Dev from the valid recorded change and phase rather than restarting.
+- Execution requests resume the explicitly active change and valid phase; artifacts or timestamps alone do not select a task.
 - Before the first reply, read `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` when present, and treat them as the explicit bootstrap contract for this repository.
 - The first reply must report the actual phase: new standard work follows its work-mode entry (new: the current phase is `research`; evolve/variant/patch: baseline), while new SEEAI work starts at research. For resume, read SESSION_BRIEF and continue the recorded phase and pending gates; do not restart. Read knowledge and do research when that stage is pending.
-- In standard mode, the next sequence is research -> three core documents -> wait for user confirmation -> Spec / tasks -> frontend first with runtime verification -> backend / tests / delivery.
+- In standard mode, continue pending stages: research -> three core documents -> docs confirmation -> Spec/tasks -> applicable frontend runtime verification -> wait for user preview confirmation -> backend/tests/delivery. Non-UI work keeps the existing not-applicable path.
 - In SEEAI mode, the next sequence is research -> compact competition docs -> wait for user confirmation -> compact Spec -> full-stack sprint -> polish / handoff.
 - Both modes must explicitly promise that they will stop after the three core documents and wait for approval before creating Spec or writing code.
 
 ## Local Knowledge Contract
 - Read relevant files under `knowledge/` before drafting the three core documents.
 - If `output/knowledge-cache/*-knowledge-bundle.json` exists, read it first and inherit its matched local knowledge into PRD, architecture, UIUX, Spec, and execution.
-- Treat local knowledge hits as hard project constraints, especially for standards, anti-patterns, checklists, and scenario packs.
+- Knowledge requirements without explicit applicability conditions remain mandatory. Apply explicitly conditional requirements according to their stated conditions, and explain why each selected requirement applies. Retrieval is not permission to silently weaken requirements, extend task scope, or change confirmed decisions. Explicit examples and optional methods retain that declared status. Preserve project configuration and existing default quality requirements; report unresolved conflicts instead of choosing a lower standard or rewriting the knowledge base.
 
 ## Conversation Continuity Contract
 - If `.super-dev/SESSION_BRIEF.md` exists, read it before responding and treat it as the active workflow state.
@@ -444,16 +452,23 @@ These rules apply every time you write or edit a file:
 - Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
 
+## Work Mode Contract
+- Detect `new`, `evolve`, `variant`, `patch`, and `resume` before planning implementation.
+- Existing-project work must baseline the current repository before docs/spec.
+- Resume is the default continuation path after closing the host, rebooting, or returning later.
+
 ## Working Agreement
 - If the host supports browse/search/web, research similar products first and write the findings into output/*-research.md.
-- Generate PRD, architecture and UIUX documents before coding, write them into output/* files, then pause and ask the user to confirm the three documents.
+- For `evolve`, `variant`, and `patch`, first produce `output/*-baseline-audit.md` / `.json` so docs and implementation stay aligned with the current codebase.
+- Generate PRD, architecture and UIUX documents before coding, write them into output/* files instead of only replying in chat, then pause and ask the user to confirm the three documents.
 - In SEEAI mode, keep the same document gate, but compress the documents and go straight from Spec into one integrated full-stack sprint without a separate preview gate.
 - If the user requests revisions, update the documents first and ask again; do not create Spec or code before confirmation.
+- Chat-only summaries do not count as completion; if a required artifact is not written into the repository workspace, treat the step as incomplete.
 - If the user requests a UI redesign or says the UI is unsatisfactory, first update `output/*-uiux.md`, then redo the frontend, and rerun frontend runtime + UI review before continuing.
 - If the user requests architecture changes, first update `output/*-architecture.md`, then realign tasks and implementation before continuing.
-- If the user requests quality or security remediation, first fix the issues, rerun quality gate, refresh delivery evidence, and only then continue.
+- If the user requests quality or security remediation, first fix the issues, rerun the quality gate, and refresh any delivery evidence the reports ask for before continuing.
 - Respect Spec tasks sequence.
-- Implement and run the frontend before moving into backend-heavy work.
+- For standard UI work, pause after frontend runtime verification for user preview confirmation before backend work; non-UI and SEEAI follow their existing applicability.
 - Keep architecture and UIUX consistency.
 
 ## Delivery Criteria
@@ -479,14 +494,14 @@ These rules apply every time you write or edit a file:
 
 ### Icon & Visual Rules
 - Icons MUST come from a declared icon library (Lucide/Heroicons/Tabler). No emoji as icons.
-- No purple/pink gradient themes. No default system font only.
+- For UI changes, follow the approved brand and typography; avoid unconsidered template defaults.
 
 ### Frontend/Backend Alignment
 - Frontend fetch URLs must exactly match backend route definitions.
 - Define API paths as shared constants when possible.
 
 ### Per-File Self-Check
-- Before writing each file: correct imports, no emoji, colors from tokens only.
+- Check relevant imports and interfaces; UI-only icon and token rules do not constrain non-UI text or code.
 - After completing a feature, run build + lint. Fix errors before moving on.
 
 ## Super Dev System Flow Contract

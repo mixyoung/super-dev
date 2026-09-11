@@ -52,6 +52,13 @@ class ExpertDefinition:
     file_path: str = ""
 
 
+def _unquote(value: str) -> str:
+    """Remove a matching YAML quote pair without damaging quotes in plain text."""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
 def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
     """解析 Markdown 文件的 YAML frontmatter。
 
@@ -79,7 +86,7 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
 
         # List item under current key
         if stripped.startswith("- ") and current_key:
-            item = stripped[2:].strip().strip('"').strip("'")
+            item = _unquote(stripped[2:].strip())
             if current_list is not None:
                 current_list.append(item)
             continue
@@ -88,7 +95,7 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str | list[str]], str]:
         if ":" in stripped:
             key, _, val = stripped.partition(":")
             key = key.strip()
-            val = val.strip().strip('"').strip("'")
+            val = _unquote(val.strip())
             current_key = key
             if val:
                 result[key] = val
@@ -255,7 +262,12 @@ def load_expert_profiles(
     definitions = load_expert_definitions(project_dir)
     profiles: dict[ExpertRole, ExpertProfile] = {}
 
-    for defn in definitions.values():
+    source_priority = {"builtin": 0, "user": 1, "project": 2}
+    for defn in sorted(definitions.values(), key=lambda item: source_priority.get(item.source, 0)):
+        # Built-in variants remain explicitly selectable definitions. They must not
+        # replace the general role just because their filenames sort after it.
+        if defn.source == "builtin" and defn.name.upper() != defn.role.upper():
+            continue
         profile = definition_to_profile(defn)
         profiles[profile.role] = profile
 

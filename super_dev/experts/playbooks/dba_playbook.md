@@ -1,5 +1,7 @@
 # 数据库专家（DBA）操作手册
 
+> 使用范围：这是 DBA 的按需方法参考，职责与交接见[专家设定](../builtin/DBA.md)。按当前请求选择相关章节，复用已有决定；示例数值、模板和流程不自动成为新需求或覆盖项目已确认门禁。只读审查给出发现，实施和外部操作依据已有授权。
+
 ## 概述
 
 数据库专家负责数据模型设计、查询优化、迁移策略和数据库运维。核心目标是确保数据的正确性、一致性、安全性和查询性能。DBA 不只关心"数据存得下"，更关心"查得快、改得动、丢不了"。
@@ -7,7 +9,7 @@
 ### 核心原则
 
 1. **数据正确性优先**：约束和校验在数据库层面执行，不依赖应用层
-2. **查询可预测**：所有关键查询必须有 EXPLAIN 分析，避免全表扫描
+2. **查询可预测**：性能敏感查询根据数据规模核对执行计划，顺序扫描本身不等于缺陷
 3. **可迁移**：每次 schema 变更都有版本化迁移脚本和回滚方案
 4. **最小暴露**：应用层只拥有必要的数据库权限
 
@@ -108,7 +110,7 @@ LIMIT 20;
 
 | 指标 | 理想值 | 警告值 |
 |------|-------|-------|
-| Seq Scan（全表扫描） | 小表 OK | 大表（>10K行）必须索引 |
+| Seq Scan（全表扫描） | 按选择性、规模和读取成本判断 | 有瓶颈时比较索引方案，不按固定行数强制添加 |
 | Rows Removed by Filter | 低 | 高说明索引缺失或无效 |
 | Sort Method: external merge | 不出现 | 出现说明 work_mem 不足 |
 | Nested Loop 行数 | 小 | 大说明可能 N+1 |
@@ -192,9 +194,9 @@ ALTER TABLE users DROP COLUMN avatar_url;
 
 **规范要求**：
 - 文件名格式：`{日期}_{序号}_{描述}.sql`
-- 每个迁移必须有 UP 和 DOWN
-- 迁移必须幂等（重复执行不报错）
-- 大表 DDL 使用 `CONCURRENTLY`（不锁表）
+- 迁移记录前向变更及恢复方式；可逆变更可提供 DOWN，不可逆变更说明备份恢复或前向修复条件
+- 明确迁移工具的一次性执行与重复执行行为，不把失败静默当成幂等
+- PostgreSQL 创建索引可按需使用 `CREATE INDEX CONCURRENTLY` 减少对写入的阻塞；它不适用于所有 DDL，也不意味着完全无锁
 
 #### 3.2 前向兼容原则
 
@@ -220,7 +222,7 @@ ALTER TABLE users DROP COLUMN avatar_url;
 #### 3.4 回滚计划
 
 每次迁移前必须准备：
-- DOWN 脚本经过测试
+- 适用的 DOWN、备份恢复或前向修复方案经过隔离验证
 - 数据备份（大表至少备份受影响的数据）
 - 回滚时间估算
 - 回滚后的数据一致性验证方法
@@ -270,8 +272,8 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
 
 ### 迁移与变更（6 项）
 
-- [ ] 迁移脚本是否有 UP 和 DOWN
-- [ ] 大表 DDL 是否使用 CONCURRENTLY
+- [ ] 迁移是否有前向变更和适用恢复方案，不可逆限制是否明确
+- [ ] 是否核对当前数据库与具体 DDL 的锁和并发限制
 - [ ] 新列是否可空或有默认值（前向兼容）
 - [ ] 数据迁移是否分批执行（避免长事务）
 - [ ] 回滚方案是否准备并测试
@@ -324,7 +326,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
 
 **症状**：生产环境全表扫描，查询超时
 
-**正确做法**：上线前所有关键查询必须有 EXPLAIN 分析
+**正确做法**：上线前对本轮性能敏感的关键查询核对执行计划与实际数据规模
 
 ### 3. 过度范式化
 
@@ -355,3 +357,5 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;
 - `knowledge/development/01-standards/redis-complete.md` — Redis 使用标准
 - `knowledge/development/01-standards/elasticsearch-complete.md` — Elasticsearch 标准
 - `knowledge/development/01-standards/performance-optimization-complete.md` — 性能优化标准
+
+索引语法与并发限制核对依据：[PostgreSQL 18 CREATE INDEX](https://www.postgresql.org/docs/18/sql-createindex.html)，核对日期 2026-09-11。

@@ -26,6 +26,7 @@ from typing import Any
 import yaml
 
 from ..utils import get_logger
+from ..workflow_contract import knowledge_authority_guidance
 
 # ---------------------------------------------------------------------------
 # 阶段-知识域映射（核心配置）
@@ -208,10 +209,16 @@ class KnowledgePush:
         lines.append("")
 
         # 约束清单
+        lines.append(knowledge_authority_guidance())
+        lines.append(
+            "清单片段不包含全部适用条件；使用前读取下方来源原文，不将被截取的片段另作无条件规范。"
+        )
         if self.constraints:
             lines.append("### 硬约束 (Agent Checklist)")
             lines.append("")
-            lines.append("以下约束来自本地知识库，必须遵守，不得降级为可选参考：")
+            lines.append(
+                "以下条目来自知识库检查清单，约束力遵循上述规则，保留原文中明确的条件、示例和例外。"
+            )
             lines.append("")
             for i, c in enumerate(self.constraints, 1):
                 lines.append(f"{i}. {c}")
@@ -221,7 +228,7 @@ class KnowledgePush:
         if self.antipatterns:
             lines.append("### 禁止项 (Anti-patterns)")
             lines.append("")
-            lines.append("以下反模式必须避免：")
+            lines.append("按当前技术栈与实际场景核对以下常见问题，不将案例全部转为必做任务：")
             lines.append("")
             for i, a in enumerate(self.antipatterns, 1):
                 lines.append(f"{i}. ❌ {a}")

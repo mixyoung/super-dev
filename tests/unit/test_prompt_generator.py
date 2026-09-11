@@ -43,7 +43,8 @@ class TestAIPromptGenerator:
         assert "Super Dev` 流水线已激活" in prompt
         assert ".super-dev/WORKFLOW.md" in prompt
         assert "output/demo-bootstrap.md" in prompt
-        assert "当前阶段是 `research`" in prompt
+        assert "当前阶段是 `docs_confirm`" in prompt
+        assert "当前阶段是 `research`" not in prompt
         assert "三份核心文档完成后会暂停等待用户确认" in prompt
         assert "阶段 1.5. 文档确认门（强制暂停）" in prompt
         assert "未经用户明确确认，不得创建 `.super-dev/changes/*`" in prompt
@@ -65,13 +66,15 @@ class TestAIPromptGenerator:
         assert "每个关键页面必须提供 **2 个视觉方案**" in prompt
         assert "Token → Primitive → Pattern → Surface" in prompt
         assert "不存在任何 emoji 功能图标" in prompt
-        assert "在向用户展示任何 UI 预览前，必须自检源码和预览里不存在任何 emoji 字符" in prompt
+        assert "用户输入、示例和被分析文字不得因此被删改" in prompt
+        assert "源码和预览里不存在任何 emoji 字符" not in prompt
         assert "非技术与专业用户都能使用同一套交互" in prompt
         assert "Web/H5/微信小程序/APP/桌面端" in prompt
         assert "TDesign 小程序 / RN / Flutter / SwiftUI / Electron / Tauri" in prompt
         assert "实现收尾与自审闭环（必须遵守）" in prompt
         assert "本轮新增的函数、方法、字段、组件、配置、日志埋点" in prompt
-        assert "未接入则删除" in prompt
+        assert "公共库接口通过消费者或契约测试验证" in prompt
+        assert "未接入则删除" not in prompt
         assert "build / compile / type-check / test / runtime smoke" in prompt
 
     def test_generate_bugfix_prompt_requires_lightweight_docs(self, temp_project_dir: Path):

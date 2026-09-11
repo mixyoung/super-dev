@@ -166,7 +166,7 @@ _DEFAULT_STYLE_POLICY = (
 )
 
 
-def load_ui_policy(project_dir: Path | None = None) -> dict[str, str]:
+def load_ui_policy(project_dir: Path | None = None, *, scoped: bool = False) -> dict[str, str]:
     """从 super-dev.yaml 加载 UI 策略配置。
 
     配置示例 (super-dev.yaml):
@@ -182,6 +182,9 @@ def load_ui_policy(project_dir: Path | None = None) -> dict[str, str]:
     icon_policy = _DEFAULT_ICON_POLICY
     style_policy = _DEFAULT_STYLE_POLICY
     icon_library = "Lucide"
+    if scoped:
+        icon_policy = "功能图标与占位使用已声明图标库，不用 emoji 代替；用户输入、示例或被分析文本不因此删改。"
+        style_policy = "沿用已确认品牌、字体和设计变量，避免无层级卡片墙及无依据的模板化视觉。"
 
     if project_dir:
         config_path = project_dir / "super-dev.yaml"
@@ -254,6 +257,8 @@ def build_full_reminders(
     backend: str = "",
     project_dir: Path | None = None,
     knowledge_dir: Path | None = None,
+    *,
+    scoped: bool = False,
 ) -> str:
     """构建完整的关键约束提醒。
 
@@ -270,22 +275,31 @@ def build_full_reminders(
         project_dir: 项目根目录
         knowledge_dir: knowledge/ 目录 (None 自动检测)
     """
-    ui_policy = load_ui_policy(project_dir)
+    ui_policy = load_ui_policy(project_dir, scoped=scoped)
 
     parts: list[str] = []
 
     # 1. 核心约束
-    parts.append(
-        "## 关键约束提醒（每次操作前必读）\n\n"
-        "⛔ 以下规则在整个开发过程中始终有效，不得以任何理由违反：\n\n"
-        f"1. **图标系统**: {ui_policy['icon_policy']}\n\n"
-        f"2. **视觉风格**: {ui_policy['style_policy']}\n\n"
-        "3. **代码纪律**: 不要添加没被要求的功能。不要为不可能的场景添加错误处理。"
-        "不要为一次性操作创建抽象。三行相似代码好过一个过早的抽象。\n\n"
-        "4. **自检规则**: 在向用户展示任何 UI 代码或预览前，"
-        "必须自检源码中不存在 emoji 字符。发现后先替换为正式图标库再继续。\n\n"
-        "5. **输出准确性**: 如果测试失败就说失败。不要声称'所有测试通过'当输出显示失败。"
-    )
+    if scoped:
+        parts.append(
+            "## 关键约束提醒\n\n只处理本轮已授权范围，如实报告实际验证，保留未涉及的用户内容。"
+        )
+        if frontend.strip().lower() not in {"", "none"}:
+            parts.append(
+                f"### 本轮 UI 规范\n{ui_policy['icon_policy']}\n{ui_policy['style_policy']}"
+            )
+    else:
+        parts.append(
+            "## 关键约束提醒（每次操作前必读）\n\n"
+            "⛔ 以下规则在整个开发过程中始终有效，不得以任何理由违反：\n\n"
+            f"1. **图标系统**: {ui_policy['icon_policy']}\n\n"
+            f"2. **视觉风格**: {ui_policy['style_policy']}\n\n"
+            "3. **代码纪律**: 不要添加没被要求的功能。不要为不可能的场景添加错误处理。"
+            "不要为一次性操作创建抽象。三行相似代码好过一个过早的抽象。\n\n"
+            "4. **自检规则**: 在向用户展示任何 UI 代码或预览前，"
+            "必须自检源码中不存在 emoji 字符。发现后先替换为正式图标库再继续。\n\n"
+            "5. **输出准确性**: 如果测试失败就说失败。不要声称'所有测试通过'当输出显示失败。"
+        )
 
     # 2. 前端技术栈知识（从文件加载，不写死）
     if knowledge_dir is None and project_dir:

@@ -209,7 +209,7 @@ class ExpertToolkit:
             sections.append(f"当前阶段: {phase}")
             sections.append("")
 
-        sections.append(f"已加载 {len(files)} 个知识文件:")
+        sections.append(f"找到 {len(files)} 个候选知识文件，可按当前问题读取:")
         for f in files:
             sections.append(f"  - {f}")
         sections.append("")
@@ -243,7 +243,9 @@ class ExpertToolkit:
             dim_name = qdim.get("name", "")
             min_score = qdim.get("min_score", 0)
             if dim_name:
-                items.append(f"{dim_name} 维度达标（>= {min_score}）")
+                items.append(
+                    f"{dim_name} 维度按项目已确认阈值检查（内置参考 {min_score} 不覆盖项目配置）"
+                )
 
         # 3. 来自 phase_prompts
         phase_prompt = self.phase_prompts.get(phase, "")
@@ -403,7 +405,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         ),
         phase_prompts={
             "research": "对标竞品功能矩阵，识别差异化点和 MVP 边界",
-            "docs": "确保 PRD 包含用户分层、用户故事和 Given-When-Then 验收标准",
+            "docs": "确保 PRD 有本轮角色、行为与可观察验收结果；Given-When-Then 为可选表达",
             "spec": "检查 Spec 中 SHALL/MUST 需求是否覆盖 PRD 的 P0 功能",
         },
         playbook=[
@@ -413,7 +415,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         ],
         phase_checklists={
             "research": [
-                "同类产品至少调研 3-5 个",
+                "有市场判断需求时比较相关替代方案，数量以决策需要为准",
                 "共性功能模块已提取",
                 "关键用户流程已梳理",
             ],
@@ -475,13 +477,13 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
             "5) 扩展性是否考虑"
         ),
         phase_prompts={
-            "docs": "架构文档须包含分层图、数据流图和至少 3 条 ADR",
+            "docs": "架构说明本轮边界和数据流，只有重要且难逆的取舍才记录 ADR",
             "spec": "验证 Spec 的技术方案与架构文档一致",
             "backend": "检查实现是否遵循架构文档中的模块边界和通信契约",
         },
         playbook=[
             "先定义系统边界与模块职责，再确定通信契约。",
-            "对关键链路做容量估算与扩展策略（缓存/队列/分片）。",
+            "有容量或扩展需求时估算关键链路，按瓶颈选择缓存、队列等方案。",
             "沉淀可演进架构决策记录（ADR），降低后续返工风险。",
         ],
         phase_checklists={
@@ -601,7 +603,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
                     "dimension": "交互体验",
                     "checklist": [
                         "核心任务流步骤数是否合理",
-                        "导航层级是否不超过 3 层",
+                        "导航层级是否便于目标用户完成当前任务",
                         "错误状态是否提供恢复指引",
                         "加载/空/错误状态是否完整",
                         "WCAG 2.1 AA 是否满足",
@@ -612,19 +614,19 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         system_prompt_injection=(
             "以 UX 设计师视角审查：\n"
             "1) 用户旅程是否覆盖主路径和异常路径\n"
-            "2) 导航结构是否不超过 3 层\n"
-            "3) 表单是否有实时验证和错误恢复\n"
-            "4) 关键操作是否有确认/撤销\n"
+            "2) 导航结构是否符合当前信息量和用户任务\n"
+            "3) 表单是否按场景选择提交、失焦或必要的即时验证，并能恢复错误\n"
+            "4) 关键操作是否按后果与可逆性选择确认、撤销或恢复\n"
             "5) 可访问性（WCAG 2.1 AA）是否满足"
         ),
         phase_prompts={
-            "docs": "UIUX 文档须包含任务流程图和页面层级规划",
+            "docs": "UIUX 文档说明本轮任务流程和必要页面层级；复杂关系按需用图解释",
             "frontend": "验证核心任务流步骤数不超过设计规范上限",
         },
         playbook=[
             "梳理关键任务流并减少不必要步骤。",
             "定义空状态、错误态与加载态，避免流程中断。",
-            "通过可观测埋点验证转化漏斗并持续迭代。",
+            "有量化使用分析需求时安排适用埋点；其他任务用操作场景验证。",
         ],
         phase_checklists={
             "docs": [
@@ -756,7 +758,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         ),
         system_prompt_injection=(
             "以代码专家视角审查：\n"
-            "1) 函数职责是否单一（不超过 30 行）\n"
+            "1) 函数职责和耦合是否清晰，避免机械按行数拆分\n"
             "2) 异常处理是否完整\n"
             "3) 命名是否清晰\n"
             "4) Linter 是否零警告\n"
@@ -820,7 +822,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
                     "checklist": [
                         "ER 图是否完整",
                         "索引策略是否合理",
-                        "迁移脚本是否可回滚",
+                        "迁移是否有与数据兼容的恢复方案",
                         "敏感字段是否标记加密",
                         "是否有 N+1 查询风险",
                     ],
@@ -831,18 +833,18 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
             "以数据库专家视角审查：\n"
             "1) 数据模型是否规范（ER 图完整）\n"
             "2) 索引策略是否合理\n"
-            "3) 迁移脚本是否可回滚\n"
+            "3) 迁移是否有与数据兼容的恢复方案\n"
             "4) 敏感数据是否加密存储\n"
             "5) 是否有 N+1 查询风险"
         ),
         phase_prompts={
             "docs": "架构文档须包含 ER 图和索引策略",
-            "backend": "检查 ORM 查询是否有 N+1 问题，迁移是否可回滚",
+            "backend": "检查 ORM 查询是否有 N+1 问题，迁移是否有适用恢复方案",
         },
         playbook=[
             "先建模实体关系，再补充索引和约束策略。",
             "对高频查询设计覆盖索引并验证执行计划。",
-            "迁移脚本确保可回滚，发布时采用灰度策略。",
+            "涉及迁移时核对兼容和恢复；发布策略依据运行形态与已有授权选择。",
         ],
         phase_checklists={
             "spec": [
@@ -852,7 +854,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
             "backend": [
                 "高频查询有覆盖索引",
                 "执行计划已验证",
-                "迁移脚本可回滚",
+                "迁移的恢复方案与限制已明确",
             ],
         },
     ),
@@ -885,10 +887,10 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
                 {
                     "dimension": "质量保障",
                     "checklist": [
-                        "质量门禁评分是否 >= 80",
+                        "质量门禁评分是否满足项目已确认阈值",
                         "无 Critical 级失败项",
-                        "测试覆盖率是否 >= 80%",
-                        "所有 API 是否有集成测试",
+                        "测试覆盖是否满足项目既有要求和本轮风险",
+                        "相关关键 API 是否覆盖正常与失败路径",
                         "交付证据是否完整",
                     ],
                 },
@@ -896,10 +898,10 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         ),
         system_prompt_injection=(
             "以 QA 专家视角审查：\n"
-            "1) 质量门禁评分是否达标（>= 80）\n"
+            "1) 质量门禁评分是否满足项目已确认阈值\n"
             "2) 无 Critical 级失败项\n"
-            "3) 测试覆盖率 >= 80%（核心逻辑）\n"
-            "4) 所有 API 有集成测试\n"
+            "3) 核心逻辑的测试覆盖满足项目既有要求\n"
+            "4) 相关关键 API 有对应验证\n"
             "5) 交付证据链完整"
         ),
         phase_prompts={

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 LOGO_COMPACT = "Super Dev"
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 
 # 阶段编号和名称映射
 PHASE_NAMES: dict[str, str] = {

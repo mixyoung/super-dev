@@ -19,9 +19,9 @@
 
 ## Version
 
-Current version: `2.5.0` (mixyoung/super-dev fork release)
+Current repository version: `2.5.1` (not yet released; latest published version: `2.5.0`)
 
-- Release notes: [v2.5.0](docs/releases/2.5.0.md)
+- Version notes: [v2.5.1](docs/releases/2.5.1.md); published release: [v2.5.0](docs/releases/2.5.0.md)
 - Website changelog: [superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## Install

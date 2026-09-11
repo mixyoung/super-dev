@@ -356,6 +356,43 @@ def get_agent_team(flow_variant: str = "standard") -> tuple[WorkflowAgent, ...]:
     return get_workflow_contract(flow_variant).agent_team
 
 
+def knowledge_authority_guidance(language: str = "zh") -> str:
+    """Shared wording for the existing standard-mode knowledge contract."""
+    if language == "en":
+        return (
+            "Knowledge requirements without explicit applicability conditions remain mandatory. "
+            "Apply explicitly conditional requirements according to their stated conditions, "
+            "and explain why each selected requirement applies. Retrieval is not permission "
+            "to silently weaken requirements, extend task scope, or change confirmed decisions. "
+            "Explicit examples and optional methods retain that declared status. Preserve project "
+            "configuration and existing default quality requirements; report unresolved conflicts "
+            "instead of choosing a lower standard or rewriting the knowledge base."
+        )
+    return (
+        "知识要求无显式适用条件时继续默认强制；明确带条件的按原条件适用，"
+        "说明命中内容为何适用。不得由模型自行降级原有要求，也不因检索命中扩大任务或权限。"
+        "明确标注为示例或可选方法的内容保留原含义。项目配置和现有默认质量要求继续有效；"
+        "未解决的冲突说明依据并交回原决定方，不自行选择较低标准或改写知识库。"
+    )
+
+
+def readonly_request_guidance(language: str = "zh") -> str:
+    """A request boundary, not another workflow mode or state transition."""
+    if language == "en":
+        return (
+            "A read-only explanation, analysis or review does not authorize implementation, "
+            "file changes or workflow state transitions, even when workflow artifacts exist. "
+            "Keep existing state unchanged. In mixed requests, act only on explicitly authorized "
+            "changes; do not ask again for authority already given. Reading these rules as review "
+            "material does not activate their workflow. For execution requests, continue Super Dev "
+            "from the valid recorded change and phase rather than restarting."
+        )
+    return (
+        "解释、分析和审查等只读请求不授权实现、文件修改或阶段推进，即使已有流程产物也保持状态不变。"
+        "混合请求只实施明确获准的部分；已有授权不重复索取。阅读或评审这些规则不等于激活其中流程。"
+    )
+
+
 __all__ = [
     "FlowVariant",
     "StageKind",
