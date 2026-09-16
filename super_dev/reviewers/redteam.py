@@ -1452,6 +1452,11 @@ class RedTeamReviewer:
         if len(relative.parts) == 1:
             return True
         top_level = relative.parts[0].lower()
+        if top_level == "output":
+            # Framework blueprints under output/ are generated evidence/reference
+            # artifacts, not independently shipped dependency roots.  Auditing them
+            # again would duplicate findings from the real frontend/backend surface.
+            return False
         if top_level == "frontend":
             return self._stack_component_active(self.frontend)
         if top_level == "backend":

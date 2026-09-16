@@ -185,6 +185,24 @@ class CliParserMixin:
             default="all",
             help="检查类型",
         )
+        quality_parser.add_argument(
+            "--attest-review",
+            action="append",
+            default=[],
+            metavar="SESSION_ID=SHA256",
+            help=(
+                "显式见证一份外部评审文件：会话 ID 与该 JSON 文件 SHA-256；"
+                "可重复使用，且仍需匹配当前工作项、版本与候选摘要"
+            ),
+        )
+        quality_parser.add_argument(
+            "--accept-review-residual-risk",
+            action="store_true",
+            help=(
+                "显式记录无法取得高风险独立复审时的用户残余风险接受；"
+                "不会把自检或未验证评审改称独立"
+            ),
+        )
 
         # config 命令
         config_parser = subparsers.add_parser(

@@ -26,6 +26,7 @@ except ImportError:
 
 from ..config.manager import ConfigManager, get_config_manager
 from ..exceptions import PhaseExecutionError, QualityGateError
+from ..shadow_ledger_store import build_shadow_ledger_summary
 from ..terminal import create_console
 from ..utils import get_logger
 from ..workflow_guard import (
@@ -35,7 +36,7 @@ from ..workflow_guard import (
     require_preview_confirmation,
 )
 from ..workflow_stage_truth import (
-    active_experts_for_stage,
+    applicable_experts_for_stage,
     canonical_stage_for_engine_phase,
     resolve_engine_phase_names,
 )
@@ -370,7 +371,19 @@ class WorkflowEngine:
                 if canonical_name not in canonical_remaining:
                     canonical_remaining.append(canonical_name)
 
-            stage_experts = list(active_experts_for_stage(canonical_current_phase))
+            config = self.config_manager.config
+            shadow_summary = build_shadow_ledger_summary(self.project_dir)
+            changed_surfaces = shadow_summary.get("changed_surfaces", [])
+            if not isinstance(changed_surfaces, list):
+                changed_surfaces = []
+            stage_experts = list(
+                applicable_experts_for_stage(
+                    canonical_current_phase,
+                    changed_surfaces=changed_surfaces,
+                    frontend=config.frontend,
+                    database=config.database,
+                )
+            )
             state = {
                 "current_phase": current_phase,
                 "canonical_phase": canonical_current_phase,

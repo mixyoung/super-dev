@@ -24,6 +24,14 @@ from .artifact_utils import (
 )
 from .baseline_governance import inspect_baseline_governance
 from .config import ConfigManager
+from .delivery_facts import (
+    DeliveryFacts,
+    OperationalOutcome,
+    merge_preserved_post_delivery_facts,
+    normalize_operational_outcomes,
+    normalize_report_delivery_facts,
+    resolve_project_target_version,
+)
 from .deployers.delivery import derive_delivery_applicability
 from .evidence_identity import (
     build_evidence_identity,
@@ -82,11 +90,14 @@ class ProofPackArtifact:
 @dataclass
 class ProofPackReport:
     project_name: str
+    target_version: str = ""
     generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     artifacts: list[ProofPackArtifact] = field(default_factory=list)
     evidence_identity: dict[str, Any] = field(default_factory=dict)
     workflow_context: dict[str, Any] = field(default_factory=dict)
     baseline_governance: dict[str, Any] = field(default_factory=dict)
+    delivery_facts: DeliveryFacts | dict[str, Any] | None = None
+    operational_outcomes: list[OperationalOutcome | dict[str, Any]] = field(default_factory=list)
 
     @property
     def ready_count(self) -> int:
@@ -539,8 +550,10 @@ class ProofPackReport:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        delivery_facts = self._delivery_facts_payload()
         return {
             "project_name": self.project_name,
+            "target_version": self.target_version,
             "generated_at": self.generated_at,
             "status": self.status,
             "ready_count": self.ready_count,
@@ -558,13 +571,32 @@ class ProofPackReport:
             "evidence_identity": dict(self.evidence_identity),
             "workflow_context": dict(self.workflow_context),
             "baseline_governance": dict(self.baseline_governance),
+            "delivery_facts": delivery_facts,
+            "operational_outcomes": [
+                outcome.to_dict()
+                for outcome in normalize_operational_outcomes(self.operational_outcomes)
+            ],
         }
+
+    def _delivery_facts_payload(self) -> dict[str, Any]:
+        evidence = [
+            f"proof pack status={self.status}; ready_artifacts={self.ready_count}/{self.total_count}"
+        ]
+        return normalize_report_delivery_facts(
+            self.delivery_facts,
+            delivery_ready=self.status == "ready",
+            evidence=evidence,
+            source="proof_pack",
+            observed_at=self.generated_at,
+            target_version=self.target_version,
+        ).to_dict()
 
     def to_markdown(self) -> str:
         lines = [
             "# Proof Pack",
             "",
             f"- Project: `{self.project_name}`",
+            f"- Target version: `{self.target_version or 'unknown'}`",
             f"- Generated at (UTC): {self.generated_at}",
             f"- Status: `{self.status}`",
             f"- Ready artifacts: {self.ready_count}/{self.total_count}",
@@ -577,6 +609,28 @@ class ProofPackReport:
             "## Blockers",
             "",
         ]
+        facts = self._delivery_facts_payload()
+        fact_lines = [
+            "## Post-delivery Facts",
+            "",
+            "这些是相互独立的证据事实，不是新阶段，也不能互相推导。",
+            "",
+        ]
+        for name in ("delivery_ready", "released", "deployed", "operating"):
+            fact = facts.get(name, {}) if isinstance(facts, dict) else {}
+            status = fact.get("status", "unknown") if isinstance(fact, dict) else "unknown"
+            fact_lines.append(f"- {name}: `{status}`")
+        fact_lines.append("")
+        outcomes = normalize_operational_outcomes(self.operational_outcomes)
+        if outcomes:
+            fact_lines.extend(["## Operational Outcomes", ""])
+            for outcome in outcomes:
+                fact_lines.append(
+                    f"- [{outcome.confidence}] {outcome.signal or '未命名信号'} "
+                    f"(source={outcome.source or 'unknown'}, version={outcome.target_version or 'unknown'})"
+                )
+            fact_lines.append("")
+        lines[lines.index("## Blockers") : lines.index("## Blockers")] = fact_lines
         if self.workflow_context:
             lines.extend(
                 [
@@ -753,13 +807,29 @@ class ProofPackBuilder:
             fallback_name=self.project_dir.name,
         )
         config = ConfigManager(self.project_dir).load()
+        self.target_version = resolve_project_target_version(
+            self.project_dir, configured_version=str(config.version or "")
+        )
         self.delivery_applicability = derive_delivery_applicability(config)
         self.platform = str(self.delivery_applicability["platform"])
         self.frontend_required = bool(self.delivery_applicability["frontend_required"])
         self.fresh_verification_required = fresh_verification_required(config)
 
     def build(self, verify_tests: bool = False) -> ProofPackReport:
-        report = ProofPackReport(project_name=self.project_name)
+        report = ProofPackReport(
+            project_name=self.project_name,
+            target_version=self.target_version,
+        )
+        previous = load_json_payload(self.output_dir / f"{self.project_name}-proof-pack.json")
+        if not previous:
+            previous = load_json_payload(
+                self.output_dir / f"{self.project_name}-release-readiness.json"
+            )
+        previous_outcomes = previous.get("operational_outcomes", [])
+        if isinstance(previous_outcomes, list):
+            report.operational_outcomes = [
+                item for item in previous_outcomes if isinstance(item, dict)
+            ]
         pipeline_summary = detect_pipeline_summary(self.project_dir)
         report.baseline_governance = inspect_baseline_governance(
             self.project_dir,
@@ -816,6 +886,13 @@ class ProofPackBuilder:
 
         # 新增：治理证据（增量添加，文件不存在则跳过）
         report.artifacts.extend(self._governance_artifacts())
+
+        current_facts = DeliveryFacts.from_dict(report._delivery_facts_payload())
+        preserved_facts = previous.get("delivery_facts", {})
+        report.delivery_facts = merge_preserved_post_delivery_facts(
+            current_facts,
+            preserved_facts if isinstance(preserved_facts, dict) else {},
+        )
 
         return report
 

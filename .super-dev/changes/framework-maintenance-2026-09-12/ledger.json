@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "harness_id": "super-dev",
+  "harness_version": "2.5.1",
+  "change_id": "framework-maintenance-2026-09-12",
+  "intent": "build",
+  "governance_depth": "architectural",
+  "work_mode": "evolve",
+  "shadow_only": true,
+  "stages": [
+    {
+      "stage": "research",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "docs",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "SATISFIED",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "docs_confirm",
+      "kind": "gate",
+      "resolution": "REQUIRE",
+      "status": "SATISFIED",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "spec",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "SATISFIED",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "frontend",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "preview_confirm",
+      "kind": "gate",
+      "resolution": "REQUIRE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "backend",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "quality",
+      "kind": "work_gate",
+      "resolution": "EXECUTE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    },
+    {
+      "stage": "delivery",
+      "kind": "work",
+      "resolution": "EXECUTE",
+      "status": "PENDING",
+      "depth": "none",
+      "reason": "",
+      "decided_by": "",
+      "evidence": [],
+      "invalidation_triggers": []
+    }
+  ],
+  "scope_advisory": {
+    "source": "stage_scope_v1",
+    "generated_at": "2026-09-14T02:29:15.062838+00:00",
+    "scope_complete": true,
+    "changed_surfaces": [
+      "architecture",
+      "authorization",
+      "backend",
+      "data",
+      "product"
+    ],
+    "control_authority": "none",
+    "recommendations": [
+      {
+        "stage": "research",
+        "kind": "work",
+        "recommended_resolution": "NOT_APPLICABLE",
+        "reason": "当前明确范围不涉及该阶段，建议经审批后标记为不适用",
+        "approval_required": true
+      },
+      {
+        "stage": "docs",
+        "kind": "work",
+        "recommended_resolution": "EXECUTE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      },
+      {
+        "stage": "docs_confirm",
+        "kind": "gate",
+        "recommended_resolution": "REQUIRE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      },
+      {
+        "stage": "spec",
+        "kind": "work",
+        "recommended_resolution": "EXECUTE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      },
+      {
+        "stage": "frontend",
+        "kind": "work",
+        "recommended_resolution": "NOT_APPLICABLE",
+        "reason": "当前明确范围不涉及该阶段，建议经审批后标记为不适用",
+        "approval_required": true
+      },
+      {
+        "stage": "preview_confirm",
+        "kind": "gate",
+        "recommended_resolution": "NOT_APPLICABLE",
+        "reason": "当前明确范围不涉及该阶段，建议经审批后标记为不适用",
+        "approval_required": true
+      },
+      {
+        "stage": "backend",
+        "kind": "work",
+        "recommended_resolution": "EXECUTE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      },
+      {
+        "stage": "quality",
+        "kind": "work_gate",
+        "recommended_resolution": "EXECUTE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      },
+      {
+        "stage": "delivery",
+        "kind": "work",
+        "recommended_resolution": "EXECUTE",
+        "reason": "当前改动范围需要保留该阶段",
+        "approval_required": false
+      }
+    ]
+  }
+}

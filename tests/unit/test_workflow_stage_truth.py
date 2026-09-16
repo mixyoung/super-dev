@@ -1,6 +1,10 @@
+import pytest
+
+from super_dev.experts.toolkit import PHASE_EXPERT_MAP
 from super_dev.workflow_contract import CANONICAL_NINE_STAGE_IDS
 from super_dev.workflow_stage_truth import (
     CANONICAL_WORKFLOW_STAGE_CHAIN,
+    WORKFLOW_STAGE_EXPERTS,
     active_experts_for_stage,
     canonical_stage_for_engine_phase,
     normalize_stage_key,
@@ -48,3 +52,36 @@ def test_engine_phase_exposes_canonical_stage_and_experts() -> None:
     assert canonical_stage_for_engine_phase("drafting") == "docs"
     assert canonical_stage_for_engine_phase("redteam") == "quality"
     assert active_experts_for_stage("quality") == ("QA", "SECURITY", "RCA", "PRODUCT")
+
+
+def test_legacy_phase_expert_map_is_readonly_view_of_canonical_truth() -> None:
+    assert dict(PHASE_EXPERT_MAP) == dict(WORKFLOW_STAGE_EXPERTS)
+    with pytest.raises(TypeError):
+        PHASE_EXPERT_MAP["quality"] = ("QA",)  # type: ignore[index]
+
+
+def test_readme_expert_stage_table_matches_canonical_truth() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    for readme_name in ("README.md", "README_EN.md"):
+        readme = (root / readme_name).read_text(encoding="utf-8")
+        for role in (
+            "PRODUCT",
+            "PM",
+            "ARCHITECT",
+            "UI",
+            "UX",
+            "SECURITY",
+            "CODE",
+            "DBA",
+            "QA",
+            "DEVOPS",
+            "RCA",
+        ):
+            expected = ", ".join(
+                stage for stage, experts in WORKFLOW_STAGE_EXPERTS.items() if role in experts
+            )
+            assert any(
+                line.startswith(f"| {role} |") and expected in line for line in readme.splitlines()
+            )

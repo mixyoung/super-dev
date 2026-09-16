@@ -26,7 +26,11 @@ from typing import Any
 import yaml
 
 from ..utils import get_logger
-from ..workflow_contract import knowledge_authority_guidance
+from ..workflow_contract import (
+    ContentKind,
+    build_knowledge_envelope,
+    knowledge_authority_guidance,
+)
 
 # ---------------------------------------------------------------------------
 # 阶段-知识域映射（核心配置）
@@ -138,6 +142,104 @@ _TECH_KEYWORDS: dict[str, list[str]] = {
     "sass": ["sass", "scss"],
 }
 
+_CATEGORY_CONTENT_KINDS: dict[str, ContentKind] = {
+    "01-standards": ContentKind.STANDARD,
+    "02-playbooks": ContentKind.PLAYBOOK,
+    "03-checklists": ContentKind.CHECKLIST,
+    "04-antipatterns": ContentKind.CHECKLIST,
+    "05-cases": ContentKind.CASE,
+    "06-glossary": ContentKind.GLOSSARY,
+}
+
+
+def _content_kind_for(payload: dict[str, Any]) -> ContentKind:
+    explicit = str(payload.get("content_kind", "")).strip().lower()
+    if explicit:
+        try:
+            return ContentKind(explicit)
+        except ValueError:
+            pass
+    return _CATEGORY_CONTENT_KINDS.get(
+        str(payload.get("category", "")).strip().lower(), ContentKind.STANDARD
+    )
+
+
+def _source_content(payload: dict[str, Any], fallback: str) -> str:
+    source_path = Path(str(payload.get("path", "")).strip())
+    if source_path.is_file():
+        try:
+            return source_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            pass
+    return fallback
+
+
+def _attach_knowledge_envelope(
+    payload: dict[str, Any], *, content: str, phase: str
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    existing = normalized.get("envelope")
+    existing_envelope = existing if isinstance(existing, dict) else {}
+    path = (
+        str(normalized.get("path", "")).strip()
+        or str(normalized.get("filename", "unknown")).strip()
+    )
+    reason = str(normalized.get("applicability_reason", "")).strip()
+    if not reason:
+        domain = str(normalized.get("domain", "")).strip() or "通用"
+        reason = f"{phase} 阶段命中 {domain} 知识域"
+    envelope = build_knowledge_envelope(
+        source_path=path,
+        source_kind=str(
+            normalized.get("source_kind", existing_envelope.get("source_kind", "curated"))
+        ).strip()
+        or "curated",
+        content_kind=_content_kind_for(normalized),
+        content=content,
+        source_content=_source_content(normalized, content),
+        applicability_reason=reason,
+        version_or_verified_at=str(
+            normalized.get(
+                "version_or_verified_at",
+                normalized.get("verified_at", existing_envelope.get("version_or_verified_at", "")),
+            )
+        ).strip(),
+        explicit_authority=(
+            str(normalized.get("authority", existing_envelope.get("authority", ""))).strip() or None
+        ),
+        applicability_matched=bool(normalized.get("applicability_matched", True)),
+    )
+    normalized["envelope"] = envelope.to_dict()
+    return normalized
+
+
+def _render_enveloped_content(payload: dict[str, Any], *, content: str, phase: str) -> list[str]:
+    normalized = _attach_knowledge_envelope(payload, content=content, phase=phase)
+    envelope = normalized["envelope"]
+    allowed = ",".join(str(item) for item in envelope.get("allowed_effects", []))
+    forbidden = ",".join(str(item) for item in envelope.get("forbidden_effects", []))
+    reason = " ".join(str(envelope.get("applicability_reason", "")).split()) or "未说明"
+    header = (
+        "KNOWLEDGE_ENVELOPE "
+        f"source={envelope.get('source_path', 'unknown')} "
+        f"source_kind={envelope.get('source_kind', 'curated')} "
+        f"content_kind={envelope.get('content_kind', 'standard')} "
+        f"authority={envelope.get('authority', 'advisory')} "
+        f"applicability={reason} "
+        f"version_or_verified_at={envelope.get('version_or_verified_at') or 'unknown'} "
+        f"allowed={allowed} forbidden={forbidden} "
+        f"content_digest={envelope.get('content_digest', '')} "
+        f"source_digest={envelope.get('source_digest', '')} 无控制权"
+    )
+    digest = str(envelope.get("content_digest", ""))
+    return [
+        header,
+        f"KNOWLEDGE_CONTENT_BEGIN content_digest={digest}",
+        content,
+        f"KNOWLEDGE_CONTENT_END content_digest={digest}",
+    ]
+
+
 # ---------------------------------------------------------------------------
 # 数据模型
 # ---------------------------------------------------------------------------
@@ -208,6 +310,44 @@ class KnowledgePush:
             lines.append(f"> **技术栈过滤**: {self.tech_stack_filter}")
         lines.append("")
 
+        selected_sources = "|".join(
+            str(item.get("path", "")).strip()
+            for item in self.files
+            if str(item.get("path", "")).strip()
+        )
+        source_kinds = {
+            str(
+                (
+                    item.get("envelope", {}).get("source_kind", "")
+                    if isinstance(item.get("envelope"), dict)
+                    else ""
+                )
+                or item.get("source_kind", "curated")
+            ).strip()
+            for item in self.files
+        }
+        if source_kinds == {"project"}:
+            derived_source_kind = "project"
+        elif source_kinds and source_kinds <= {"curated", "project"}:
+            derived_source_kind = "curated"
+        else:
+            derived_source_kind = "external"
+        selected_authorities = {
+            str(item.get("envelope", {}).get("authority", ""))
+            for item in self.files
+            if isinstance(item.get("envelope"), dict)
+        }
+        derived_authority = "advisory" if "advisory" in selected_authorities else ""
+
+        def snippet_payload(kind: str) -> dict[str, Any]:
+            return {
+                "path": selected_sources or "derived:selected-knowledge",
+                "source_kind": derived_source_kind,
+                "content_kind": kind,
+                "authority": derived_authority,
+                "applicability_reason": f"{self.phase} 阶段从已选知识派生",
+            }
+
         # 约束清单
         lines.append(knowledge_authority_guidance())
         lines.append(
@@ -221,7 +361,12 @@ class KnowledgePush:
             )
             lines.append("")
             for i, c in enumerate(self.constraints, 1):
-                lines.append(f"{i}. {c}")
+                lines.append(f"{i}.")
+                lines.extend(
+                    _render_enveloped_content(
+                        snippet_payload("checklist"), content=c, phase=self.phase
+                    )
+                )
             lines.append("")
 
         # 反模式
@@ -231,7 +376,12 @@ class KnowledgePush:
             lines.append("按当前技术栈与实际场景核对以下常见问题，不将案例全部转为必做任务：")
             lines.append("")
             for i, a in enumerate(self.antipatterns, 1):
-                lines.append(f"{i}. ❌ {a}")
+                lines.append(f"{i}.")
+                lines.extend(
+                    _render_enveloped_content(
+                        snippet_payload("checklist"), content=a, phase=self.phase
+                    )
+                )
             lines.append("")
 
         # 知识来源
@@ -246,12 +396,10 @@ class KnowledgePush:
                 title = f.get("title", f.get("filename", ""))
                 lines.append(f"- [{domain}/{category}] **{title}** {stars}")
                 excerpt = f.get("excerpt", "")
-                if excerpt:
-                    # 截取前 120 字符
-                    short = excerpt[:120].replace("\n", " ").strip()
-                    if len(excerpt) > 120:
-                        short += "..."
-                    lines.append(f"  > {short}")
+                short = excerpt[:120].replace("\n", " ").strip()
+                if len(excerpt) > 120:
+                    short += "..."
+                lines.extend(_render_enveloped_content(f, content=short, phase=self.phase))
             lines.append("")
 
         lines.append("---")
@@ -361,11 +509,10 @@ class LayeredKnowledgePush:
                 domain = f.get("domain", "")
                 priority = f.get("priority", "")
                 lines.append(f"- **{title}** [{domain}] (priority={priority})")
-                if summary:
-                    short = summary[:150].replace("\n", " ").strip()
-                    if len(summary) > 150:
-                        short += "..."
-                    lines.append(f"  > {short}")
+                short = summary[:150].replace("\n", " ").strip()
+                if len(summary) > 150:
+                    short += "..."
+                lines.extend(_render_enveloped_content(f, content=short, phase=self.phase))
             lines.append("")
 
         # L2: 详情层
@@ -379,9 +526,8 @@ class LayeredKnowledgePush:
                 tag = " (compressed)" if compressed else ""
                 lines.append(f"#### {title}{tag}")
                 lines.append("")
-                if content:
-                    lines.append(content)
-                    lines.append("")
+                lines.extend(_render_enveloped_content(f, content=content, phase=self.phase))
+                lines.append("")
 
         # L3: 深度引用
         if self.l3_references:
@@ -518,7 +664,7 @@ class KnowledgePusher:
         selected = candidates[:max_files]
 
         # 6. 转为 dict 列表并提取摘要
-        file_dicts = self._to_file_dicts(selected)
+        file_dicts = self._to_file_dicts(selected, phase=phase)
 
         # 7. 提取约束和反模式
         constraints = self._extract_constraints(selected)
@@ -653,7 +799,7 @@ class KnowledgePusher:
         l1_tokens = 0
         for entry in entries:
             summary_tokens = self._estimate_tokens(f"{entry.title}: {entry.summary}")
-            l1_index.append(
+            l1_payload = _attach_knowledge_envelope(
                 {
                     "path": entry.path,
                     "filename": entry.filename,
@@ -668,8 +814,11 @@ class KnowledgePusher:
                     "token_budget": entry.token_budget,
                     "related": entry.related,
                     "summary_tokens": summary_tokens,
-                }
+                },
+                content=entry.summary,
+                phase=phase,
             )
+            l1_index.append(l1_payload)
             l1_tokens += summary_tokens
 
         # Step 6: L2 详情层 — 最相关文件全文，填满剩余 token 预算
@@ -691,15 +840,19 @@ class KnowledgePusher:
             if remaining_budget >= file_tokens:
                 # 全文放入
                 l2_details.append(
-                    {
-                        "path": entry.path,
-                        "filename": entry.filename,
-                        "title": entry.title,
-                        "domain": entry.domain,
-                        "content": full_content,
-                        "tokens": file_tokens,
-                        "compressed": False,
-                    }
+                    _attach_knowledge_envelope(
+                        {
+                            "path": entry.path,
+                            "filename": entry.filename,
+                            "title": entry.title,
+                            "domain": entry.domain,
+                            "content": full_content,
+                            "tokens": file_tokens,
+                            "compressed": False,
+                        },
+                        content=full_content,
+                        phase=phase,
+                    )
                 )
                 remaining_budget -= file_tokens
                 l2_tokens += file_tokens
@@ -708,15 +861,19 @@ class KnowledgePusher:
                 compressed = self._compress(full_content, remaining_budget)
                 compressed_tokens = self._estimate_tokens(compressed)
                 l2_details.append(
-                    {
-                        "path": entry.path,
-                        "filename": entry.filename,
-                        "title": entry.title,
-                        "domain": entry.domain,
-                        "content": compressed,
-                        "tokens": compressed_tokens,
-                        "compressed": True,
-                    }
+                    _attach_knowledge_envelope(
+                        {
+                            "path": entry.path,
+                            "filename": entry.filename,
+                            "title": entry.title,
+                            "domain": entry.domain,
+                            "content": compressed,
+                            "tokens": compressed_tokens,
+                            "compressed": True,
+                        },
+                        content=compressed,
+                        phase=phase,
+                    )
                 )
                 remaining_budget -= compressed_tokens
                 l2_tokens += compressed_tokens
@@ -1400,24 +1557,37 @@ class KnowledgePusher:
     # 文件 dict 转换
     # ------------------------------------------------------------------
 
-    def _to_file_dicts(self, files: list[KnowledgeFileInfo]) -> list[dict[str, Any]]:
+    def _to_file_dicts(
+        self, files: list[KnowledgeFileInfo], *, phase: str = ""
+    ) -> list[dict[str, Any]]:
         """将 KnowledgeFileInfo 转为 dict 列表，附带摘要"""
         result: list[dict[str, Any]] = []
         for info in files:
             excerpt = self._extract_excerpt(Path(info.path))
             # 计算粗略 relevance 分数 (0-1)
             relevance = min(1.0, (info.size / 50000) + 0.3) if info.size > 0 else 0.3
+            frontmatter = self._parse_frontmatter(info.path)
             result.append(
-                {
-                    "path": info.path,
-                    "filename": info.filename,
-                    "domain": info.domain,
-                    "category": info.category,
-                    "title": info.title,
-                    "relevance": round(relevance, 2),
-                    "excerpt": excerpt,
-                    "tags": info.tags,
-                }
+                _attach_knowledge_envelope(
+                    {
+                        "path": info.path,
+                        "filename": info.filename,
+                        "domain": info.domain,
+                        "category": info.category,
+                        "title": info.title,
+                        "relevance": round(relevance, 2),
+                        "excerpt": excerpt,
+                        "tags": info.tags,
+                        "source_kind": frontmatter.get("source_kind", "curated"),
+                        "content_kind": frontmatter.get("content_kind", ""),
+                        "authority": frontmatter.get("authority", ""),
+                        "version_or_verified_at": frontmatter.get(
+                            "version", frontmatter.get("verified_at", "")
+                        ),
+                    },
+                    content=excerpt,
+                    phase=phase or "unknown",
+                )
             )
         return result
 

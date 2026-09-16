@@ -21,6 +21,10 @@ _RUNTIME_CACHE_PATHS = (
     ".super-dev/knowledge-stats.db-wal",
     ".super-dev/knowledge-stats.db-shm",
 )
+_CANDIDATE_EXCLUDED_PATHS = (
+    *_RUNTIME_CACHE_PATHS,
+    ".claude/settings.local.json",
+)
 
 
 def _sha256(value: bytes) -> str:
@@ -37,7 +41,14 @@ def _canonical_digest(payload: dict[str, Any]) -> str:
 
 def _git_bytes(project_dir: Path, *args: str) -> bytes | None:
     completed = subprocess.run(  # nosec B603
-        ["git", "-c", "core.quotepath=false", *args],
+        [
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "-c",
+            "core.excludesFile=",
+            *args,
+        ],
         cwd=str(project_dir),
         check=False,
         capture_output=True,
@@ -66,7 +77,7 @@ def _filesystem_snapshot_digest(project: Path, file_manifest: dict[str, str] | N
         key=lambda item: item.relative_to(project).as_posix(),
     ):
         label = path.relative_to(project).as_posix()
-        if label in _RUNTIME_CACHE_PATHS:
+        if label in _CANDIDATE_EXCLUDED_PATHS:
             continue
         resolved = path.resolve(strict=False)
         if any(root == resolved or root in resolved.parents for root in excluded_roots):
@@ -112,7 +123,7 @@ def build_candidate_identity(
     excluded_paths = (
         ":!.super-dev/extensions",
         ":!output",
-        *(f":!{path}" for path in _RUNTIME_CACHE_PATHS),
+        *(f":!{path}" for path in _CANDIDATE_EXCLUDED_PATHS),
     )
 
     if head_sha:

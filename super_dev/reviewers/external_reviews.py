@@ -8,10 +8,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from ..artifact_utils import resolve_work_item_identity
+from ..config import ConfigManager
+from ..delivery_facts import resolve_project_target_version
+from ..experts.review_protocol import ReviewExecutionEvidence
+from ..extensions.evidence import build_candidate_identity
 
 _logger = logging.getLogger("super_dev.reviewers.external_reviews")
 
@@ -28,6 +35,11 @@ class ExternalReviewResult:
     summary: str
     details: list[dict] = field(default_factory=list)  # 具体问题列表
     raw_path: str = ""  # 原始文件路径
+    review_execution: ReviewExecutionEvidence | None = None
+
+    @property
+    def independence(self) -> str:
+        return self.review_execution.classification if self.review_execution else "unverified"
 
 
 class ExternalReviewCollector:
@@ -40,9 +52,90 @@ class ExternalReviewCollector:
     - 自定义: output/external-reviews/*.json
     """
 
-    def __init__(self, project_dir: Path) -> None:
+    def __init__(
+        self,
+        project_dir: Path,
+        *,
+        attested_review_files: dict[str, str] | None = None,
+        high_risk: bool = False,
+        residual_risk_accepted: bool = False,
+    ) -> None:
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
+        self.attested_review_files = {
+            str(session_id).strip(): str(digest).strip().lower().removeprefix("sha256:")
+            for session_id, digest in (attested_review_files or {}).items()
+            if str(session_id).strip() and str(digest).strip()
+        }
+        identity = resolve_work_item_identity(self.project_dir)
+        self.current_work_item_id = identity.work_item_id if identity.valid else ""
+        config = ConfigManager(self.project_dir).load()
+        self.current_target_version = resolve_project_target_version(
+            self.project_dir, configured_version=str(config.version or "")
+        )
+        self.current_candidate_digest = build_candidate_identity(self.project_dir).candidate_digest
+        self.high_risk = high_risk
+        self.residual_risk_accepted = residual_risk_accepted
+
+    def _review_execution(self, data: dict, *, path: Path) -> ReviewExecutionEvidence | None:
+        payload = data.get("review_execution", data.get("review_independence", {}))
+        if not isinstance(payload, dict) or not payload:
+            return None
+        review_session_id = str(payload.get("review_session_id", "")).strip()
+        work_item_id = str(payload.get("work_item_id", "")).strip()
+        target_version = str(payload.get("target_version", "")).strip()
+        candidate_digest = str(payload.get("candidate_digest", "")).strip()
+        try:
+            review_file_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            review_file_digest = ""
+        attested_digest = self.attested_review_files.get(review_session_id, "")
+        binding_matches = bool(
+            review_session_id
+            and attested_digest
+            and review_file_digest == attested_digest
+            and work_item_id
+            and work_item_id == self.current_work_item_id
+            and target_version
+            and target_version == self.current_target_version
+            and candidate_digest
+            and candidate_digest == self.current_candidate_digest
+        )
+        readonly_scope = payload.get("readonly_scope", ())
+        tool_evidence = payload.get("tool_evidence", ())
+        return ReviewExecutionEvidence(
+            review_session_id=review_session_id,
+            producer_session_id=str(payload.get("producer_session_id", "")),
+            model=str(payload.get("model", "")),
+            provider=str(payload.get("provider", "")),
+            readonly_scope=tuple(
+                str(item)
+                for item in (readonly_scope if isinstance(readonly_scope, list | tuple) else ())
+                if str(item).strip()
+            ),
+            tool_evidence=tuple(
+                str(item)
+                for item in (tool_evidence if isinstance(tool_evidence, list | tuple) else ())
+                if str(item).strip()
+            ),
+            file_change_evidence=str(payload.get("file_change_evidence", "")),
+            work_item_id=work_item_id,
+            target_version=target_version,
+            candidate_digest=candidate_digest,
+            host_attested=binding_matches,
+            attestation_evidence=(
+                "caller-attested review file digest and current work item/version/candidate match"
+                if binding_matches
+                else "self-reported review metadata is not caller-attested for the current candidate"
+            ),
+            reviewer_model_family=str(payload.get("reviewer_model_family", "")),
+            producer_model_family=str(payload.get("producer_model_family", "")),
+            different_model_family_available=bool(
+                payload.get("different_model_family_available", False)
+            ),
+            high_risk=self.high_risk,
+            residual_risk_accepted=self.residual_risk_accepted,
+        )
 
     def collect_all(self) -> list[ExternalReviewResult]:
         """收集所有外部审查结果"""
@@ -96,6 +189,7 @@ class ExternalReviewCollector:
                 summary=data.get("summary", f"CodeRabbit: {len(issues)} issues found"),
                 details=issues,
                 raw_path=str(path),
+                review_execution=self._review_execution(data, path=path),
             )
         except (json.JSONDecodeError, TypeError, KeyError) as exc:
             _logger.warning("Failed to parse CodeRabbit file %s: %s", path, exc)
@@ -148,6 +242,7 @@ class ExternalReviewCollector:
                 summary=data.get("summary", f"Qodo: {len(issues)} issues found"),
                 details=issues,
                 raw_path=str(path),
+                review_execution=self._review_execution(data, path=path),
             )
         except (json.JSONDecodeError, TypeError, KeyError) as exc:
             _logger.warning("Failed to parse Qodo file %s: %s", path, exc)
@@ -205,6 +300,7 @@ class ExternalReviewCollector:
                 ),
                 details=comments,
                 raw_path=str(path),
+                review_execution=self._review_execution(data, path=path),
             )
         except (json.JSONDecodeError, TypeError, KeyError) as exc:
             _logger.warning("Failed to parse GitHub PR file %s: %s", path, exc)
@@ -252,6 +348,7 @@ class ExternalReviewCollector:
                         summary=data.get("summary", f"{source}: {issues_count} issues"),
                         details=data.get("details", []),
                         raw_path=str(path),
+                        review_execution=self._review_execution(data, path=path),
                     )
                 )
             except (json.JSONDecodeError, TypeError, KeyError) as exc:
@@ -269,8 +366,8 @@ class ExternalReviewCollector:
             "",
             f"Total sources: {len(results)}",
             "",
-            "| Source | Status | Score | Issues | Critical |",
-            "|--------|--------|-------|--------|----------|",
+            "| Source | Status | Independence | Score | Issues | Critical |",
+            "|--------|--------|--------------|-------|--------|----------|",
         ]
 
         total_issues = 0
@@ -280,7 +377,7 @@ class ExternalReviewCollector:
         for r in results:
             status = "PASSED" if r.passed else "FAILED"
             lines.append(
-                f"| {r.source} | {status} | {r.score}/100 "
+                f"| {r.source} | {status} | {r.independence} | {r.score}/100 "
                 f"| {r.issues_count} | {r.critical_count} |"
             )
             total_issues += r.issues_count

@@ -10,6 +10,7 @@ Spec 构建器 - 自动创建 Spec 规范
 from pathlib import Path
 
 from .. import __version__
+from ..artifact_utils import resolve_work_item_identity
 from ..config import ConfigManager
 from ..shadow_ledger_lifecycle import (
     ShadowLedgerCreationResult,
@@ -19,7 +20,12 @@ from ..shadow_ledger_lifecycle import (
 )
 from ..specs import ChangeManager, SpecGenerator, SpecManager
 from ..specs.models import DeltaType, Task, TaskStatus
-from ..workflow_guard import docs_gate_status, require_docs_confirmation
+from ..work_item_identity import bind_standard_work_item
+from ..workflow_guard import (
+    docs_gate_status,
+    require_docs_confirmation,
+    require_spec_work_item_binding,
+)
 from .requirement_parser import RequirementParser
 
 
@@ -60,8 +66,14 @@ class SpecBuilder:
         if scenario is None:
             scenario = self.requirement_parser.detect_scenario(self.project_dir)
 
-        # 生成变更 ID (从项目名称转换)
-        change_id = self.name.replace("_", "-").lower()
+        # An explicit standard work-item identity is canonical and may be case-sensitive.
+        identity = resolve_work_item_identity(self.project_dir)
+        change_id = (
+            identity.work_item_id
+            if not identity.legacy and identity.valid and identity.work_item_id
+            else self.name.replace("_", "-").lower()
+        )
+        require_spec_work_item_binding(self.project_dir, change_id)
 
         # 1. 创建变更提案
         self.spec_generator.create_change(
@@ -85,6 +97,7 @@ class SpecBuilder:
 
         # 3. 自动生成任务
         self._generate_tasks_for_change(change_id, tech_stack, scenario)
+        bind_standard_work_item(self.project_dir, change_id)
 
         try:
             config = ConfigManager(self.project_dir).config

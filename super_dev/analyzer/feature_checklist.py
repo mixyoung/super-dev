@@ -181,7 +181,10 @@ class FeatureChecklistBuilder:
 
         features = self._extract_prd_features(prd_path)
         task_states = self._extract_task_states(task_path)
-        explicit_gaps = self._extract_explicit_gaps(markdown_sources)
+        explicit_gaps = self._extract_explicit_gaps(
+            markdown_sources,
+            task_states=task_states,
+        )
 
         items = self._merge_feature_states(features, task_states, explicit_gaps)
         covered_count = sum(1 for item in items if item.status == "covered")
@@ -331,7 +334,12 @@ class FeatureChecklistBuilder:
             states.append((status, title))
         return states
 
-    def _extract_explicit_gaps(self, markdown_sources: list[Path]) -> list[FeatureChecklistItem]:
+    def _extract_explicit_gaps(
+        self,
+        markdown_sources: list[Path],
+        *,
+        task_states: list[tuple[str, str]],
+    ) -> list[FeatureChecklistItem]:
         items: list[FeatureChecklistItem] = []
         seen: set[tuple[str, str]] = set()
         for file_path in markdown_sources:
@@ -349,12 +357,20 @@ class FeatureChecklistBuilder:
                     )
                     continue
                 priority_match = PRIORITY_PATTERN.search(line)
-                has_gap_keyword = any(keyword in line.lower() for keyword in GAP_KEYWORDS) or bool(
-                    priority_match
-                )
-                if not in_gap_section and not priority_match:
-                    continue
-                if not has_gap_keyword:
+                has_gap_keyword = any(keyword in line.lower() for keyword in GAP_KEYWORDS)
+                if not in_gap_section and not has_gap_keyword:
+                    candidate_title = self._extract_gap_title(line)
+                    linked_task_status = next(
+                        (
+                            status
+                            for status, task_title in task_states
+                            if self._is_related(candidate_title, task_title)
+                        ),
+                        "",
+                    )
+                    if not priority_match or linked_task_status != "planned":
+                        continue
+                if not has_gap_keyword and not priority_match:
                     continue
                 candidate = self._extract_gap_title(line)
                 if not candidate:

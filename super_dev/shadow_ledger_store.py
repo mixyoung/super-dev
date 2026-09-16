@@ -10,6 +10,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Any
 
+from .artifact_utils import resolve_active_change_id
 from .change_ledger import ChangeLedger, ChangeLedgerError, StageResolution, StageStatus
 
 MAX_LEDGER_BYTES = 1_000_000
@@ -43,6 +44,7 @@ class ShadowLedgerSummary:
     status_counts: dict[str, int] = field(default_factory=dict)
     scope_advisory_present: bool = False
     scope_complete: bool = False
+    changed_surfaces: list[str] = field(default_factory=list)
     recommended_resolution_counts: dict[str, int] = field(default_factory=dict)
     recommended_reduction_count: int = 0
     approval_required_count: int = 0
@@ -66,6 +68,7 @@ class ShadowLedgerSummary:
             "status_counts": dict(self.status_counts),
             "scope_advisory_present": self.scope_advisory_present,
             "scope_complete": self.scope_complete,
+            "changed_surfaces": list(self.changed_surfaces),
             "recommended_resolution_counts": dict(self.recommended_resolution_counts),
             "recommended_reduction_count": self.recommended_reduction_count,
             "approval_required_count": self.approval_required_count,
@@ -181,7 +184,21 @@ def build_shadow_ledger_summary(project_dir: Path) -> dict[str, Any]:
             summary.summary = f"只读观察不可用：{len(errors)}个账本未通过校验"
         return summary.to_dict()
 
-    active = max(records, key=lambda item: (item.modified_at, item.path.as_posix()))
+    active_change_id = resolve_active_change_id(project_dir)
+    if not active_change_id:
+        summary.summary = (
+            f"检测到{len(records)}个只读影子账本，但没有显式绑定的当前 change；未选择当前账本"
+        )
+        return summary.to_dict()
+    active = next(
+        (record for record in records if record.ledger.change_id == active_change_id),
+        None,
+    )
+    if active is None:
+        summary.summary = (
+            f"当前 change 为 {active_change_id}，但没有找到其有效影子账本；未选择其他账本"
+        )
+        return summary.to_dict()
     resolution_counts = Counter(entry.resolution.value for entry in active.ledger.stages)
     status_counts = Counter(entry.status.value for entry in active.ledger.stages)
     summary.active_change_id = active.ledger.change_id
@@ -216,6 +233,7 @@ def build_shadow_ledger_summary(project_dir: Path) -> dict[str, Any]:
         approval_count = sum(item.approval_required for item in advisory.recommendations)
         summary.scope_advisory_present = True
         summary.scope_complete = advisory.scope_complete
+        summary.changed_surfaces = list(advisory.changed_surfaces)
         summary.recommended_resolution_counts = dict(sorted(recommended_counts.items()))
         summary.recommended_reduction_count = reduction_count
         summary.approval_required_count = approval_count

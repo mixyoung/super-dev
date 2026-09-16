@@ -14,10 +14,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 
 from ..orchestrator.experts import ExpertRole
+from ..workflow_stage_truth import WORKFLOW_STAGE_EXPERTS
 
 # ===================================================================
 # Layer 2: Knowledge
@@ -274,15 +277,9 @@ class ExpertToolkit:
 # 阶段 → 专家映射（保留旧版常量供下游引用）
 # ===================================================================
 
-PHASE_EXPERT_MAP: dict[str, list[str]] = {
-    "research": ["PRODUCT", "PM", "ARCHITECT"],
-    "docs": ["PM", "ARCHITECT", "UI", "UX", "SECURITY"],
-    "spec": ["PM", "ARCHITECT", "CODE", "DBA"],
-    "frontend": ["UI", "UX", "CODE", "SECURITY"],
-    "backend": ["ARCHITECT", "CODE", "DBA", "SECURITY"],
-    "quality": ["QA", "SECURITY", "DEVOPS"],
-    "delivery": ["DEVOPS", "QA", "RCA"],
-}
+PHASE_EXPERT_MAP: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {stage: tuple(experts) for stage, experts in WORKFLOW_STAGE_EXPERTS.items()}
+)
 
 
 # ===================================================================
@@ -1095,7 +1092,7 @@ def get_active_toolkits_for_phase(phase: str) -> dict[str, ExpertToolkit]:
     Returns:
         ``{role: toolkit}`` 字典。
     """
-    expert_ids = PHASE_EXPERT_MAP.get(phase, [])
+    expert_ids: tuple[str, ...] = PHASE_EXPERT_MAP.get(phase, ())
     if expert_ids:
         return {eid: _EXPERT_TOOLKITS[eid] for eid in expert_ids if eid in _EXPERT_TOOLKITS}
     # 回退：有 phase_prompts 条目的专家视为该阶段激活

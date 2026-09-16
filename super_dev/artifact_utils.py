@@ -4,8 +4,10 @@ import hashlib
 import json
 import re
 import subprocess
+import unicodedata
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +41,7 @@ CORE_ARTIFACT_SUFFIXES: tuple[str, ...] = (
     "-uiux.md",
 )
 
-_CHANGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$")
+_CHANGE_ID_PATTERN = re.compile(r"^[^\W_](?:[\w.-]{0,126}[^\W_])?$", re.UNICODE)
 _CHANGE_BRANCH_PREFIXES = {
     "bugfix",
     "chore",
@@ -53,9 +55,22 @@ _CHANGE_BRANCH_PREFIXES = {
     "test",
 }
 
+WORK_ITEM_IDENTITY_SCHEMA_VERSION = 2
+
+
+@dataclass(frozen=True)
+class WorkItemIdentity:
+    work_item_id: str
+    artifact_prefix: str
+    active_change_id: str
+    binding_status: str
+    legacy: bool
+    valid: bool
+    issues: tuple[str, ...] = ()
+
 
 def sanitize_artifact_name(name: str) -> str:
-    raw = str(name).strip()
+    raw = unicodedata.normalize("NFKC", str(name)).strip()
     if not raw:
         return ""
     value = raw.lower()
@@ -101,10 +116,8 @@ def _nested_values_for_key(payload: Any, key: str) -> Iterator[Any]:
 
 
 def _validated_change_id(project_dir: Path, value: Any) -> str:
-    if not isinstance(value, str):
-        return ""
-    change_id = value.strip()
-    if not change_id or not _CHANGE_ID_PATTERN.fullmatch(change_id):
+    change_id = normalize_work_item_id(value)
+    if not change_id:
         return ""
 
     changes_root = (Path(project_dir).resolve() / ".super-dev" / "changes").resolve()
@@ -116,6 +129,91 @@ def _validated_change_id(project_dir: Path, value: Any) -> str:
     if not change_dir.is_dir():
         return ""
     return change_dir.name
+
+
+def _valid_identity_text(value: Any) -> str:
+    return normalize_work_item_id(value)
+
+
+def normalize_work_item_id(value: Any) -> str:
+    """Return the single NFKC identity form accepted by change and work-item readers."""
+
+    if not isinstance(value, str):
+        return ""
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    if not normalized or not _CHANGE_ID_PATTERN.fullmatch(normalized):
+        return ""
+    return normalized
+
+
+def _load_workflow_identity_payload(project_dir: Path) -> dict[str, Any]:
+    state_path = Path(project_dir).resolve() / ".super-dev" / "workflow-state.json"
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def resolve_work_item_identity(project_dir: Path) -> WorkItemIdentity:
+    """Read the standard-flow identity without selecting by age or directory order."""
+
+    project_path = Path(project_dir).resolve()
+    payload = _load_workflow_identity_payload(project_path)
+    explicit_work_item = (
+        "work_item_id" in payload
+        and str(payload.get("flow_variant", "standard")).strip().lower() != "seeai"
+    )
+    raw_work_item = payload.get("work_item_id", "")
+    work_item_id = _valid_identity_text(raw_work_item)
+    raw_active = payload.get("active_change_id", payload.get("change_id", ""))
+    active_text = _valid_identity_text(raw_active)
+
+    if not explicit_work_item:
+        legacy_change = _validated_change_id(project_path, active_text)
+        legacy_prefix = sanitize_artifact_name(legacy_change or payload.get("artifact_prefix", ""))
+        return WorkItemIdentity(
+            work_item_id=legacy_change,
+            artifact_prefix=legacy_prefix,
+            active_change_id=legacy_change,
+            binding_status="bound" if legacy_change else "",
+            legacy=True,
+            valid=True,
+        )
+
+    issues: list[str] = []
+    if not work_item_id:
+        issues.append("invalid_work_item_id")
+    expected_prefix = sanitize_artifact_name(work_item_id)
+    stored_prefix = str(payload.get("artifact_prefix", "")).strip()
+    if stored_prefix and stored_prefix != expected_prefix:
+        issues.append("artifact_prefix_mismatch")
+
+    binding_status = str(payload.get("binding_status", "")).strip().lower()
+    if not binding_status:
+        binding_status = "bound" if active_text else "pre_spec"
+    if binding_status not in {"pre_spec", "bound"}:
+        issues.append("invalid_binding_status")
+    if binding_status == "pre_spec" and active_text:
+        issues.append("pre_spec_has_active_change")
+    if binding_status == "bound" and active_text != work_item_id:
+        issues.append("active_change_mismatch")
+
+    validated_active = ""
+    if binding_status == "bound" and active_text == work_item_id:
+        validated_active = _validated_change_id(project_path, active_text)
+        if not validated_active:
+            issues.append("bound_change_missing")
+
+    return WorkItemIdentity(
+        work_item_id=work_item_id,
+        artifact_prefix=expected_prefix,
+        active_change_id=validated_active,
+        binding_status=binding_status,
+        legacy=False,
+        valid=not issues,
+        issues=tuple(issues),
+    )
 
 
 def _current_git_branch(project_dir: Path) -> str:
@@ -138,13 +236,15 @@ def resolve_active_change_id(project_dir: Path) -> str:
     """Resolve the active change only from explicit workflow or Git evidence."""
 
     project_path = Path(project_dir).resolve()
-    workflow_state_path = project_path / ".super-dev" / "workflow-state.json"
-    try:
-        workflow_payload = json.loads(workflow_state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeError):
-        workflow_payload = {}
+    workflow_payload = _load_workflow_identity_payload(project_path)
 
     if isinstance(workflow_payload, dict):
+        if (
+            "work_item_id" in workflow_payload
+            and str(workflow_payload.get("flow_variant", "standard")).strip().lower() != "seeai"
+        ):
+            identity = resolve_work_item_identity(project_path)
+            return identity.active_change_id if identity.valid else ""
         for key in ("active_change_id", "change_id"):
             for value in _nested_values_for_key(workflow_payload, key):
                 change_id = _validated_change_id(project_path, value)
@@ -173,6 +273,9 @@ def resolve_project_artifact_prefix(
     fallback_name: str = "",
 ) -> str:
     project_path = Path(project_dir).resolve()
+    identity = resolve_work_item_identity(project_path)
+    if not identity.legacy and identity.work_item_id:
+        return identity.artifact_prefix
     output_dir = project_path / "output"
     configured = sanitize_artifact_name(configured_name)
     fallback = sanitize_artifact_name(fallback_name or project_path.name)
@@ -220,6 +323,10 @@ def resolve_current_artifact_prefix(
     """Prefer the active change prefix when it owns at least one core artifact."""
 
     project_path = Path(project_dir).resolve()
+    identity = resolve_work_item_identity(project_path)
+    if not identity.legacy and identity.work_item_id:
+        # A pre-Spec work item intentionally shadows every old active change and proof pack.
+        return identity.artifact_prefix
     active_change_id = resolve_active_change_id(project_path)
     active_prefix = sanitize_artifact_name(active_change_id)
     output_dir = project_path / "output"

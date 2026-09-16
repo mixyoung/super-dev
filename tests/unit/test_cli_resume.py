@@ -5,6 +5,7 @@ import super_dev.cli_workflow_runtime_mixin as workflow_runtime
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
+from super_dev.review_state import save_workflow_state
 from super_dev.scope_advisory import build_scope_advisory
 
 
@@ -302,6 +303,7 @@ def test_run_status_json_exposes_shadow_ledger_as_read_only_observation(
         json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    save_workflow_state(temp_project_dir, {"active_change_id": "cli-ledger"})
 
     code = cli._cmd_run_status(type("Args", (), {"json": True})())
 
@@ -329,6 +331,7 @@ def test_finalized_next_step_payload_includes_shadow_ledger(temp_project_dir, mo
         json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    save_workflow_state(temp_project_dir, {"active_change_id": "next-ledger"})
     monkeypatch.setattr(cli, "_preferred_host_target_for_project", lambda _path: "codex-cli")
     monkeypatch.setattr(cli, "_project_has_super_dev_context", lambda _path: True)
     monkeypatch.setattr(cli, "_build_host_continue_instruction", lambda **_kwargs: "continue")

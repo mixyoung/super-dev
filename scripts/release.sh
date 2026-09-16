@@ -14,6 +14,11 @@ else
     exit 1
 fi
 
+USE_UV=0
+if command -v uv >/dev/null 2>&1 && [[ -f "$ROOT_DIR/uv.lock" ]]; then
+    USE_UV=1
+fi
+
 REPOSITORY="github"
 RELEASE_GITHUB_REPO="mixyoung/super-dev"
 ALLOW_DIRTY=0
@@ -164,8 +169,13 @@ elif [[ "$REPOSITORY" == "github" ]]; then
         if [[ "$SKIP_BENCHMARK" -eq 1 ]]; then PREFLIGHT_ARGS+=("--skip-benchmark"); fi
         "${PREFLIGHT_ARGS[@]}"
     fi
-    "$PYTHON_BIN" -m build
-    "$PYTHON_BIN" -m twine check "$WHEEL_PATH" "$SDIST_PATH"
+    if [[ "$USE_UV" -eq 1 ]]; then
+        uv build
+        uvx twine check "$WHEEL_PATH" "$SDIST_PATH"
+    else
+        "$PYTHON_BIN" -m build
+        "$PYTHON_BIN" -m twine check "$WHEEL_PATH" "$SDIST_PATH"
+    fi
 else
     PUBLISH_ARGS=("./scripts/publish.sh" "--repository" "$REPOSITORY")
     if [[ "$ALLOW_DIRTY" -eq 1 ]]; then

@@ -6,7 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .artifact_utils import resolve_active_change_id, sanitize_artifact_name
+from .artifact_utils import (
+    resolve_active_change_id,
+    resolve_work_item_identity,
+    sanitize_artifact_name,
+)
+from .atomic_io import atomic_write_text
 from .review_state import (
     load_docs_confirmation,
     load_preview_confirmation,
@@ -14,6 +19,7 @@ from .review_state import (
     save_docs_confirmation,
     save_preview_confirmation,
 )
+from .workflow_contract import ContentEffect, ControlSource, ensure_control_effect_allowed
 from .workflow_stage_truth import (
     active_experts_for_stage,
     normalize_stage_key,
@@ -80,7 +86,7 @@ def save_stage_ledger(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
     file_path = stage_ledger_file(project_dir)
-    file_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(file_path, json.dumps(payload, ensure_ascii=False, indent=2))
     return file_path
 
 
@@ -124,8 +130,10 @@ def _artifact_binding(
     stage: str,
     patterns: tuple[str, ...],
     active_change_id: str = "",
+    work_item_id: str = "",
+    binding_status: str = "",
 ) -> dict[str, Any]:
-    artifact_prefix = sanitize_artifact_name(active_change_id)
+    artifact_prefix = sanitize_artifact_name(work_item_id or active_change_id)
     files = _artifact_files(project_dir, patterns, artifact_prefix=artifact_prefix)
     return {
         "stage": stage,
@@ -133,26 +141,27 @@ def _artifact_binding(
         "files": [str(path) for path in files],
         "digest": _binding_digest(files) if files else "",
         "generated_at": _utc_now(),
-        **(
-            {
-                "active_change_id": active_change_id,
-                "artifact_prefix": artifact_prefix,
-            }
-            if active_change_id
-            else {}
-        ),
+        **({"active_change_id": active_change_id} if active_change_id else {}),
+        **({"work_item_id": work_item_id} if work_item_id else {}),
+        **({"binding_status": binding_status} if binding_status else {}),
+        **({"artifact_prefix": artifact_prefix} if artifact_prefix else {}),
     }
 
 
 def collect_docs_artifact_binding(project_dir: Path) -> dict[str, Any]:
+    identity = resolve_work_item_identity(project_dir)
     active_change_id = resolve_active_change_id(project_dir)
+    work_item_id = identity.work_item_id if not identity.legacy else active_change_id
+    artifact_owner_id = work_item_id or active_change_id
     binding = _artifact_binding(
         project_dir,
         stage="docs",
-        patterns=_ACTIVE_DOC_PATTERNS if active_change_id else _DOC_PATTERNS,
+        patterns=_ACTIVE_DOC_PATTERNS if artifact_owner_id else _DOC_PATTERNS,
         active_change_id=active_change_id,
+        work_item_id=work_item_id,
+        binding_status=identity.binding_status,
     )
-    if active_change_id:
+    if artifact_owner_id:
         artifact_prefix = str(binding.get("artifact_prefix", ""))
         output_dir = Path(project_dir).resolve() / "output"
         core_files = [output_dir / f"{artifact_prefix}{pattern[1:]}" for pattern in _DOC_PATTERNS]
@@ -177,6 +186,83 @@ def collect_preview_artifact_binding(project_dir: Path) -> dict[str, Any]:
     )
 
 
+def require_spec_work_item_binding(project_dir: Path, change_id: str) -> dict[str, Any]:
+    """Require the formal Spec id to match the explicit pre-Spec identity and docs."""
+
+    identity = resolve_work_item_identity(project_dir)
+    if identity.legacy:
+        return require_docs_confirmation(
+            project_dir,
+            action="spec_work_item_binding",
+            require_context=True,
+        )
+    if not identity.valid:
+        raise WorkflowGateError(
+            "工作项身份无效，不能创建或绑定 Spec。",
+            gate="work_item_identity",
+            action="spec_work_item_binding",
+            details={"issues": list(identity.issues), "change_id": change_id},
+        )
+    if str(change_id).strip() != identity.work_item_id:
+        raise WorkflowGateError(
+            "工作项身份与正式 change 不一致，不能自动选择或改写。",
+            gate="work_item_identity",
+            action="spec_work_item_binding",
+            details={
+                "work_item_id": identity.work_item_id,
+                "change_id": str(change_id).strip(),
+            },
+        )
+
+    gate_state = docs_gate_status(project_dir)
+    confirmed_binding = gate_state.get("confirmed_artifact_binding", {})
+    confirmed_work_item = (
+        str(confirmed_binding.get("work_item_id", "")).strip()
+        if isinstance(confirmed_binding, dict)
+        else ""
+    )
+    if not gate_state.get("confirmed") or confirmed_work_item != identity.work_item_id:
+        raise WorkflowGateError(
+            "当前文档绑定与工作项身份不一致，不能创建或绑定 Spec。",
+            gate="docs_confirmation",
+            action="spec_work_item_binding",
+            details={
+                "work_item_id": identity.work_item_id,
+                "confirmed_work_item_id": confirmed_work_item,
+                "binding_matches_current": bool(gate_state.get("binding_matches_current")),
+                "current_binding": gate_state.get("artifact_binding", {}),
+                "confirmed_binding": confirmed_binding,
+            },
+        )
+    return gate_state
+
+
+def require_bound_work_item(project_dir: Path, change_id: str, *, action: str) -> dict[str, Any]:
+    """Block post-Spec execution when an explicit identity is not formally bound."""
+
+    identity = resolve_work_item_identity(project_dir)
+    if identity.legacy:
+        return require_docs_confirmation(project_dir, action=action, require_context=True)
+    if (
+        not identity.valid
+        or identity.binding_status != "bound"
+        or identity.active_change_id != str(change_id).strip()
+    ):
+        raise WorkflowGateError(
+            "工作项尚未与当前正式 change 绑定，不能进入 Spec 后执行。",
+            gate="work_item_identity",
+            action=action,
+            details={
+                "work_item_id": identity.work_item_id,
+                "active_change_id": identity.active_change_id,
+                "change_id": str(change_id).strip(),
+                "binding_status": identity.binding_status,
+                "issues": list(identity.issues),
+            },
+        )
+    return require_docs_confirmation(project_dir, action=action, require_context=True)
+
+
 def _update_stage_ledger(
     project_dir: Path,
     *,
@@ -190,6 +276,18 @@ def _update_stage_ledger(
     source: str = "",
     comment: str = "",
 ) -> dict[str, Any]:
+    source_key = str(source).strip().lower()
+    content_sources = {
+        "knowledge": ControlSource.KNOWLEDGE,
+        "external": ControlSource.EXTERNAL,
+        "generated": ControlSource.GENERATED,
+        "tool_output": ControlSource.TOOL_OUTPUT,
+        "reviewed_instruction": ControlSource.REVIEWED_INSTRUCTION,
+    }
+    ensure_control_effect_allowed(
+        content_sources.get(source_key, ControlSource.SYSTEM_CONTRACT),
+        ContentEffect.PHASE,
+    )
     ledger = load_stage_ledger(project_dir)
     artifact_binding = artifact_binding or {}
     normalized_stage = normalize_stage_key(stage)
@@ -265,6 +363,14 @@ def record_stage_progress(
 def save_bound_docs_confirmation(
     project_dir: Path, payload: dict[str, Any]
 ) -> tuple[Path, dict[str, Any]]:
+    identity = resolve_work_item_identity(project_dir)
+    if not identity.legacy and not identity.valid:
+        raise WorkflowGateError(
+            "工作项身份无效，不能写入文档确认。",
+            gate="work_item_identity",
+            action="save_docs_confirmation",
+            details={"issues": list(identity.issues)},
+        )
     binding = collect_docs_artifact_binding(project_dir)
     normalized = dict(payload)
     normalized["artifact_binding"] = binding
@@ -385,6 +491,28 @@ def require_docs_confirmation(
     requested_phases: list[str] | None = None,
     require_context: bool = True,
 ) -> dict[str, Any]:
+    identity = resolve_work_item_identity(project_dir)
+    if not identity.legacy and not identity.valid:
+        raise WorkflowGateError(
+            "工作项身份无效，不能推进文档确认后的阶段。",
+            gate="work_item_identity",
+            action=action,
+            details={"issues": list(identity.issues)},
+        )
+    requested = {
+        normalize_stage_key(item) for item in (requested_phases or []) if str(item).strip()
+    }
+    if (
+        not identity.legacy
+        and identity.binding_status == "pre_spec"
+        and requested & {"frontend", "preview_confirm", "backend", "quality", "delivery"}
+    ):
+        raise WorkflowGateError(
+            "工作项仍处于 pre_spec，不能进入 Spec 之后的执行阶段。",
+            gate="work_item_identity",
+            action=action,
+            details={"work_item_id": identity.work_item_id, "requested_phases": sorted(requested)},
+        )
     gate_state = docs_gate_status(project_dir)
     if requested_phases is not None and not requested_phases_require_docs_confirmation(
         requested_phases

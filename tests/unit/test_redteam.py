@@ -254,6 +254,27 @@ def load_users(users, db):
         issues = reviewer._scan_with_npm_audit()
         assert any(i.category == "依赖漏洞" and i.severity == "high" for i in issues)
 
+    def test_generated_output_package_is_not_a_second_release_surface(
+        self, temp_project_dir: Path
+    ):
+        frontend = temp_project_dir / "frontend"
+        output_blueprint = temp_project_dir / "output" / "frontend-react"
+        frontend.mkdir(parents=True, exist_ok=True)
+        output_blueprint.mkdir(parents=True, exist_ok=True)
+        frontend_package = frontend / "package.json"
+        frontend_package.write_text('{"name":"frontend"}', encoding="utf-8")
+        (output_blueprint / "package.json").write_text(
+            '{"name":"frontend-blueprint"}', encoding="utf-8"
+        )
+
+        reviewer = RedTeamReviewer(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"backend": "python", "frontend": "react"},
+        )
+
+        assert reviewer._find_package_json_files() == [frontend_package.resolve()]
+
     def test_inactive_node_scaffolds_are_outside_python_cli_release_surface(
         self, temp_project_dir: Path, monkeypatch
     ):

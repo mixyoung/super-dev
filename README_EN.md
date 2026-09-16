@@ -19,19 +19,19 @@
 
 ## Version
 
-Current repository version: `2.5.1` (not yet released; latest published version: `2.5.0`)
+Current repository version: `2.5.1` (latest GitHub-only release)
 
-- Version notes: [v2.5.1](docs/releases/2.5.1.md); published release: [v2.5.0](docs/releases/2.5.0.md)
+- Version notes and release record: [v2.5.1](docs/releases/2.5.1.md)
 - Website changelog: [superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## Install
 
 The homepage installation story is now intentionally uv-first:
 
-This fork is released on GitHub only, not PyPI. Published 2.5.0 still has the old updater; the first transition requires installing a version containing the new updater. Current development code unifies startup hints, `update --check`, and `update` on this fork's stable GitHub Releases. Existing, unmodified project text is refreshed by default; user-level refresh requires explicit `--include-user`. See [update boundaries and recovery](docs/FORK_UPDATES.md). These development changes are not a new published release.
+This fork is released on GitHub only, not PyPI. Version 2.5.1 unifies startup hints, `update --check`, and `update` on this fork's stable GitHub Releases; install 2.5.1 directly for the first transition from 2.5.0. Existing, unmodified project text is refreshed by default; user-level refresh requires explicit `--include-user`. See [update boundaries and recovery](docs/FORK_UPDATES.md).
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 Then run:
@@ -153,7 +153,7 @@ In practice:
 Regular users should remember 1 install command and 3 terminal commands:
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 ```bash
@@ -257,19 +257,19 @@ Super Dev currently ships with eleven domain-expert agents. Each expert is injec
 
 | Expert | Role | Injection Stages |
 |--------|------|-----------------|
-| PRODUCT | Product Lead | research, prd, quality, delivery |
-| PM | Product Manager | research, prd |
-| ARCHITECT | System Architect | architecture |
-| UI | Interface Designer | uiux, frontend |
-| UX | Interaction Designer | uiux, frontend |
-| SECURITY | Security Engineer | architecture, backend, quality |
-| CODE | Software Engineer | frontend, backend |
-| DBA | Database Architect | architecture, backend |
-| QA | Quality Assurance | quality |
+| PRODUCT | Product Lead | baseline, research, docs_confirm, preview_confirm, quality, delivery, polish |
+| PM | Product Manager | research, docs, docs_confirm, spec, build_fullstack |
+| ARCHITECT | System Architect | baseline, research, docs, spec, backend, build_fullstack |
+| UI | Interface Designer | docs, frontend, preview_confirm, build_fullstack, polish |
+| UX | Interaction Designer | docs, frontend, preview_confirm, polish |
+| SECURITY | Security Engineer | quality |
+| CODE | Software Engineer | baseline, spec, frontend, backend, build_fullstack |
+| DBA | Database Architect | backend |
+| QA | Quality Assurance | frontend, backend, quality, delivery, build_fullstack, polish |
 | DEVOPS | DevOps Engineer | delivery |
-| RCA | Root Cause Analyst | quality, delivery |
+| RCA | Root Cause Analyst | quality |
 
-Each expert carries: objective definition, background story, thinking framework, and quality criteria. The generated AI prompts ensure every stage meets domain-specific professional baselines.
+Each expert carries a work contract: applicability, required inputs, outputs, authority limits, evidence, stopping conditions, and handoff. Authority comes from verifiable scope and evidence, not a fictional biography; changing roles in one model session remains self-review rather than independent review.
 
 ### 2. UI Design Intelligence System
 
@@ -422,7 +422,7 @@ New features follow the full pipeline. Bug fixes follow a lightweight patch path
 ### 1. uv (recommended)
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 Upgrade:
@@ -434,13 +434,13 @@ super-dev update
 ### 2. Pin a specific version
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 Upgrade:
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 super-dev update
 ```
 
@@ -457,7 +457,7 @@ This generates `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` to lock down
 ### 3. Install from GitHub tag
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 ### 4. Source install for development

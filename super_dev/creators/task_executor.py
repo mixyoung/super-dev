@@ -16,7 +16,11 @@ from super_dev.artifact_utils import ui_contract_filename
 
 from ..specs import ChangeManager
 from ..specs.models import ChangeStatus, Task, TaskStatus
-from ..workflow_guard import require_docs_confirmation, require_preview_confirmation
+from ..workflow_guard import (
+    require_bound_work_item,
+    require_docs_confirmation,
+    require_preview_confirmation,
+)
 
 
 @dataclass
@@ -49,6 +53,11 @@ class SpecTaskExecutor:
             self.project_dir,
             action="spec_task_execute",
             require_context=True,
+        )
+        require_bound_work_item(
+            self.project_dir,
+            change_id,
+            action="spec_task_execute",
         )
 
         change = self.change_manager.load_change(change_id)

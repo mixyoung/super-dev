@@ -2,13 +2,16 @@
 质量门禁检查器测试
 """
 
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from super_dev.change_ledger import ChangeLedger
 from super_dev.extensions.builtins.fresh_verification import parse_junit_summary
+from super_dev.extensions.evidence import build_candidate_identity
 from super_dev.review_state import save_host_runtime_validation, save_workflow_state
 from super_dev.reviewers.quality_gate import (
     CheckStatus,
@@ -17,6 +20,7 @@ from super_dev.reviewers.quality_gate import (
     QualityGateResult,
     inspect_current_fresh_verification,
 )
+from super_dev.scope_advisory import build_scope_advisory
 from super_dev.workflow_guard import save_bound_docs_confirmation
 
 
@@ -57,6 +61,35 @@ def _activate_quality_change(project_dir: Path, change_id: str = "current-change
     )
 
 
+def _write_scope_ledger(
+    project_dir: Path,
+    *,
+    change_id: str,
+    changed_surfaces: set[str],
+    scope_complete: bool = True,
+) -> None:
+    change_dir = project_dir / ".super-dev" / "changes" / change_id
+    change_dir.mkdir(parents=True, exist_ok=True)
+    ledger = ChangeLedger.create(
+        change_id=change_id,
+        harness_version="2.5.1",
+        intent="build",
+        governance_depth="architectural",
+        work_mode="evolve",
+    )
+    ledger.scope_advisory = build_scope_advisory(
+        changed_surfaces=changed_surfaces,
+        work_mode="evolve",
+        governance_depth="architectural",
+        scope_complete=scope_complete,
+        generated_at="2026-09-15T00:00:00+00:00",
+    )
+    (change_dir / "ledger.json").write_text(
+        json.dumps(ledger.to_dict()),
+        encoding="utf-8",
+    )
+
+
 def _write_fresh_run_files(
     project_dir: Path,
     *,
@@ -92,6 +125,321 @@ def _write_fresh_run_files(
 
 
 class TestQualityGateChecker:
+    @pytest.mark.parametrize("surface", ["data", "database", "migration"])
+    def test_high_risk_scope_requires_independent_review_evidence(
+        self,
+        temp_project_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        surface: str,
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_shadow_ledger_summary",
+            lambda _project_dir: {"changed_surfaces": [surface]},
+        )
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        external = [check for check in result.checks if check.category == "external_review"]
+        assert len(external) == 1
+        assert external[0].status is CheckStatus.FAILED
+        assert result.passed is False
+        assert any("高风险" in item for item in result.critical_failures)
+
+    def test_high_risk_review_requires_exact_file_and_candidate_attestation(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        config_path = temp_project_dir / "super-dev.yaml"
+        config_path.write_text(
+            config_path.read_text(encoding="utf-8") + "version: 1.0.0\n",
+            encoding="utf-8",
+        )
+        save_workflow_state(
+            temp_project_dir,
+            {
+                "status": "quality",
+                "flow_variant": "standard",
+                "work_item_id": "current-change",
+                "binding_status": "pre_spec",
+            },
+        )
+        candidate_digest = build_candidate_identity(temp_project_dir).candidate_digest
+        review_dir = temp_project_dir / "output" / "external-reviews"
+        review_dir.mkdir(parents=True)
+        review_path = review_dir / "deepseek.json"
+        review_path.write_text(
+            json.dumps(
+                {
+                    "source": "deepseek-v4-flash",
+                    "passed": True,
+                    "score": 95,
+                    "issues_count": 0,
+                    "critical_count": 0,
+                    "summary": "read-only review passed",
+                    "review_execution": {
+                        "review_session_id": "review-session",
+                        "producer_session_id": "producer-session",
+                        "model": "deepseek-v4-flash",
+                        "provider": "deepseek-payg-gy-com-dsv4f",
+                        "readonly_scope": ["tracked.patch", "current/"],
+                        "tool_evidence": ["read scoped bundle"],
+                        "file_change_evidence": "bundle digest unchanged",
+                        "work_item_id": "current-change",
+                        "target_version": "1.0.0",
+                        "candidate_digest": candidate_digest,
+                        "host_attested": True,
+                        "residual_risk_accepted": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        review_digest = hashlib.sha256(review_path.read_bytes()).hexdigest()
+
+        def checker(attested: bool) -> QualityGateChecker:
+            instance = QualityGateChecker(
+                project_dir=temp_project_dir,
+                name="demo",
+                tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+                scenario_override="1-N+1",
+                attested_review_files=({"review-session": review_digest} if attested else {}),
+            )
+            monkeypatch.setattr(instance, "_check_documentation", lambda: [])
+            monkeypatch.setattr(instance, "_check_security", lambda _r: [])
+            monkeypatch.setattr(instance, "_check_performance", lambda _r: [])
+            monkeypatch.setattr(instance, "_check_testing", lambda: [])
+            monkeypatch.setattr(instance, "_check_code_quality", lambda: [])
+            monkeypatch.setattr(instance, "_check_compliance_artifacts", lambda: [])
+            instance._rule_engine = None
+            return instance
+
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_shadow_ledger_summary",
+            lambda _project_dir: {"changed_surfaces": ["authorization"]},
+        )
+        untrusted_checker = checker(False)
+        untrusted_result = untrusted_checker.check(None)
+        attested_result = checker(True).check(None)
+
+        untrusted_reviews = [
+            check for check in untrusted_result.checks if check.category == "external_review"
+        ]
+        attested_reviews = [
+            check for check in attested_result.checks if check.category == "external_review"
+        ]
+        untrusted_advisories = [
+            check
+            for check in untrusted_result.checks
+            if check.category == "external_review_advisory"
+        ]
+        assert any(check.status is CheckStatus.FAILED for check in untrusted_reviews)
+        assert any("independence=blocked" in check.description for check in untrusted_advisories)
+        assert all(
+            check.category != "external_review_advisory"
+            for check in untrusted_checker._score_bearing_checks(untrusted_result.checks)
+        )
+        assert len(attested_reviews) == 1
+        assert attested_reviews[0].status is CheckStatus.PASSED
+        assert "independence=independent" in attested_reviews[0].description
+
+    def test_real_scope_advisory_drives_high_risk_review_requirement(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        _write_scope_ledger(
+            temp_project_dir,
+            change_id="current-change",
+            changed_surfaces={"authorization"},
+        )
+        save_workflow_state(
+            temp_project_dir,
+            {
+                "status": "quality",
+                "flow_variant": "standard",
+                "work_item_id": "current-change",
+                "active_change_id": "current-change",
+                "binding_status": "bound",
+            },
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        required = next(
+            check
+            for check in result.checks
+            if check.name == "External Review: required for high-risk change"
+        )
+        assert required.status is CheckStatus.FAILED
+        assert not any(check.name == "High-Risk Scope: undetermined" for check in result.checks)
+
+    def test_missing_scope_advisory_for_explicit_work_item_is_conservative(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        save_workflow_state(
+            temp_project_dir,
+            {
+                "status": "quality",
+                "flow_variant": "standard",
+                "work_item_id": "current-change",
+                "binding_status": "pre_spec",
+            },
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        scope = next(
+            check for check in result.checks if check.name == "High-Risk Scope: undetermined"
+        )
+        required = next(
+            check
+            for check in result.checks
+            if check.name == "External Review: required for high-risk change"
+        )
+        assert scope.status is CheckStatus.WARNING
+        assert scope.category == "external_review_advisory"
+        assert required.status is CheckStatus.FAILED
+
+    def test_high_risk_review_collection_exception_fails_closed(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from super_dev.reviewers.external_reviews import ExternalReviewCollector
+
+        _write_quality_config(temp_project_dir, frontend="none")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_shadow_ledger_summary",
+            lambda _project_dir: {"changed_surfaces": ["data"]},
+        )
+        monkeypatch.setattr(
+            ExternalReviewCollector,
+            "collect_all",
+            lambda _self: (_ for _ in ()).throw(OSError("review evidence unavailable")),
+        )
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        collection = next(
+            check for check in result.checks if check.name == "External Review: evidence collection"
+        )
+        assert collection.status is CheckStatus.FAILED
+        assert "review evidence unavailable" in collection.description
+
+    def test_high_risk_residual_acceptance_is_explicit_and_not_independent(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+            residual_review_risk_accepted=True,
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        monkeypatch.setattr(
+            "super_dev.reviewers.quality_gate.build_shadow_ledger_summary",
+            lambda _project_dir: {"changed_surfaces": ["authorization"]},
+        )
+        checker._rule_engine = None
+
+        result = checker.check(None)
+
+        review = next(
+            check
+            for check in result.checks
+            if check.name == "External Review: required for high-risk change"
+        )
+        assert review.status is CheckStatus.WARNING
+        assert "不得称为独立评审" in review.description
+
+    def test_cross_review_uses_only_applicable_artifact_roles(
+        self, temp_project_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_quality_config(temp_project_dir, frontend="none")
+        output = temp_project_dir / "output"
+        output.mkdir(parents=True, exist_ok=True)
+        (output / "demo-architecture.md").write_text(
+            "# Architecture\n\n当前模块边界与回退策略。",
+            encoding="utf-8",
+        )
+        checker = QualityGateChecker(
+            project_dir=temp_project_dir,
+            name="demo",
+            tech_stack={"frontend": "none", "backend": "python", "database": "none"},
+            scenario_override="1-N+1",
+        )
+        monkeypatch.setattr(checker, "_check_documentation", lambda: [])
+        monkeypatch.setattr(checker, "_check_security", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_performance", lambda _r: [])
+        monkeypatch.setattr(checker, "_check_testing", lambda: [])
+        monkeypatch.setattr(checker, "_check_code_quality", lambda: [])
+        monkeypatch.setattr(checker, "_check_compliance_artifacts", lambda: [])
+        checker._rule_engine = None
+
+        result = checker.check(None)
+        cross_reviews = [check for check in result.checks if check.category == "cross_review"]
+
+        assert cross_reviews
+        assert all(check.name.startswith("Cross-Review: ARCHITECT") for check in cross_reviews)
+
     def test_scenario_override_zero_to_one(self, temp_project_dir: Path):
         # 即使存在源码目录，通过 override 仍应按 0-1 判定
         (temp_project_dir / "src").mkdir(parents=True, exist_ok=True)

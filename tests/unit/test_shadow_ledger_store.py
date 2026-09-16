@@ -31,6 +31,8 @@ def _write_ledger(project_dir: Path, change_id: str) -> Path:
         json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    state_path = project_dir / ".super-dev" / "workflow-state.json"
+    state_path.write_text(json.dumps({"active_change_id": change_id}), encoding="utf-8")
     return ledger_path
 
 
@@ -60,6 +62,20 @@ def test_summary_reads_valid_canonical_ledger_without_control_authority(
     assert summary["resolution_counts"] == {"EXECUTE": 7, "REQUIRE": 2}
     assert summary["status_counts"] == {"PENDING": 9}
     assert load_shadow_ledger(temp_project_dir, ledger_path).ledger.change_id == "change-1"
+
+
+def test_summary_never_selects_latest_ledger_without_explicit_identity(
+    temp_project_dir: Path,
+) -> None:
+    _write_ledger(temp_project_dir, "older")
+    _write_ledger(temp_project_dir, "newer")
+    (temp_project_dir / ".super-dev" / "workflow-state.json").unlink()
+
+    summary = build_shadow_ledger_summary(temp_project_dir)
+
+    assert summary["active_change_id"] == ""
+    assert summary["ledger_path"] == ""
+    assert "未选择当前账本" in summary["summary"]
 
 
 def test_invalid_json_is_reported_without_breaking_status_reads(temp_project_dir: Path) -> None:
@@ -174,6 +190,7 @@ def test_summary_separates_scope_advice_from_real_stage_decisions(
     assert summary["scope_complete"] is True
     assert summary["recommended_reduction_count"] == 5
     assert summary["approval_required_count"] == 5
+    assert summary["changed_surfaces"] == ["backend"]
     assert "建议保留4个阶段" in summary["scope_advisory_summary"]
 
 

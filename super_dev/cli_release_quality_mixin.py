@@ -380,6 +380,20 @@ class CliReleaseQualityMixin:
             return 1
 
         # 代码或全量检查走质量门禁评估
+        attested_review_files: dict[str, str] = {}
+        for raw_attestation in getattr(args, "attest_review", []) or []:
+            session_id, separator, digest = str(raw_attestation).partition("=")
+            normalized_digest = digest.strip().lower().removeprefix("sha256:")
+            if (
+                not separator
+                or not session_id.strip()
+                or len(normalized_digest) != 64
+                or any(character not in "0123456789abcdef" for character in normalized_digest)
+            ):
+                self.console.print("[red]--attest-review 必须使用 SESSION_ID=SHA256 格式[/red]")
+                return 1
+            attested_review_files[session_id.strip()] = normalized_digest
+
         gate_checker = QualityGateChecker(
             project_dir=project_dir,
             name=project_name,
@@ -387,6 +401,8 @@ class CliReleaseQualityMixin:
             threshold_override=config.quality_gate,
             host_compatibility_min_score_override=config.host_compatibility_min_score,
             host_compatibility_min_ready_hosts_override=config.host_compatibility_min_ready_hosts,
+            attested_review_files=attested_review_files,
+            residual_review_risk_accepted=bool(getattr(args, "accept_review_residual_risk", False)),
         )
         persisted_redteam = load_persisted_redteam_report(project_dir, project_name)
         gate_result = gate_checker.check(
