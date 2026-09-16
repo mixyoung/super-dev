@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Super Dev 核心模块调用拓扑",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mixyoung/super-dev",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "1ce44a6e83534b3ed7021c27c0a57c60b0236cf1"
+    },
+    "views": [
+      {
+        "id": "command-path",
+        "label": "命令主路径",
+        "focus": ["entrypoints", "contracts", "orchestrator", "creators", "reviewers", "deployers", "evidence_state"],
+        "note": "从公共入口到治理、生成、验证、交付和持久化证据。"
+      },
+      {
+        "id": "host-path",
+        "label": "宿主接入",
+        "focus": ["entrypoints", "integrations", "contracts", "evidence_state"],
+        "note": "宿主配置、规则和 Skill 只负责接入，不接管生命周期。"
+      },
+      {
+        "id": "intelligence-path",
+        "label": "知识与专家",
+        "focus": ["knowledge_experts", "orchestrator", "creators", "reviewers"],
+        "note": "知识和专家按阶段进入同一个编排核心。"
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [42, 76],
+    "cols": 5,
+    "gapX": 50,
+    "gapY": 45,
+    "cellW": 178,
+    "cellH": 94
+  },
+  "components": [
+    {
+      "id": "entrypoints",
+      "type": "frontend",
+      "label": "公共入口",
+      "sublabel": "cli.py · web/api.py",
+      "row": 1,
+      "col": 0,
+      "size": [178, 72],
+      "sources": [
+        {"path": "super_dev/cli.py", "line": 92, "label": "SuperDevCLI"},
+        {"path": "super_dev/web/api.py", "line": 1, "label": "Web API"}
+      ]
+    },
+    {
+      "id": "integrations",
+      "type": "external",
+      "label": "宿主集成",
+      "sublabel": "install · detect · doctor",
+      "row": 0,
+      "col": 0,
+      "size": [190, 72],
+      "sources": [
+        {"path": "super_dev/integrations/manager.py", "line": 31, "label": "IntegrationManager"},
+        {"path": "super_dev/host_adapters.py", "line": 1, "label": "Host adapters"},
+        {"path": "super_dev/skills/manager.py", "line": 1, "label": "Skill manager"}
+      ]
+    },
+    {
+      "id": "contracts",
+      "type": "security",
+      "label": "合同与状态真源",
+      "sublabel": "contract · stages · review state",
+      "row": 1,
+      "col": 1,
+      "size": [200, 76],
+      "sources": [
+        {"path": "super_dev/workflow_contract.py", "line": 354, "label": "Flow contract"},
+        {"path": "super_dev/workflow_stage_truth.py", "line": 9, "label": "Stage truth"},
+        {"path": "super_dev/review_state.py", "line": 119, "label": "Review state"}
+      ]
+    },
+    {
+      "id": "knowledge_experts",
+      "type": "database",
+      "label": "知识与专家",
+      "sublabel": "knowledge · experts · overseer",
+      "row": 0,
+      "col": 2,
+      "size": [196, 72],
+      "sources": [
+        {"path": "super_dev/orchestrator/knowledge_pusher.py", "line": 27, "label": "KnowledgePusher"},
+        {"path": "super_dev/orchestrator/experts.py", "line": 23, "label": "Experts"},
+        {"path": "super_dev/orchestrator/overseer.py", "line": 1, "label": "Overseer"}
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "编排核心",
+      "sublabel": "pipeline runtime · engine",
+      "tag": "阶段推进与恢复",
+      "row": 1,
+      "col": 2,
+      "size": [198, 84],
+      "sources": [
+        {"path": "super_dev/cli_pipeline_runtime_mixin.py", "line": 34, "label": "CLI pipeline"},
+        {"path": "super_dev/orchestrator/engine.py", "line": 128, "label": "WorkflowEngine"},
+        {"path": "super_dev/work_item_identity.py", "line": 24, "label": "Work item"}
+      ]
+    },
+    {
+      "id": "creators",
+      "type": "backend",
+      "label": "Creators 与 Design",
+      "sublabel": "docs · spec · design · build",
+      "row": 1,
+      "col": 3,
+      "size": [204, 76],
+      "sources": [
+        {"path": "super_dev/creators/document_generator.py", "line": 23, "label": "Documents"},
+        {"path": "super_dev/creators/spec_builder.py", "line": 32, "label": "Spec"},
+        {"path": "super_dev/design/ui_intelligence.py", "line": 1, "label": "UI intelligence"}
+      ]
+    },
+    {
+      "id": "reviewers",
+      "type": "security",
+      "label": "Enforcement 与 Reviewers",
+      "sublabel": "enforce · red team · quality",
+      "row": 2,
+      "col": 2,
+      "size": [204, 76],
+      "sources": [
+        {"path": "super_dev/enforcement/pre_code_gate.py", "line": 1, "label": "Pre-code gate"},
+        {"path": "super_dev/reviewers/redteam.py", "line": 598, "label": "Red team"},
+        {"path": "super_dev/reviewers/quality_gate.py", "line": 432, "label": "Quality gate"}
+      ]
+    },
+    {
+      "id": "deployers",
+      "type": "cloud",
+      "label": "交付与演练",
+      "sublabel": "CI/CD · package · rehearsal",
+      "row": 2,
+      "col": 3,
+      "size": [194, 76],
+      "sources": [
+        {"path": "super_dev/deployers/cicd.py", "line": 15, "label": "CI/CD"},
+        {"path": "super_dev/deployers/delivery.py", "line": 46, "label": "Delivery"},
+        {"path": "super_dev/deployers/rehearsal.py", "line": 14, "label": "Rehearsal"}
+      ]
+    },
+    {
+      "id": "evidence_state",
+      "type": "messagebus",
+      "label": "证据与项目状态",
+      "sublabel": "proof pack · readiness · artifacts",
+      "tag": ".super-dev/ · output/",
+      "row": 2,
+      "col": 4,
+      "size": [204, 82],
+      "sources": [
+        {"path": "super_dev/proof_pack.py", "line": 799, "label": "Proof pack"},
+        {"path": "super_dev/release_readiness.py", "line": 500, "label": "Readiness"},
+        {"path": "super_dev/workflow_state.py", "line": 841, "label": "Workflow state"}
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "接入面",
+      "wraps": ["entrypoints", "integrations"]
+    },
+    {
+      "kind": "region",
+      "label": "Super Dev Core",
+      "wraps": ["contracts", "knowledge_experts", "orchestrator", "creators", "reviewers", "deployers", "evidence_state"]
+    }
+  ],
+  "connections": [
+    {"id": "entry-integrations", "from": "entrypoints", "to": "integrations", "fromSide": "top", "toSide": "bottom"},
+    {"id": "entry-contracts", "from": "entrypoints", "to": "contracts"},
+    {"id": "integrations-contracts", "from": "integrations", "to": "contracts", "label": "宿主上下文", "variant": "dashed", "fromSide": "bottom", "toSide": "top"},
+    {"id": "contracts-orchestrator", "from": "contracts", "to": "orchestrator", "label": "阶段 / 门禁 / 状态", "variant": "security", "labelDy": 70},
+    {"id": "knowledge-orchestrator", "from": "knowledge_experts", "to": "orchestrator", "label": "知识与专家合同", "variant": "dashed", "fromSide": "bottom", "toSide": "top"},
+    {"id": "orchestrator-creators", "from": "orchestrator", "to": "creators", "label": "生成与实现计划", "variant": "emphasis", "labelDx": -70, "labelDy": 77},
+    {"id": "creators-reviewers", "from": "creators", "to": "reviewers", "label": "候选与运行证据", "labelDy": 9},
+    {"id": "reviewers-deployers", "from": "reviewers", "to": "deployers", "label": "门禁通过", "variant": "security", "route": "straight", "labelDx": 70, "labelDy": -60},
+    {"id": "deployers-evidence-state", "from": "deployers", "to": "evidence_state", "label": "交付清单、证据与状态", "variant": "emphasis", "labelDy": 68}
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "调用主线",
+      "items": ["入口读取合同后交给唯一编排核心", "Creators 产出候选，Reviewers 阻断不合格候选"]
+    },
+    {
+      "dot": "violet",
+      "title": "横切能力",
+      "items": ["知识与专家按阶段注入，不另建流程", "宿主适配只改变接入面，不改变阶段合同"]
+    },
+    {
+      "dot": "emerald",
+      "title": "证据闭环",
+      "items": ["证据绑定当前工作项、候选与版本", "最终工件写入 output/ 与 .super-dev/"]
+    }
+  ]
+}

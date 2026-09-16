@@ -108,20 +108,6 @@ super-dev
 
 ---
 
-## 联系开发者与加入社群
-
-<div align="center">
-
-微信号：**Excellent_We**
-
-<img src="docs/assets/superdev-community-qr.png" alt="SuperDev AI 社区：添加开发者好友、加入微信群或飞书群" width="1000">
-
-扫码添加开发者好友，或加入 SuperDev AI 社区微信群、飞书群
-
-</div>
-
----
-
 ## 项目介绍
 
 `Super Dev` 不是再给宿主叠一层命令集合或脚手架壳。它更像一个宿主教练系统，用来把宿主里的模型能力训练成一套稳定、清晰、可审计、能做商业项目的交付流程。
@@ -418,90 +404,9 @@ Super Dev 内置结构化知识库（`knowledge/` 目录），270+ 个知识文�
 
 ---
 
-## 安装方式
+## 安装与依赖边界
 
-### 1. uv 安装（推荐）
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-```
-
-升级：
-
-```bash
-super-dev update
-```
-
-### 2. 指定版本安装
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-```
-
-升级：
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-super-dev update
-```
-
-安装完成后，直接运行：
-
-```bash
-super-dev
-```
-
-默认会进入宿主安装引导：
-
-- 顶部显示 `Super Dev` 安装入口
-- `↑ / ↓` 选择宿主
-- `Space` 勾选宿主
-- `Enter` 开始安装
-- `A` 全选
-- `C` 仅选择 CLI 宿主
-- `I` 仅选择 IDE 宿主
-- `R` 清空选择
-- `U` 升级已安装宿主
-
-安装完成后，终端会直接给出该宿主的最终触发方式：
-
-- slash 宿主：`/super-dev 你的需求`
-- 非 slash 宿主：`super-dev: 你的需求`
-- 比赛极速版：`/super-dev-seeai 比赛需求` 或 `super-dev-seeai: 比赛需求`
-- 需要继续验收或恢复时，优先回到宿主里说“继续当前流程”或“现在下一步是什么”
-
-### 3. GitHub 指定标签安装
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-```
-
-### 4. 源码开发安装
-
-```bash
-git clone https://github.com/mixyoung/super-dev.git
-cd super-dev
-uv sync
-uv run super-dev --version
-```
-
----
-
-## 依赖安装说明
-
-当用户执行：
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-```
-
-或：
-
-```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
-```
-
-安装器会自动安装 `pyproject.toml` 中声明的 Python 依赖，例如：
+使用 README 顶部的推荐命令安装时，安装器会自动安装 `pyproject.toml` 中声明的 Python 依赖，例如：
 
 - `rich`
 - `pyyaml`
@@ -594,23 +499,31 @@ super-dev bootstrap --name my-project --platform web --frontend next --backend n
 
 ## 架构概览
 
-Super Dev 2.5.1 架构由四层组成：**宿主接入层**（统一宿主矩阵，按 CLI / IDE / 桌面助手分组）、**知识治理层**（306 索引 / 渐进式加载 / 自演化）、**编排引擎层**（9 阶段流水线 / 11 专家 + Overseer / 验证规则引擎）、**交付审计层**（DORA 度量 / ADR / 一致性检测 / proof-pack）。
+Super Dev 2.5.1 由五个职责面协同：**宿主接入**、**合同与编排核心**、**知识与专家注入**、**生成与实现指导**、**验证与交付审计**。宿主保留模型、搜索、终端与代码写入；Super Dev Core 是唯一生命周期所有者，项目状态与证据落在 `output/` 和 `.super-dev/`。
+
+下方静态图用于 README 快速阅读；每张图同时保留 Archify JSON 图源和可交互 HTML，可查看源码证据、关系路径、亮暗主题与导出能力。
 
 ### 一、系统高阶流转架构
 
 展示用户、宿主端工具、Super Dev 编排引擎与最终产物之间的流转关系。
 
+[打开交互图](docs/assets/architecture/system-overview.html) · [查看 Archify 图源](docs/assets/architecture/system-overview.archify.json)
+
 ![系统高阶流转架构](docs/assets/architecture/system-overview.png)
 
-### 二、9 阶段核心工作流
+### 二、标准九阶段核心工作流
 
 详细描绘每次对话触发后，引擎在底层的流转经过。
 
-![9 阶段核心工作流](docs/assets/architecture/pipeline-12-phase.png)
+[打开交互图](docs/assets/architecture/pipeline-12-phase.html) · [查看 Archify 图源](docs/assets/architecture/pipeline-12-phase.archify.json)
+
+![标准九阶段核心工作流](docs/assets/architecture/pipeline-12-phase.png)
 
 ### 三、核心模块调用拓扑
 
 展示 `super_dev` 下核心源码目录的职责边界和调用关系。
+
+[打开交互图](docs/assets/architecture/module-topology.html) · [查看 Archify 图源](docs/assets/architecture/module-topology.archify.json)
 
 ![核心模块调用拓扑](docs/assets/architecture/module-topology.png)
 
@@ -1197,11 +1110,13 @@ droid exec --session-id <id> "continue with next steps"
 
 ---
 
-## 关注我们
+## 联系开发者与加入社群
 
 <div align="center">
 
-<img src="super-dev-website/public/logo.png" alt="微信公众号" width="100%">
+<img src="docs/assets/superdev-community-qr.png" alt="SuperDev AI 社区：添加开发者好友、加入微信群或飞书群" width="1000">
+
+扫码添加开发者好友，或加入 SuperDev AI 社区微信群、飞书群
 
 </div>
 
