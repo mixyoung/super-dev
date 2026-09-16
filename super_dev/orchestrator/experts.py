@@ -117,7 +117,8 @@ class ExpertProfile:
             )
             if builtin_path.is_file():
                 self.file_path = str(builtin_path)
-                self.content_digest = hashlib.sha256(builtin_path.read_bytes()).hexdigest()
+                builtin_text = builtin_path.read_text(encoding="utf-8")
+                self.content_digest = hashlib.sha256(builtin_text.encode("utf-8")).hexdigest()
 
 
 EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
