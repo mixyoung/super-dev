@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Super Dev 系统高阶流转架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/mixyoung/super-dev",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "1ce44a6e83534b3ed7021c27c0a57c60b0236cf1"
+    },
+    "views": [
+      {
+        "id": "host-path",
+        "label": "宿主主路径",
+        "focus": ["user", "host", "integration", "orchestrator", "creators", "artifacts"],
+        "note": "宿主负责模型、工具和实际编码；Super Dev 负责治理与证据。"
+      },
+      {
+        "id": "governance-path",
+        "label": "治理注入",
+        "focus": ["governance_inputs", "orchestrator"],
+        "note": "阶段合同、知识信封和专家工作合同在执行前注入。"
+      },
+      {
+        "id": "evidence-path",
+        "label": "质量与证据",
+        "focus": ["creators", "verification", "artifacts"],
+        "note": "实现产物与验证证据汇入同一工作项，但保持事实语义独立。"
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [48, 72],
+    "cols": 5,
+    "gapX": 50,
+    "gapY": 60,
+    "cellW": 200,
+    "cellH": 92
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "需求 · 确认 · 反馈",
+      "row": 1,
+      "col": 0,
+      "size": [190, 68]
+    },
+    {
+      "id": "host",
+      "type": "frontend",
+      "label": "AI Coding 宿主",
+      "sublabel": "CLI · IDE · Desktop",
+      "tag": "模型 / 搜索 / 工具 / 编码",
+      "row": 1,
+      "col": 1,
+      "size": [210, 82]
+    },
+    {
+      "id": "integration",
+      "type": "backend",
+      "label": "宿主接入层",
+      "sublabel": "Rules · Skills · Slash · Adapters",
+      "row": 1,
+      "col": 2,
+      "size": [220, 74],
+      "sources": [
+        {"path": "super_dev/integrations/manager.py", "line": 31, "label": "IntegrationManager"},
+        {"path": "super_dev/host_registry.py", "line": 1, "label": "Host registry"}
+      ]
+    },
+    {
+      "id": "governance_inputs",
+      "type": "security",
+      "label": "治理输入",
+      "sublabel": "阶段合同 · 权限 · 知识信封 · 专家",
+      "tag": "确认门与适用性",
+      "row": 0,
+      "col": 3,
+      "size": [226, 82],
+      "sources": [
+        {"path": "super_dev/workflow_contract.py", "line": 354, "label": "Nine-stage contract"},
+        {"path": "super_dev/orchestrator/knowledge_pusher.py", "line": 27, "label": "KnowledgePusher"},
+        {"path": "super_dev/workflow_stage_truth.py", "line": 84, "label": "Stage experts"}
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "Super Dev Core",
+      "sublabel": "工作项 · 编排 · 恢复 · 状态推进",
+      "tag": "唯一生命周期所有者",
+      "row": 1,
+      "col": 3,
+      "size": [230, 84],
+      "sources": [
+        {"path": "super_dev/cli_pipeline_runtime_mixin.py", "line": 34, "label": "Pipeline runtime"},
+        {"path": "super_dev/orchestrator/engine.py", "line": 128, "label": "WorkflowEngine"},
+        {"path": "super_dev/work_item_identity.py", "line": 24, "label": "Work item identity"}
+      ]
+    },
+    {
+      "id": "creators",
+      "type": "backend",
+      "label": "生成与实现指导",
+      "sublabel": "Research · 三文档 · Spec · 实现参考",
+      "row": 2,
+      "col": 2,
+      "size": [220, 76],
+      "sources": [
+        {"path": "super_dev/creators/document_generator.py", "line": 23, "label": "Documents"},
+        {"path": "super_dev/creators/spec_builder.py", "line": 32, "label": "Spec"},
+        {"path": "super_dev/creators/implementation_builder.py", "line": 1, "label": "Implementation"}
+      ]
+    },
+    {
+      "id": "verification",
+      "type": "security",
+      "label": "验证与交付门禁",
+      "sublabel": "Red Team · UI Review · Quality · Readiness",
+      "row": 2,
+      "col": 4,
+      "size": [230, 76],
+      "sources": [
+        {"path": "super_dev/reviewers/quality_gate.py", "line": 432, "label": "QualityGateChecker"},
+        {"path": "super_dev/proof_pack.py", "line": 799, "label": "ProofPackBuilder"},
+        {"path": "super_dev/release_readiness.py", "line": 500, "label": "Release readiness"}
+      ]
+    },
+    {
+      "id": "artifacts",
+      "type": "cloud",
+      "label": "项目工件与审计状态",
+      "sublabel": "output/ · .super-dev/ · delivery manifest",
+      "tag": "可恢复 · 可绑定 · 可审计",
+      "row": 3,
+      "col": 3,
+      "size": [230, 84],
+      "sources": [
+        {"path": "super_dev/review_state.py", "line": 119, "label": "Review state"},
+        {"path": "super_dev/workflow_state.py", "line": 841, "label": "Artifact detection"},
+        {"path": "super_dev/deployers/delivery.py", "line": 46, "label": "DeliveryPackager"}
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "宿主执行边界",
+      "wraps": ["user", "host"]
+    },
+    {
+      "kind": "region",
+      "label": "Super Dev 治理核心",
+      "wraps": ["integration", "governance_inputs", "orchestrator", "creators", "verification"]
+    },
+    {
+      "kind": "region",
+      "label": "项目工作区",
+      "wraps": ["artifacts"]
+    }
+  ],
+  "connections": [
+    {"id": "user-host", "from": "user", "to": "host", "label": "需求 / 确认", "variant": "emphasis"},
+    {"id": "host-integration", "from": "host", "to": "integration"},
+    {"id": "integration-core", "from": "integration", "to": "orchestrator", "label": "工作项与恢复上下文", "labelDx": -70, "labelDy": 73},
+    {"id": "governance-core", "from": "governance_inputs", "to": "orchestrator", "label": "约束与阶段指导", "variant": "security", "fromSide": "bottom", "toSide": "top"},
+    {"id": "core-creators", "from": "orchestrator", "to": "creators", "label": "生成 / 实现任务"},
+    {"id": "core-verification", "from": "orchestrator", "to": "verification", "label": "验证计划与候选身份", "variant": "security"},
+    {"id": "creators-artifacts", "from": "creators", "to": "artifacts", "label": "项目工件", "variant": "emphasis"},
+    {"id": "verification-artifacts", "from": "verification", "to": "artifacts", "label": "证据与交付事实", "variant": "security"}
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "执行边界",
+      "items": ["宿主保留模型、搜索、终端与代码写入", "Super Dev 不提供独立模型推理"]
+    },
+    {
+      "dot": "violet",
+      "title": "治理真源",
+      "items": ["标准流程由 workflow_contract.py 定义", "阶段专家映射由 workflow_stage_truth.py 定义"]
+    },
+    {
+      "dot": "emerald",
+      "title": "事实边界",
+      "items": ["delivery_ready、released、deployed、operating 相互独立", "文档存在不等于运行或发布成功"]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Super Dev 标准九阶段核心工作流",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy-path",
+        "label": "标准主路径",
+        "focus": ["research", "docs", "docs_confirm", "spec", "frontend", "preview_confirm", "backend", "quality", "delivery"],
+        "note": "从研究到交付，两个确认门不可跨越。"
+      },
+      {
+        "id": "human-gates",
+        "label": "用户确认门",
+        "focus": ["docs", "docs_confirm", "frontend", "preview_confirm"],
+        "note": "文档或预览未确认时，流程回到对应产物继续修改。"
+      },
+      {
+        "id": "quality-loop",
+        "label": "质量整改闭环",
+        "focus": ["backend", "quality", "delivery"],
+        "note": "质量未通过先整改并重新验证，不能直接进入交付。"
+      }
+    ]
+  },
+  "lanes": [
+    {"id": "discovery", "label": "研究与文档"},
+    {"id": "approval", "label": "用户确认", "variant": "exception"},
+    {"id": "implementation", "label": "规格与实现"},
+    {"id": "assurance", "label": "质量与交付"}
+  ],
+  "phases": [
+    {"id": "understand", "label": "研究", "fromCol": 0, "toCol": 0},
+    {"id": "plan", "label": "文档、确认与规格", "fromCol": 1, "toCol": 2, "variant": "emphasis"},
+    {"id": "build", "label": "前端与预览", "fromCol": 3, "toCol": 3},
+    {"id": "verify_deliver", "label": "后端、验证与交付", "fromCol": 4, "toCol": 5, "variant": "security"}
+  ],
+  "mainPath": ["research", "docs", "docs_confirm", "spec", "frontend", "preview_confirm", "backend", "quality", "delivery"],
+  "semanticChecks": {
+    "allowedRoots": ["research"],
+    "allowedTerminals": ["delivery"],
+    "requiredPaths": [
+      {"from": "research", "to": "delivery"}
+    ]
+  },
+  "nodes": [
+    {"id": "research", "lane": "discovery", "col": 0, "type": "external", "label": "1 Research", "sublabel": "同类产品与约束", "width": 170},
+    {"id": "docs", "lane": "discovery", "col": 1, "type": "backend", "label": "2 Docs", "sublabel": "PRD · 架构 · UI/UX", "width": 200},
+    {"id": "docs_confirm", "lane": "approval", "col": 1, "type": "security", "label": "3 Docs Confirm", "sublabel": "确认或提出修改", "tag": "必需门禁", "width": 200},
+    {"id": "spec", "lane": "implementation", "col": 2, "type": "database", "label": "4 Spec", "sublabel": "proposal · tasks.md", "width": 170},
+    {"id": "frontend", "lane": "implementation", "col": 3, "type": "frontend", "label": "5 Frontend", "sublabel": "实现与运行验证", "width": 180},
+    {"id": "preview_confirm", "lane": "approval", "col": 3, "type": "security", "label": "6 Preview Confirm", "sublabel": "确认预览或继续改版", "tag": "UI 工作必需", "width": 210},
+    {"id": "backend", "lane": "implementation", "col": 4, "type": "backend", "label": "7 Backend", "sublabel": "API · 数据层 · 联调", "width": 180},
+    {"id": "quality", "lane": "assurance", "col": 4, "type": "security", "label": "8 Quality", "sublabel": "红队 · UI 审查 · 质量门禁", "tag": "未通过则整改重验", "width": 210},
+    {"id": "delivery", "lane": "assurance", "col": 5, "type": "cloud", "label": "9 Delivery", "sublabel": "交付包 · 配置 · 审计", "width": 190}
+  ],
+  "edges": [
+    {"id": "research-docs", "from": "research", "to": "docs", "role": "main"},
+    {"id": "docs-confirm", "from": "docs", "to": "docs_confirm", "label": "三文档完成", "role": "main"},
+    {"id": "confirm-spec", "from": "docs_confirm", "to": "spec", "label": "用户确认", "role": "main", "variant": "security"},
+    {"id": "spec-frontend", "from": "spec", "to": "frontend", "role": "main"},
+    {"id": "frontend-preview", "from": "frontend", "to": "preview_confirm", "label": "可运行预览", "role": "main"},
+    {"id": "preview-backend", "from": "preview_confirm", "to": "backend", "label": "用户确认", "role": "main", "variant": "security"},
+    {"id": "backend-quality", "from": "backend", "to": "quality", "label": "实现与联调完成", "role": "main", "variant": "emphasis"},
+    {"id": "quality-delivery", "from": "quality", "to": "delivery", "label": "门禁通过", "role": "main", "variant": "security"}
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "入口与确认权",
+      "items": ["new 直接进入 Research；已有项目先完成 baseline 与确认", "三文档确认前不创建 Spec；标准 UI 工作预览确认前不进入 Backend"]
+    },
+    {
+      "dot": "emerald",
+      "title": "交付事实",
+      "items": ["Delivery 生成工件和审计证据", "delivery_ready 不自动等于 released / deployed / operating"]
+    }
+  ]
+}
