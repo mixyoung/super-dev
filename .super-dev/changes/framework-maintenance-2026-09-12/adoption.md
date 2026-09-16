@@ -1,6 +1,6 @@
 # 周期性框架维护与知识边界加固
 
-日期：2026-09-14，外部复审收口于 2026-09-15。基线：`af875a92b6828896a923c5c7cfc680519647e2fd`。本记录只对应用户已确认的 `framework-maintenance-2026-09-12` 三文档与 P0/P1 实施范围；P2 保持后置评估，不因本记录自动进入实现。
+日期：2026-09-14，外部复审与发布门禁收口于 2026-09-16。基线：`af875a92b6828896a923c5c7cfc680519647e2fd`。本记录只对应用户已确认的 `framework-maintenance-2026-09-12` 三文档与 P0/P1 实施范围；P2 保持后置评估，不因本记录自动进入实现。
 
 ## 问题与现有覆盖
 
@@ -28,6 +28,8 @@ Super Dev 已有单一 Core、标准九阶段、文档/预览确认门、知识�
 外部评审结果仍是低权威证据内容，不能凭 JSON 正文自证独立或替用户接受风险。高风险独立评审只有在调用方显式见证精确评审文件摘要，并同时匹配当前工作项、目标版本和候选摘要时才成立；收集异常失败关闭。残余风险接受是单独的显式质量命令输入，即使存在也不会把未验证或自检结果改称独立。
 
 候选摘要只描述项目候选，不受机器级 Git ignore 或用户本地宿主配置影响。候选清单显式排除 `.claude/settings.local.json`，并覆盖 `core.excludesFile` 的跨机器差异；否则高权限验证与受限质量进程会对同一源码产生不同身份，破坏证据绑定。
+
+发布门禁收口只修复可复现的验证基础设施问题：内置专家摘要统一按 UTF-8 规范化文本计算，避免 CRLF/LF 造成同内容假差异；红队依赖审计继续检查真实 `frontend/`/`backend/`，但不把 `output/` 下的生成参考副本当成第二个发布根重复扣分；GitHub-only 发行构建在存在 `uv.lock` 时使用锁定的 uv 环境，仍保留无 uv 项目的 Python 回退。上述修复不降低红队阈值、不跳过真实锁文件检查，也不改变发布目标。
 
 不采纳项：P2 Skill 拆分和周期自动跟踪本批不实施；不增加知识自治写回、角色团队、评分门槛、第二账本或自动发布/部署。
 
@@ -65,6 +67,7 @@ Super Dev 已有单一 Core、标准九阶段、文档/预览确认门、知识�
 - knowledge/ai/prompt-and-tool-guardrails.md
 - plugins/super-dev-claude/skills/super-dev/SKILL.md
 - plugins/super-dev-codex/skills/super-dev/SKILL.md
+- scripts/release.sh
 - output/external-reviews/framework-maintenance-2026-09-12-independent-review-blocked.json
 - output/framework-maintenance-2026-09-12-architecture-drift.json
 - output/framework-maintenance-2026-09-12-architecture-drift.md
@@ -127,6 +130,7 @@ Super Dev 已有单一 Core、标准九阶段、文档/预览确认门、知识�
 - super_dev/reviewers/external_reviews.py
 - super_dev/reviewers/quality_gate.py
 - super_dev/reviewers/quality_gate_evidence_mixin.py
+- super_dev/reviewers/redteam.py
 - super_dev/shadow_ledger_store.py
 - super_dev/skills/skill_template.py
 - super_dev/specs/generator.py
@@ -142,10 +146,13 @@ Super Dev 已有单一 Core、标准九阶段、文档/预览确认门、知识�
 - tests/unit/test_delivery_facts.py
 - tests/unit/test_expert_profile_v2.py
 - tests/unit/test_quality_gate.py
+- tests/unit/test_redteam.py
+- tests/unit/test_release_script_routing.py
 - tests/unit/test_shadow_ledger_store.py
 - tests/unit/test_work_item_identity.py
 - tests/unit/test_workflow_stage_truth.py
 - tests/unit/test_workflow_state.py
+- uv.lock
 
 ## 验证与未验证
 
@@ -155,8 +162,10 @@ Super Dev 已有单一 Core、标准九阶段、文档/预览确认门、知识�
 
 源码披露获得明确授权后，OpenCode MiniMax 与 DeepSeek 在不同会话完成两轮小范围副本复审；四份结论均按 `CHANGES_REQUIRED` 原样保留，有效问题已定向修复，未用模型自报替代当前候选见证。正式 fresh-verification 在 1800 秒时受阻，候选未变化且进程已清理；此前质量 82.6/90、发布就绪 50/100、proof-pack 27/35，均未通过。尚未全量运行 integration/e2e、跨平台 CI、真实发布、部署或生产运营观察；旧模型审查或未绑定当前候选的报告不能作为当前实现验收。
 
+上述中间态随后完成收口：正式 fresh-verification 运行 `18f6fe3d06174d58a756e092d2bb78e7` 收集 388 项、执行 386 项、跳过 2 项、0 失败/错误；MiniMax-M3 会话 `ses_f59fc1607ffeyAmORScUs6CbQY` 与 DeepSeek-v4-flash 会话 `ses_f59fb6702ffeAZdJJ3jo0WUeM3` 对最终审查包均给出 PASS 且无必改项。Quality Gate 90.6/90、Release Readiness 100/85、Proof Pack 35/35，workflow 持久化为 `delivery_ready`。发布前完整 preflight `output/release/preflight-20260916-100903` 为 PASS：Pytest 3297 通过、10 跳过，Ruff、类型门禁、完整 Mypy、知识审计/门禁、交付 smoke、宿主兼容、Bandit、pip-audit 与 benchmark 全部通过；wheel 与 sdist 随后实际构建并通过 Twine 校验。
+
 ## 决定与回退
 
-用户已确认三文档并授权按确认范围进入 Spec 与实现。P0/P1 采用；P2 暂缓。当前没有提交、推送、合并、发布、部署或全局安装授权。
+用户已确认三文档并授权按确认范围进入 Spec 与实现，后续明确授权提交、合并并发布本 fork 的 GitHub Release。P0/P1 采用；P2 暂缓。发布授权不包含 PyPI、部署、生产运营或全局安装；`released` 不得推导为 `deployed` 或 `operating`。
 
 若验证失败，只回退本 change 在上述明确文件中的差异，并保留用户原有未跟踪文件与其他 change；不得重置整个工作树、降低质量阈值、删失败用例或把未知记为通过。核心语义如需超出已确认文档，必须重新回到架构/文档确认。
