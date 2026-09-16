@@ -108,15 +108,15 @@ super-dev
 
 ---
 
-## 联系开发者
+## 联系开发者与加入社群
 
 <div align="center">
 
 微信号：**Excellent_We**
 
-<img src="super-dev-website/public/wx.png" alt="开发者微信" width="200">
+<img src="docs/assets/superdev-community-qr.png" alt="SuperDev AI 社区：添加开发者好友、加入微信群或飞书群" width="1000">
 
-扫码或搜索微信号联系开发者
+扫码添加开发者好友，或加入 SuperDev AI 社区微信群、飞书群
 
 </div>
 
