@@ -6,12 +6,14 @@
 
 1. [快速开始](./QUICKSTART.md)
 2. [安装方式](./INSTALL_OPTIONS.md)
-3. [宿主使用指南](./HOST_USAGE_GUIDE.md)
+3. [统一接入宿主矩阵](./HOST_MATRIX.md)
+4. [宿主使用指南](./HOST_USAGE_GUIDE.md)
 
 ## 用户文档
 
 - [快速开始](./QUICKSTART.md)
 - [安装方式](./INSTALL_OPTIONS.md)
+- [统一接入宿主矩阵](./HOST_MATRIX.md)
 - [宿主使用指南](./HOST_USAGE_GUIDE.md)
 - [工作流指南（中文）](./WORKFLOW_GUIDE.md)
 - [工作流指南（英文）](./WORKFLOW_GUIDE_EN.md)
