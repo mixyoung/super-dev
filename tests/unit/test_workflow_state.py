@@ -5,7 +5,11 @@ import os
 from pathlib import Path
 
 from super_dev.change_ledger import ChangeLedger
-from super_dev.review_state import save_baseline_confirmation, save_resume_gate
+from super_dev.review_state import (
+    save_baseline_confirmation,
+    save_resume_gate,
+    save_workflow_state,
+)
 from super_dev.workflow_guard import record_stage_progress, save_bound_docs_confirmation
 from super_dev.workflow_state import (
     build_host_entry_prompts,
@@ -431,6 +435,7 @@ def test_detect_pipeline_summary_includes_read_only_shadow_ledger(
         json.dumps(ledger.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    save_workflow_state(temp_project_dir, {"active_change_id": "summary-ledger"})
 
     summary = detect_pipeline_summary(temp_project_dir, include_shadow_ledger=True)
 

@@ -5,6 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .artifact_utils import (
+    normalize_work_item_id,
+    resolve_work_item_identity,
+    sanitize_artifact_name,
+)
+from .atomic_io import atomic_write_text
+from .workflow_contract import ContentEffect, ControlSource, ensure_control_effect_allowed
+
 _WORKFLOW_EVENT_LABELS = {
     "workflow_state_saved": "流程状态已保存",
     "baseline_confirmation_saved": "基线确认状态已更新",
@@ -20,6 +28,91 @@ _WORKFLOW_EVENT_LABELS = {
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _control_source(payload: dict[str, Any]) -> tuple[ControlSource, bool]:
+    raw_source = str(payload.get("_control_source", "system_contract")).strip().lower()
+    try:
+        source = ControlSource(raw_source)
+    except ValueError as exc:
+        raise PermissionError(f"unknown control source: {raw_source}") from exc
+    return source, bool(payload.get("_explicit_user_authority", False))
+
+
+def _normalize_controlled_payload(
+    payload: dict[str, Any], *, effect: ContentEffect
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    source, explicit_user_authority = _control_source(normalized)
+    ensure_control_effect_allowed(
+        source,
+        effect,
+        explicit_user_authority=explicit_user_authority,
+    )
+    normalized.pop("_control_source", None)
+    normalized.pop("_explicit_user_authority", None)
+    return normalized
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> Path:
+    return atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _bind_current_work_item(project_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    identity = resolve_work_item_identity(project_dir)
+    if not identity.legacy and identity.work_item_id:
+        normalized["work_item_id"] = identity.work_item_id
+    return normalized
+
+
+def _only_for_current_work_item(
+    project_dir: Path, payload: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    if payload is None:
+        return None
+    identity = resolve_work_item_identity(project_dir)
+    if identity.legacy:
+        return payload
+    if not identity.valid or not identity.work_item_id:
+        return None
+    return (
+        payload if str(payload.get("work_item_id", "")).strip() == identity.work_item_id else None
+    )
+
+
+def _normalize_work_item_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    if str(normalized.get("flow_variant", "standard")).strip().lower() == "seeai":
+        return normalized
+    if "work_item_id" not in normalized:
+        return normalized
+    work_item_id = normalize_work_item_id(normalized.get("work_item_id", ""))
+    if not work_item_id:
+        raise ValueError("work_item_id cannot be empty when the field is present")
+    normalized["work_item_id"] = work_item_id
+    expected_prefix = sanitize_artifact_name(work_item_id)
+    stored_prefix = str(normalized.get("artifact_prefix", "")).strip()
+    if stored_prefix and stored_prefix != expected_prefix:
+        raise ValueError("artifact_prefix must be derived from work_item_id")
+    normalized["artifact_prefix"] = expected_prefix
+    binding_status = str(normalized.get("binding_status", "")).strip().lower()
+    raw_active_change_id = str(normalized.get("active_change_id", "")).strip()
+    active_change_id = normalize_work_item_id(raw_active_change_id) if raw_active_change_id else ""
+    if raw_active_change_id and not active_change_id:
+        raise ValueError("active_change_id is invalid")
+    if active_change_id:
+        normalized["active_change_id"] = active_change_id
+    if not binding_status:
+        binding_status = "bound" if active_change_id else "pre_spec"
+    if binding_status == "pre_spec" and active_change_id:
+        raise ValueError("pre_spec work item cannot have active_change_id")
+    if binding_status == "bound" and active_change_id != work_item_id:
+        raise ValueError("bound active_change_id must equal work_item_id")
+    if binding_status not in {"pre_spec", "bound"}:
+        raise ValueError("binding_status must be pre_spec or bound")
+    normalized["binding_status"] = binding_status
+    return normalized
 
 
 def review_state_dir(project_dir: Path) -> Path:
@@ -297,7 +390,7 @@ def load_resume_gate(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_ui_revision(project_dir: Path) -> dict[str, Any] | None:
@@ -308,7 +401,7 @@ def load_ui_revision(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_preview_confirmation(project_dir: Path) -> dict[str, Any] | None:
@@ -330,7 +423,7 @@ def load_architecture_revision(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_quality_revision(project_dir: Path) -> dict[str, Any] | None:
@@ -341,7 +434,7 @@ def load_quality_revision(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_host_runtime_validation(project_dir: Path) -> dict[str, Any] | None:
@@ -352,7 +445,7 @@ def load_host_runtime_validation(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_workflow_state(project_dir: Path) -> dict[str, Any] | None:
@@ -377,10 +470,10 @@ def load_workflow_state(project_dir: Path) -> dict[str, Any] | None:
 def save_docs_confirmation(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _normalize_controlled_payload(payload, effect=ContentEffect.CONFIRMATION)
     normalized["updated_at"] = _utc_now()
     file_path = docs_confirmation_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="docs_confirmation_saved",
@@ -394,10 +487,10 @@ def save_docs_confirmation(project_dir: Path, payload: dict[str, Any]) -> Path:
 def save_baseline_confirmation(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _normalize_controlled_payload(payload, effect=ContentEffect.CONFIRMATION)
     normalized["updated_at"] = _utc_now()
     file_path = baseline_confirmation_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="baseline_confirmation_saved",
@@ -411,10 +504,12 @@ def save_baseline_confirmation(project_dir: Path, payload: dict[str, Any]) -> Pa
 def save_resume_gate(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _bind_current_work_item(
+        project_dir, _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = resume_gate_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="resume_gate_saved",
@@ -428,10 +523,12 @@ def save_resume_gate(project_dir: Path, payload: dict[str, Any]) -> Path:
 def save_ui_revision(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _bind_current_work_item(
+        project_dir, _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = ui_revision_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="ui_revision_saved",
@@ -445,10 +542,10 @@ def save_ui_revision(project_dir: Path, payload: dict[str, Any]) -> Path:
 def save_preview_confirmation(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _normalize_controlled_payload(payload, effect=ContentEffect.CONFIRMATION)
     normalized["updated_at"] = _utc_now()
     file_path = preview_confirmation_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="preview_confirmation_saved",
@@ -462,10 +559,12 @@ def save_preview_confirmation(project_dir: Path, payload: dict[str, Any]) -> Pat
 def save_architecture_revision(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _bind_current_work_item(
+        project_dir, _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = architecture_revision_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="architecture_revision_saved",
@@ -479,10 +578,12 @@ def save_architecture_revision(project_dir: Path, payload: dict[str, Any]) -> Pa
 def save_quality_revision(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _bind_current_work_item(
+        project_dir, _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = quality_revision_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="quality_revision_saved",
@@ -496,10 +597,12 @@ def save_quality_revision(project_dir: Path, payload: dict[str, Any]) -> Path:
 def save_host_runtime_validation(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _bind_current_work_item(
+        project_dir, _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = host_runtime_validation_file(project_dir)
-    file_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(file_path, normalized)
     _append_workflow_event(
         project_dir,
         event="host_runtime_validation_saved",
@@ -513,18 +616,20 @@ def save_host_runtime_validation(project_dir: Path, payload: dict[str, Any]) -> 
 def save_workflow_state(project_dir: Path, payload: dict[str, Any]) -> Path:
     state_dir = review_state_dir(project_dir)
     state_dir.mkdir(parents=True, exist_ok=True)
-    normalized = dict(payload)
+    normalized = _normalize_work_item_fields(
+        _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
+    )
     normalized["updated_at"] = _utc_now()
     file_path = workflow_state_file(project_dir)
     serialized = json.dumps(normalized, ensure_ascii=False, indent=2)
-    file_path.write_text(serialized, encoding="utf-8")
+    atomic_write_text(file_path, serialized)
     history_dir = workflow_state_history_dir(project_dir)
     history_dir.mkdir(parents=True, exist_ok=True)
     latest_file = latest_workflow_snapshot_file(project_dir)
-    latest_file.write_text(serialized, encoding="utf-8")
+    atomic_write_text(latest_file, serialized)
     stamp = normalized["updated_at"].replace(":", "").replace("-", "").replace(".", "")
     snapshot_file = history_dir / f"workflow-state-{stamp}.json"
-    snapshot_file.write_text(serialized, encoding="utf-8")
+    atomic_write_text(snapshot_file, serialized)
     _append_workflow_event(
         project_dir,
         event="workflow_state_saved",

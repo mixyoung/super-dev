@@ -47,6 +47,96 @@ class ReviewFinding:
     """补充说明"""
 
 
+@dataclass(frozen=True)
+class ReviewExecutionEvidence:
+    """Execution facts that distinguish an independent review from role-play."""
+
+    review_session_id: str
+    producer_session_id: str
+    model: str
+    provider: str
+    readonly_scope: tuple[str, ...] = ()
+    tool_evidence: tuple[str, ...] = ()
+    file_change_evidence: str = ""
+    work_item_id: str = ""
+    target_version: str = ""
+    candidate_digest: str = ""
+    host_attested: bool = False
+    attestation_evidence: str = ""
+    reviewer_model_family: str = ""
+    producer_model_family: str = ""
+    different_model_family_available: bool = False
+    high_risk: bool = False
+    residual_risk_accepted: bool = False
+
+    @property
+    def minimum_evidence_complete(self) -> bool:
+        return all(
+            (
+                self.review_session_id.strip(),
+                self.producer_session_id.strip(),
+                self.model.strip(),
+                self.provider.strip(),
+                self.readonly_scope,
+                self.tool_evidence,
+                self.file_change_evidence.strip(),
+                self.work_item_id.strip(),
+                self.target_version.strip(),
+                self.candidate_digest.strip(),
+                self.host_attested,
+            )
+        )
+
+    @property
+    def classification(self) -> str:
+        same_session = (
+            bool(self.review_session_id.strip())
+            and self.review_session_id.strip() == self.producer_session_id.strip()
+        )
+        if same_session:
+            return (
+                "risk_accepted" if self.high_risk and self.residual_risk_accepted else "self_review"
+            )
+        if self.minimum_evidence_complete:
+            return "independent"
+        if self.high_risk:
+            return "risk_accepted" if self.residual_risk_accepted else "blocked"
+        return "unverified"
+
+    @property
+    def model_family_note(self) -> str:
+        if not self.different_model_family_available:
+            return "availability_not_recorded"
+        if not self.reviewer_model_family or not self.producer_model_family:
+            return "family_evidence_missing"
+        if self.reviewer_model_family == self.producer_model_family:
+            return "different_family_preferred"
+        return "different_family_used"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "classification": self.classification,
+            "review_session_id": self.review_session_id,
+            "producer_session_id": self.producer_session_id,
+            "model": self.model,
+            "provider": self.provider,
+            "readonly_scope": list(self.readonly_scope),
+            "tool_evidence": list(self.tool_evidence),
+            "file_change_evidence": self.file_change_evidence,
+            "work_item_id": self.work_item_id,
+            "target_version": self.target_version,
+            "candidate_digest": self.candidate_digest,
+            "host_attested": self.host_attested,
+            "attestation_evidence": self.attestation_evidence,
+            "reviewer_model_family": self.reviewer_model_family,
+            "producer_model_family": self.producer_model_family,
+            "different_model_family_available": self.different_model_family_available,
+            "model_family_note": self.model_family_note,
+            "high_risk": self.high_risk,
+            "residual_risk_accepted": self.residual_risk_accepted,
+        }
+
+
 @dataclass
 class CrossReviewReport:
     """交叉审查汇总报告。"""
@@ -59,6 +149,9 @@ class CrossReviewReport:
 
     findings: list[ReviewFinding] = field(default_factory=list)
     """全部审查发现"""
+
+    review_evidence: ReviewExecutionEvidence | None = None
+    """可选执行证据；缺失时不能把角色交叉审查称为独立评审。"""
 
     @property
     def passed_count(self) -> int:
@@ -93,8 +186,23 @@ class CrossReviewReport:
             f"- 未通过: {self.failed_count}",
             f"- 通过率: {self.pass_rate:.1f}%",
             f"- 总体结论: {'PASS' if self.overall_passed else 'FAIL'}",
+            f"- 评审独立性: {self.review_evidence.classification if self.review_evidence else 'unverified'}",
             "",
         ]
+
+        if self.review_evidence:
+            evidence = self.review_evidence.to_dict()
+            lines.extend(
+                [
+                    "## 评审执行证据",
+                    "",
+                    f"- 会话: {evidence['review_session_id']}",
+                    f"- 模型/提供方: {evidence['model']} / {evidence['provider']}",
+                    f"- 只读范围: {', '.join(self.review_evidence.readonly_scope)}",
+                    f"- 文件变化核对: {evidence['file_change_evidence']}",
+                    "",
+                ]
+            )
 
         if self.findings:
             lines.append("## 详细发现")
@@ -109,6 +217,29 @@ class CrossReviewReport:
             lines.append("")
 
         return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "phase": self.phase,
+            "artifact_type": self.artifact_type,
+            "passed": self.overall_passed,
+            "pass_rate": self.pass_rate,
+            "review_independence": (
+                self.review_evidence.to_dict()
+                if self.review_evidence
+                else {"classification": "unverified"}
+            ),
+            "findings": [
+                {
+                    "expert_id": finding.expert_id,
+                    "dimension": finding.dimension,
+                    "item": finding.item,
+                    "passed": finding.passed,
+                    "detail": finding.detail,
+                }
+                for finding in self.findings
+            ],
+        }
 
 
 # ===================================================================
@@ -125,7 +256,13 @@ class CrossReviewEngine:
     """
 
     def __init__(self, toolkits: dict[str, ExpertToolkit] | None = None):
-        self.toolkits: dict[str, ExpertToolkit] = toolkits or get_all_toolkits()
+        self.toolkits: dict[str, ExpertToolkit] = (
+            get_all_toolkits() if toolkits is None else toolkits
+        )
+
+    def _active_toolkits(self, phase: str) -> dict[str, ExpertToolkit]:
+        canonical = get_active_toolkits_for_phase(phase)
+        return {role: self.toolkits[role] for role in canonical if role in self.toolkits}
 
     # ------------------------------------------------------------------
     # 审查矩阵
@@ -182,7 +319,7 @@ class CrossReviewEngine:
         Returns:
             可直接注入 Prompt 的多专家审查指令文本。
         """
-        active = get_active_toolkits_for_phase(phase)
+        active = self._active_toolkits(phase)
         if not active:
             return ""
 
@@ -244,7 +381,7 @@ class CrossReviewEngine:
             :class:`CrossReviewReport` 实例。
         """
         report = CrossReviewReport(phase=phase, artifact_type=artifact_type or phase)
-        active = get_active_toolkits_for_phase(phase)
+        active = self._active_toolkits(phase)
 
         for role, tk in active.items():
             for dim in tk.protocol.review_dimensions:

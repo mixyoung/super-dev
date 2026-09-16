@@ -15,6 +15,7 @@ Expert 定义加载器 — 支持从 Markdown frontmatter 加载专家定义。
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,8 +49,16 @@ class ExpertDefinition:
     model: str = ""
     effort: str = ""  # min/low/medium/high/max
     when_to_use: str = ""
+    when_not_to_use: str = ""
+    required_inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
+    authority: list[str] = field(default_factory=list)
+    non_goals: list[str] = field(default_factory=list)
+    evidence_requirements: list[str] = field(default_factory=list)
+    stop_conditions: list[str] = field(default_factory=list)
     source: str = "builtin"  # builtin / user / project
     file_path: str = ""
+    content_digest: str = ""
 
 
 def _unquote(value: str) -> str:
@@ -168,7 +177,11 @@ def parse_expert_from_markdown(
         title=title,
         description=description,
         goal=goal,
-        backstory=_extract_section(body, "backstory") or str(fm.get("backstory", "")),
+        backstory=(
+            _extract_section(body, "工作立场")
+            or _extract_section(body, "backstory")
+            or str(fm.get("backstory", ""))
+        ),
         focus_areas=_parse_list_field(fm, "focus_areas"),
         thinking_framework=_parse_list_field(fm, "thinking_framework"),
         quality_criteria=_parse_list_field(fm, "quality_criteria"),
@@ -179,8 +192,16 @@ def parse_expert_from_markdown(
         model=str(fm.get("model", "")),
         effort=str(fm.get("effort", "")),
         when_to_use=str(fm.get("when_to_use", "")),
+        when_not_to_use=str(fm.get("when_not_to_use", "")),
+        required_inputs=_parse_list_field(fm, "required_inputs"),
+        outputs=_parse_list_field(fm, "outputs"),
+        authority=_parse_list_field(fm, "authority"),
+        non_goals=_parse_list_field(fm, "non_goals"),
+        evidence_requirements=_parse_list_field(fm, "evidence_requirements"),
+        stop_conditions=_parse_list_field(fm, "stop_conditions"),
         source=source,
         file_path=str(file_path),
+        content_digest=hashlib.sha256(text.encode("utf-8")).hexdigest(),
     )
 
 
@@ -197,8 +218,8 @@ def definition_to_profile(defn: ExpertDefinition) -> ExpertProfile:
     """将 ExpertDefinition 转换为现有的 ExpertProfile 格式。"""
     try:
         role = ExpertRole(defn.role)
-    except ValueError:
-        role = ExpertRole.CODE  # 默认回退
+    except ValueError as exc:
+        raise ValueError(f"unknown expert role: {defn.role}") from exc
 
     return ExpertProfile(
         role=role,
@@ -209,6 +230,19 @@ def definition_to_profile(defn: ExpertDefinition) -> ExpertProfile:
         thinking_framework=defn.thinking_framework,
         quality_criteria=defn.quality_criteria,
         handoff_checklist=defn.handoff_checklist,
+        stages=defn.phases if defn.source != "builtin" else [],
+        when_to_use=defn.when_to_use,
+        when_not_to_use=defn.when_not_to_use,
+        required_inputs=defn.required_inputs,
+        outputs=defn.outputs,
+        authority=defn.authority,
+        non_goals=defn.non_goals,
+        evidence_requirements=defn.evidence_requirements,
+        stop_conditions=defn.stop_conditions,
+        source=defn.source,
+        file_path=defn.file_path,
+        user_authored=defn.source in {"user", "project"},
+        content_digest=defn.content_digest,
     )
 
 
@@ -264,11 +298,15 @@ def load_expert_profiles(
 
     source_priority = {"builtin": 0, "user": 1, "project": 2}
     for defn in sorted(definitions.values(), key=lambda item: source_priority.get(item.source, 0)):
-        # Built-in variants remain explicitly selectable definitions. They must not
-        # replace the general role just because their filenames sort after it.
-        if defn.source == "builtin" and defn.name.upper() != defn.role.upper():
+        # Variants remain explicit definitions, but aliases never replace a regular
+        # runtime role merely because their files sort later or come from a project.
+        if defn.name.upper() != defn.role.upper():
             continue
-        profile = definition_to_profile(defn)
+        try:
+            profile = definition_to_profile(defn)
+        except ValueError:
+            logger.warning("忽略未注册的专家角色 %s (%s)", defn.role, defn.file_path)
+            continue
         profiles[profile.role] = profile
 
     # 如果 Markdown 没有覆盖所有内置角色，从硬编码回退

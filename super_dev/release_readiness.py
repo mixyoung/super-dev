@@ -27,6 +27,14 @@ from .artifact_utils import (
 )
 from .baseline_governance import inspect_baseline_governance
 from .config import ConfigManager
+from .delivery_facts import (
+    DeliveryFacts,
+    OperationalOutcome,
+    merge_preserved_post_delivery_facts,
+    normalize_operational_outcomes,
+    normalize_report_delivery_facts,
+    resolve_project_target_version,
+)
 from .evidence_identity import build_evidence_identity, evidence_identity_matches, load_json_payload
 from .extensions.evidence import build_candidate_identity
 from .framework_harness import FrameworkHarnessBuilder
@@ -81,6 +89,7 @@ class ReleaseReadinessCheck:
 @dataclass
 class ReleaseReadinessReport:
     project_name: str
+    target_version: str = ""
     generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     threshold: int = 85
     checks: list[ReleaseReadinessCheck] = field(default_factory=list)
@@ -90,6 +99,8 @@ class ReleaseReadinessReport:
     workflow_context: dict[str, Any] = field(default_factory=dict)
     baseline_governance: dict[str, Any] = field(default_factory=dict)
     governance_notes: list[str] = field(default_factory=list)
+    delivery_facts: DeliveryFacts | dict[str, Any] | None = None
+    operational_outcomes: list[OperationalOutcome | dict[str, Any]] = field(default_factory=list)
 
     def _weight(self, severity: str) -> int:
         mapping = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -318,8 +329,14 @@ class ReleaseReadinessReport:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        delivery_facts = self._delivery_facts_payload()
+        operational_outcomes = [
+            outcome.to_dict()
+            for outcome in normalize_operational_outcomes(self.operational_outcomes)
+        ]
         return {
             "project_name": self.project_name,
+            "target_version": self.target_version,
             "generated_at": self.generated_at,
             "score": self.score,
             "passed": self.passed,
@@ -333,13 +350,34 @@ class ReleaseReadinessReport:
             "workflow_context": dict(self.workflow_context),
             "baseline_governance": dict(self.baseline_governance),
             "governance_notes": list(self.governance_notes),
+            "delivery_facts": delivery_facts,
+            "operational_outcomes": operational_outcomes,
         }
+
+    def _delivery_facts_payload(self) -> dict[str, Any]:
+        evidence = (
+            [f"release readiness score={self.score}; threshold={self.threshold}"]
+            if self.passed
+            else [
+                "release readiness failed: "
+                + (", ".join(item.name for item in self.failed_checks) or "threshold not met")
+            ]
+        )
+        return normalize_report_delivery_facts(
+            self.delivery_facts,
+            delivery_ready=self.passed,
+            evidence=evidence,
+            source="release_readiness",
+            observed_at=self.generated_at,
+            target_version=self.target_version,
+        ).to_dict()
 
     def to_markdown(self) -> str:
         lines = [
             "# Release Readiness Report",
             "",
             f"- Project: `{self.project_name}`",
+            f"- Target version: `{self.target_version or 'unknown'}`",
             f"- Generated at (UTC): {self.generated_at}",
             f"- Score: {self.score}/100",
             f"- Threshold: {self.threshold}",
@@ -351,6 +389,29 @@ class ReleaseReadinessReport:
             self.executive_summary,
             "",
         ]
+        facts = self._delivery_facts_payload()
+        lines.extend(
+            [
+                "## Post-delivery Facts",
+                "",
+                "这些是相互独立的证据事实，不是新阶段，也不能互相推导。",
+                "",
+            ]
+        )
+        for name in ("delivery_ready", "released", "deployed", "operating"):
+            fact = facts.get(name, {}) if isinstance(facts, dict) else {}
+            status = fact.get("status", "unknown") if isinstance(fact, dict) else "unknown"
+            lines.append(f"- {name}: `{status}`")
+        lines.append("")
+        outcomes = normalize_operational_outcomes(self.operational_outcomes)
+        if outcomes:
+            lines.extend(["## Operational Outcomes", ""])
+            for outcome in outcomes:
+                lines.append(
+                    f"- [{outcome.confidence}] {outcome.signal or '未命名信号'} "
+                    f"(source={outcome.source or 'unknown'}, version={outcome.target_version or 'unknown'})"
+                )
+            lines.append("")
         if self.workflow_context:
             lines.extend(
                 [
@@ -496,6 +557,9 @@ class ReleaseReadinessEvaluator:
             fallback_name=self.project_dir.name,
         )
         config = ConfigManager(self.project_dir).load()
+        self.target_version = resolve_project_target_version(
+            self.project_dir, configured_version=str(config.version or "")
+        )
         frontend = str(config.frontend or "").strip().lower()
         self.frontend_required = bool(frontend and frontend != "none")
         self.fresh_verification_required = fresh_verification_required(config)
@@ -527,7 +591,18 @@ class ReleaseReadinessEvaluator:
         verify_tests: bool = False,
         preflight_checks: tuple[ReleaseReadinessCheck, ...] = (),
     ) -> ReleaseReadinessReport:
-        report = ReleaseReadinessReport(project_name=self.project_name)
+        report = ReleaseReadinessReport(
+            project_name=self.project_name,
+            target_version=self.target_version,
+        )
+        previous = load_json_payload(
+            self.output_dir / f"{self.project_name}-release-readiness.json"
+        )
+        previous_outcomes = previous.get("operational_outcomes", [])
+        if isinstance(previous_outcomes, list):
+            report.operational_outcomes = [
+                item for item in previous_outcomes if isinstance(item, dict)
+            ]
         pipeline_summary = detect_pipeline_summary(self.project_dir)
         report.workflow_context = build_host_workflow_context(
             self.project_dir,
@@ -579,6 +654,12 @@ class ReleaseReadinessEvaluator:
             report.checks.append(self._check_test_suite())
         if preflight_checks:
             report.checks = [*preflight_checks, *report.checks]
+        current_facts = DeliveryFacts.from_dict(report._delivery_facts_payload())
+        preserved_facts = previous.get("delivery_facts", {})
+        report.delivery_facts = merge_preserved_post_delivery_facts(
+            current_facts,
+            preserved_facts if isinstance(preserved_facts, dict) else {},
+        )
         return report
 
     def write(self, report: ReleaseReadinessReport) -> dict[str, Path]:

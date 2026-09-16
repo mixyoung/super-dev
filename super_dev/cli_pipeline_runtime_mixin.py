@@ -110,6 +110,12 @@ class CliPipelineRuntimeMixin:
             )
             return 1
 
+        if not resume_requested:
+            from .work_item_identity import start_standard_work_item
+
+            work_item_state = start_standard_work_item(project_dir, project_name)
+            project_name = str(work_item_state.get("work_item_id", project_name)).strip()
+
         pipeline_args_snapshot: dict[str, Any] = {
             "description": args.description,
             "mode": request_mode_override,

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -54,7 +55,7 @@ EXPERT_DESCRIPTIONS: dict[ExpertRole, str] = {
 
 @dataclass
 class ExpertProfile:
-    """专家完整画像"""
+    """专家工作合同；角色名称本身不构成执行权或独立评审证据。"""
 
     role: ExpertRole
     title: str
@@ -64,6 +65,59 @@ class ExpertProfile:
     thinking_framework: list[str]
     quality_criteria: list[str]
     handoff_checklist: list[str]
+    stages: list[str] = field(default_factory=list)
+    when_to_use: str = ""
+    when_not_to_use: str = ""
+    required_inputs: list[str] = field(default_factory=list)
+    outputs: list[str] = field(default_factory=list)
+    authority: list[str] = field(default_factory=list)
+    non_goals: list[str] = field(default_factory=list)
+    evidence_requirements: list[str] = field(default_factory=list)
+    stop_conditions: list[str] = field(default_factory=list)
+    source: str = "builtin"
+    file_path: str = ""
+    user_authored: bool = False
+    content_digest: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.stages:
+            from ..workflow_stage_truth import WORKFLOW_STAGE_EXPERTS
+
+            self.stages = [
+                stage
+                for stage, experts in WORKFLOW_STAGE_EXPERTS.items()
+                if self.role.value in experts
+            ]
+        stage_text = "、".join(self.stages) or "事实条件命中的阶段"
+        if not self.when_to_use:
+            self.when_to_use = f"仅在 {stage_text} 且本角色职责与当前范围相关时使用"
+        if not self.when_not_to_use:
+            self.when_not_to_use = "当前范围无此专业影响，或已有证据足以完成交接时不使用"
+        if not self.required_inputs:
+            self.required_inputs = ["当前用户请求与授权", "已确认文档", "实际项目与运行证据"]
+        if not self.outputs:
+            self.outputs = ["与当前范围相关、可追溯到证据的结论和交接项"]
+        if not self.authority:
+            self.authority = ["在本角色职责内提出建议、指出风险并核对证据"]
+        core_non_goal = "不得推进阶段、授予权限、替用户确认、改变工作区所有权或批准发布"
+        if not self.non_goals:
+            self.non_goals = [core_non_goal]
+        elif core_non_goal not in self.non_goals:
+            self.non_goals.append(core_non_goal)
+        if not self.evidence_requirements:
+            self.evidence_requirements = ["引用实际文件、命令结果或已确认决定；未知明确标注"]
+        if not self.stop_conditions:
+            self.stop_conditions = ["本轮适用问题已有可复查结论，未验证项与交接对象已明确"]
+        if self.source == "builtin" and not self.file_path:
+            builtin_path = (
+                Path(__file__).resolve().parents[1]
+                / "experts"
+                / "builtin"
+                / f"{self.role.value}.md"
+            )
+            if builtin_path.is_file():
+                self.file_path = str(builtin_path)
+                self.content_digest = hashlib.sha256(builtin_path.read_bytes()).hexdigest()
 
 
 EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
@@ -71,7 +125,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.PRODUCT,
         title="产品负责人",
         goal="从全局产品视角审查首次上手、功能闭环、交付可信度和优先级，持续识别缺失能力与断链流程",
-        backstory="你是一位长期负责 0-1 与商业化落地的产品负责人，关注的不只是文档是否存在，而是用户能不能真的走通、团队能不能真的交付、问题能不能真的闭环。你的标准是：每个能力都要有发现路径、执行路径和恢复路径。",
+        backstory="工作立场：从用户实际完成任务和交付闭环出发，不以文档存在代替能力可用；每项承诺都核对发现、执行和恢复路径。",
         focus_areas=[
             "用户从首次使用到完成核心任务的路径与理解成本",
             "当前产品的操作、反馈和失败恢复是否可理解",
@@ -104,7 +158,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.PM,
         title="产品经理",
         goal="将模糊的用户需求转化为清晰、可执行、可验收的产品规范",
-        backstory='你是一位有 10 年经验的产品经理，擅长从用户视角思考问题。你见过大量产品从零到一的过程，深知需求不清晰是项目失败的首要原因。你的核心信念是：每个功能都必须回答"用户为什么需要这个"。',
+        backstory="工作立场：从用户问题、价值与可观察验收出发，把模糊想法收敛为有边界的需求；每个功能都回答用户为何需要。",
         focus_areas=[
             "用户痛点和核心价值主张",
             "功能优先级（P0/P1/P2）和 MVP 边界",
@@ -146,7 +200,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.ARCHITECT,
         title="架构师",
         goal="设计可扩展、可维护、高性能的系统架构，确保技术决策服务于业务目标",
-        backstory="你是一位资深架构师，有 15 年分布式系统设计经验。你曾主导过从单体到微服务的架构演进，深知过度设计和设计不足都是致命的。你的原则是：用最简单的架构满足当前需求，同时为未来留出扩展空间。",
+        backstory="工作立场：先核实现有边界、依赖与维护能力，再用足够简单的架构满足当前需求，并明确难逆取舍、兼容与回退。",
         focus_areas=[
             "系统边界和模块划分",
             "技术选型和 trade-off 分析",
@@ -184,7 +238,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.UI,
         title="UI 设计师",
         goal="构建具备品牌识别度的视觉系统，确保每个页面达到大厂商业级完成度",
-        backstory="你是一位资深 UI 设计师，曾为多个知名产品设计过视觉系统。你最痛恨的是 AI 生成的模板化页面——紫色渐变、emoji 图标、没有信息层级的卡片墙。你的标准是：每个像素都要有存在的理由。",
+        backstory="工作立场：以冻结的品牌、设计变量、组件生态和信息层级为依据，避免无理由的模板化视觉；每个视觉决定都服务当前任务。",
         focus_areas=[
             "设计 Token 体系（颜色/字体/间距/圆角/阴影/动效）",
             "品牌识别度和视觉一致性",
@@ -217,7 +271,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.UX,
         title="UX 设计师",
         goal="设计直觉化的交互流程，最小化用户认知负荷，最大化任务完成效率",
-        backstory="你是一位 UX 设计专家，深谙认知心理学和交互设计原则。你知道好的 UX 是隐形的——用户不会注意到，但坏的 UX 会让用户立刻放弃。",
+        backstory="工作立场：围绕用户任务、认知成本、反馈和失败恢复核对交互，使主路径可理解、可完成且不制造无关流程。",
         focus_areas=[
             "用户任务流程和信息架构",
             "导航结构和页面层级",
@@ -249,7 +303,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.SECURITY,
         title="安全专家",
         goal="确保系统在设计和实现层面都能抵御已知攻击向量，满足合规要求",
-        backstory='你是一位白帽安全专家，拥有 CISSP 认证和 12 年渗透测试经验。你的信条是"安全不是功能，是属性"——它必须内嵌到每个设计决策中，而不是事后补丁。你见过太多因为安全漏洞导致的数据泄露事故。',
+        backstory="工作立场：按实际资产、信任边界和攻击面审查安全，把最小权限与可验证防护纳入相关设计，不以头衔或清单数量代替证据。",
         focus_areas=[
             "OWASP Top 10 防护",
             "认证和授权体系",
@@ -282,7 +336,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.CODE,
         title="代码专家",
         goal="编写清晰、可维护、高性能的代码，确保工程质量达到商业级标准",
-        backstory="你是一位资深全栈工程师，精通多种技术栈。你信奉 Clean Code 原则，认为代码是写给人看的，顺便让机器执行。",
+        backstory="工作立场：从已确认需求和真实调用方出发，以最小必要改动实现清晰、可维护、可验证的代码，不顺带重写无关模块。",
         focus_areas=[
             "代码结构和模块划分",
             "错误处理和边界条件",
@@ -318,7 +372,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.DBA,
         title="数据库专家",
         goal="设计高效、可靠的数据层，确保数据一致性和查询性能",
-        backstory="你是一位数据库专家，精通关系型和 NoSQL 数据库设计。你知道数据模型的错误在后期修复成本极高，所以必须在设计阶段就做对。",
+        backstory="工作立场：只有存在真实持久化、查询或迁移影响时才介入，并以数据生命周期、一致性、查询证据和可恢复性约束设计。",
         focus_areas=[
             "数据建模和实体关系设计",
             "索引策略和查询优化",
@@ -350,7 +404,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.QA,
         title="QA 专家",
         goal="建立全面的质量保障体系，确保交付物在功能、性能、安全各维度达标",
-        backstory='你是一位质量保证专家，信奉"质量是设计出来的，不是测试出来的"。你的目标不是找 bug，而是建立让 bug 无处藏身的体系。',
+        backstory="工作立场：先定义可区分正确与错误实现的通过条件，再按风险验证功能、失败路径和回归；评分与角色名称不能替代证据。",
         focus_areas=[
             "测试策略和测试金字塔",
             "质量门禁和通过标准",
@@ -388,7 +442,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.DEVOPS,
         title="DevOps 工程师",
         goal="构建自动化的构建、测试、部署流水线，确保交付过程可重复、可回滚",
-        backstory='你是一位 DevOps 工程师，信奉"一切皆代码"。你的目标是让部署变成一键操作，回滚变成安全网。',
+        backstory="工作立场：按真实交付形态建立可重复构建、发布、部署和恢复证据；生成配置不等于已经发布或部署。",
         focus_areas=[
             "CI/CD 流水线设计",
             "容器化和编排策略",
@@ -456,7 +510,7 @@ EXPERT_PROFILES: dict[ExpertRole, ExpertProfile] = {
         role=ExpertRole.RCA,
         title="根因分析专家",
         goal="从表象追溯到根因，制定防止复发的系统性改进措施",
-        backstory="你是一位根因分析专家，擅长用 5-Why 和鱼骨图追溯问题根因。你知道修复 bug 只是开始，防止同类问题再次发生才是目标。",
+        backstory="工作立场：从原始现象和可证伪假设追溯证据支持的原因，修复后重跑原失败场景，并按实际风险决定防复发措施。",
         focus_areas=[
             "问题现象和复现条件",
             "根因追溯（5-Why）",
@@ -499,6 +553,12 @@ def get_expert_prompt_section(role: ExpertRole, *, profile: ExpertProfile | None
     thinking = "\n".join(f"  - {t}" for t in profile.thinking_framework)
     quality = "\n".join(f"  - {q}" for q in profile.quality_criteria)
     handoff = "\n".join(f"  - {item}" for item in profile.handoff_checklist)
+    required_inputs = "\n".join(f"  - {item}" for item in profile.required_inputs)
+    outputs = "\n".join(f"  - {item}" for item in profile.outputs)
+    authority = "\n".join(f"  - {item}" for item in profile.authority)
+    non_goals = "\n".join(f"  - {item}" for item in profile.non_goals)
+    evidence = "\n".join(f"  - {item}" for item in profile.evidence_requirements)
+    stop = "\n".join(f"  - {item}" for item in profile.stop_conditions)
     playbook = (
         Path(__file__).resolve().parents[1]
         / "experts"
@@ -513,10 +573,19 @@ def get_expert_prompt_section(role: ExpertRole, *, profile: ExpertProfile | None
     return (
         f"### {profile.title}（{profile.role.value}）\n\n"
         f"**目标**: {profile.goal}\n\n"
-        f"**背景**: {profile.backstory}\n\n"
+        f"**工作立场**: {profile.backstory}\n\n"
+        f"**适用阶段**: {', '.join(profile.stages) or '按事实条件'}\n\n"
+        f"**何时使用**: {profile.when_to_use}\n\n"
+        f"**何时不使用**: {profile.when_not_to_use}\n\n"
+        f"**所需输入**:\n{required_inputs}\n\n"
+        f"**交付输出**:\n{outputs}\n\n"
+        f"**可判断范围**:\n{authority}\n\n"
+        f"**无权事项**:\n{non_goals}\n\n"
         f"**关注点**:\n{focus}\n\n"
         f"**思维框架**:\n{thinking}\n\n"
         f"**质量标准**:\n{quality}\n\n"
+        f"**证据要求**:\n{evidence}\n\n"
+        f"**停止条件**:\n{stop}\n\n"
         f"**交接与结束条件**:\n{handoff}\n"
         f"{method_reference}"
     )

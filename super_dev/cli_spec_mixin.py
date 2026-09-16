@@ -156,6 +156,13 @@ class CliSpecMixin:
         elif args.spec_action == "propose":
             if not self._ensure_execution_gates(project_dir, action_label="创建 Spec 变更"):
                 return 1
+            from .workflow_guard import require_spec_work_item_binding
+
+            try:
+                require_spec_work_item_binding(project_dir, args.change_id)
+            except Exception as exc:
+                self.console.print(f"[red]创建 Spec 变更被工作项绑定门禁阻止: {exc}[/red]")
+                return 1
             generator = SpecGenerator(project_dir)
             change = generator.create_change(
                 change_id=args.change_id,
@@ -167,6 +174,14 @@ class CliSpecMixin:
             scaffolded_files: dict[str, Path] = {}
             if not bool(getattr(args, "no_scaffold", False)):
                 scaffolded_files = generator.scaffold_change_artifacts(change.id, force=False)
+
+            from .work_item_identity import bind_standard_work_item
+
+            try:
+                bind_standard_work_item(project_dir, change.id)
+            except Exception as exc:
+                self.console.print(f"[red]正式 change 绑定失败: {exc}[/red]")
+                return 1
 
             shadow_result: dict[str, Any] = {}
             if scaffolded_files:

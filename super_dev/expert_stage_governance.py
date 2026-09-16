@@ -4,8 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .config import ConfigManager
+from .shadow_ledger_store import build_shadow_ledger_summary
 from .workflow_guard import load_stage_ledger
-from .workflow_stage_truth import CANONICAL_WORKFLOW_STAGE_CHAIN, active_experts_for_stage
+from .workflow_stage_truth import (
+    CANONICAL_WORKFLOW_STAGE_CHAIN,
+    applicable_experts_for_stage,
+)
 
 _LEDGER_STAGE_FALLBACKS: dict[str, tuple[str, ...]] = {
     "docs_confirm": ("docs_confirm", "docs"),
@@ -53,6 +58,13 @@ def collect_expert_stage_governance(
     project_dir = Path(project_dir).resolve()
     pipeline_state = _load_pipeline_state(project_dir)
     ledger = load_stage_ledger(project_dir)
+    config = ConfigManager(project_dir).config
+    shadow_summary = build_shadow_ledger_summary(project_dir)
+    changed_surfaces = (
+        list(shadow_summary.get("changed_surfaces", []))
+        if isinstance(shadow_summary.get("changed_surfaces"), list)
+        else []
+    )
     normalized_stage_statuses = {
         str(key).strip(): str(value).strip()
         for key, value in (stage_statuses or {}).items()
@@ -70,7 +82,14 @@ def collect_expert_stage_governance(
 
     for stage in CANONICAL_WORKFLOW_STAGE_CHAIN:
         stage_status = normalized_stage_statuses.get(stage, "pending")
-        expected_experts = list(active_experts_for_stage(stage))
+        expected_experts = list(
+            applicable_experts_for_stage(
+                stage,
+                changed_surfaces=changed_surfaces,
+                frontend=config.frontend,
+                database=config.database,
+            )
+        )
         ledger_entry = _ledger_entry_for_stage(ledger, stage)
         recorded_experts = _extract_recorded_experts(ledger_entry)
         if not recorded_experts and stage == current_stage:

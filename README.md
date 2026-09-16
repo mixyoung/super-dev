@@ -217,19 +217,19 @@ super-dev uninstall
 
 | 专家 | 角色 | 注入阶段 |
 |------|------|----------|
-| PRODUCT | 产品负责人 | research, prd, quality, delivery |
-| PM | 产品经理 | research, prd |
-| ARCHITECT | 系统架构师 | architecture |
-| UI | 界面设计师 | uiux, frontend |
-| UX | 交互设计师 | uiux, frontend |
-| SECURITY | 安全工程师 | architecture, backend, quality |
-| CODE | 开发工程师 | frontend, backend |
-| DBA | 数据库工程师 | architecture, backend |
-| QA | 质量工程师 | quality |
+| PRODUCT | 产品负责人 | baseline, research, docs_confirm, preview_confirm, quality, delivery, polish |
+| PM | 产品经理 | research, docs, docs_confirm, spec, build_fullstack |
+| ARCHITECT | 系统架构师 | baseline, research, docs, spec, backend, build_fullstack |
+| UI | 界面设计师 | docs, frontend, preview_confirm, build_fullstack, polish |
+| UX | 交互设计师 | docs, frontend, preview_confirm, polish |
+| SECURITY | 安全工程师 | quality |
+| CODE | 开发工程师 | baseline, spec, frontend, backend, build_fullstack |
+| DBA | 数据库工程师 | backend |
+| QA | 质量工程师 | frontend, backend, quality, delivery, build_fullstack, polish |
 | DEVOPS | 运维工程师 | delivery |
-| RCA | 根因分析师 | quality, delivery |
+| RCA | 根因分析师 | quality |
 
-每个专家具备四层武装：Profile（目标定义、背景故事、思维框架、质量标准）+ Knowledge（阶段知识自动推送）+ Rules（验证规则绑定）+ Protocol（交叉审查协议）。每位专家配备 350+ 行深度 Playbook 操作手册，生成的 AI 提示词超过 600 行，确保每个阶段的输出符合该领域的专业基线。
+每个专家具备四层能力：Profile（适用条件、输入输出、权限边界、证据、停止与交接合同）+ Knowledge（阶段知识自动推送）+ Rules（验证规则绑定）+ Protocol（交叉审查协议）。角色权威来自可复查的工作合同和证据，不来自虚构履历；同一模型切换角色仍是自检，不自动成为独立评审。
 
 ### 2. UI 智能设计系统
 

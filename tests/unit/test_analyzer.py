@@ -636,6 +636,61 @@ class TestFeatureChecklistBuilder:
         assert "# Feature Checklist" in markdown
         assert "数据看板" in markdown
 
+    def test_research_priority_roadmap_is_not_an_explicit_gap(self, temp_project_dir: Path) -> None:
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "current-change-prd.md").write_text(
+            "# PRD\n\n## 2. 功能范围\n\n### 核心能力\n\n- 候选身份确定性\n",
+            encoding="utf-8",
+        )
+        change_dir = temp_project_dir / ".super-dev" / "changes" / "current-change"
+        change_dir.mkdir(parents=True)
+        (change_dir / "tasks.md").write_text("# Tasks\n\n- [x] 候选身份确定性\n", encoding="utf-8")
+        (temp_project_dir / ".super-dev" / "workflow-state.json").write_text(
+            json.dumps({"active_change_id": "current-change"}), encoding="utf-8"
+        )
+        (output_dir / "current-change-research.md").write_text(
+            "## 建议的吸收优先级\n\n"
+            "| 优先级 | 建议 | 来源 |\n| --- | --- | --- |\n"
+            "| P0 | 候选身份确定性 | 现状分析 |\n",
+            encoding="utf-8",
+        )
+
+        report = FeatureChecklistBuilder(temp_project_dir).build()
+
+        assert report.status == "ready"
+        assert report.covered_count == 1
+        assert report.high_priority_gap_count == 0
+        assert report.explicit_gaps == []
+
+    def test_research_priority_roadmap_is_a_gap_when_linked_task_is_incomplete(
+        self, temp_project_dir: Path
+    ) -> None:
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "current-change-prd.md").write_text(
+            "# PRD\n\n## 2. 功能范围\n\n### 核心能力\n\n- 候选身份确定性\n",
+            encoding="utf-8",
+        )
+        change_dir = temp_project_dir / ".super-dev" / "changes" / "current-change"
+        change_dir.mkdir(parents=True)
+        (change_dir / "tasks.md").write_text("# Tasks\n\n- [ ] 候选身份确定性\n", encoding="utf-8")
+        (temp_project_dir / ".super-dev" / "workflow-state.json").write_text(
+            json.dumps({"active_change_id": "current-change"}), encoding="utf-8"
+        )
+        (output_dir / "current-change-research.md").write_text(
+            "## 建议的吸收优先级\n\n"
+            "| 优先级 | 建议 | 来源 |\n| --- | --- | --- |\n"
+            "| P0 | 候选身份确定性 | 现状分析 |\n",
+            encoding="utf-8",
+        )
+
+        report = FeatureChecklistBuilder(temp_project_dir).build()
+
+        assert report.status == "partial"
+        assert report.high_priority_gap_count == 1
+        assert report.explicit_gaps[0].title == "候选身份确定性"
+
     def test_feature_checklist_ignores_host_runtime_validation_noise(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)

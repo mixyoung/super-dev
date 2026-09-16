@@ -257,19 +257,19 @@ Super Dev currently ships with eleven domain-expert agents. Each expert is injec
 
 | Expert | Role | Injection Stages |
 |--------|------|-----------------|
-| PRODUCT | Product Lead | research, prd, quality, delivery |
-| PM | Product Manager | research, prd |
-| ARCHITECT | System Architect | architecture |
-| UI | Interface Designer | uiux, frontend |
-| UX | Interaction Designer | uiux, frontend |
-| SECURITY | Security Engineer | architecture, backend, quality |
-| CODE | Software Engineer | frontend, backend |
-| DBA | Database Architect | architecture, backend |
-| QA | Quality Assurance | quality |
+| PRODUCT | Product Lead | baseline, research, docs_confirm, preview_confirm, quality, delivery, polish |
+| PM | Product Manager | research, docs, docs_confirm, spec, build_fullstack |
+| ARCHITECT | System Architect | baseline, research, docs, spec, backend, build_fullstack |
+| UI | Interface Designer | docs, frontend, preview_confirm, build_fullstack, polish |
+| UX | Interaction Designer | docs, frontend, preview_confirm, polish |
+| SECURITY | Security Engineer | quality |
+| CODE | Software Engineer | baseline, spec, frontend, backend, build_fullstack |
+| DBA | Database Architect | backend |
+| QA | Quality Assurance | frontend, backend, quality, delivery, build_fullstack, polish |
 | DEVOPS | DevOps Engineer | delivery |
-| RCA | Root Cause Analyst | quality, delivery |
+| RCA | Root Cause Analyst | quality |
 
-Each expert carries: objective definition, background story, thinking framework, and quality criteria. The generated AI prompts ensure every stage meets domain-specific professional baselines.
+Each expert carries a work contract: applicability, required inputs, outputs, authority limits, evidence, stopping conditions, and handoff. Authority comes from verifiable scope and evidence, not a fictional biography; changing roles in one model session remains self-review rather than independent review.
 
 ### 2. UI Design Intelligence System
 

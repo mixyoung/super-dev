@@ -874,10 +874,22 @@ import {{ Save, Search, Settings }} from 'lucide-react';
     def _get_active_experts_for_phase(self) -> dict:
         """根据当前阶段返回激活的专家工具箱。"""
         try:
-            from ..experts.toolkit import PHASE_EXPERT_MAP
+            from ..config import get_config_manager
+            from ..shadow_ledger_store import build_shadow_ledger_summary
+            from ..workflow_stage_truth import applicable_experts_for_stage
 
             phase = self._current_phase()
-            expert_ids = PHASE_EXPERT_MAP.get(phase, [])
+            config = get_config_manager(self.project_dir).config
+            shadow = build_shadow_ledger_summary(self.project_dir)
+            changed_surfaces = shadow.get("changed_surfaces", [])
+            if not isinstance(changed_surfaces, list):
+                changed_surfaces = []
+            expert_ids = applicable_experts_for_stage(
+                phase,
+                changed_surfaces=changed_surfaces,
+                frontend=config.frontend,
+                database=config.database,
+            )
             return {eid: self._toolkits[eid] for eid in expert_ids if eid in self._toolkits}
         except Exception:
             return {}

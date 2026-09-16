@@ -16,11 +16,13 @@ from typing import Any, Optional
 from ..artifact_utils import (
     resolve_active_change_id,
     resolve_current_artifact_prefix,
+    resolve_work_item_identity,
 )
 from ..baseline_governance import inspect_baseline_governance
 from ..config import ConfigManager
 from ..host_runtime_governance import collect_layered_runtime_governance_gap
 from ..host_workflow_context import build_host_workflow_context
+from ..shadow_ledger_store import build_shadow_ledger_summary
 from ..workflow_guard import docs_gate_status
 from .fresh_verification_evidence import (
     FreshVerificationEvidence,
@@ -55,6 +57,20 @@ try:
     REVIEW_AGENTS_AVAILABLE = True
 except ImportError:
     REVIEW_AGENTS_AVAILABLE = False
+
+
+HIGH_RISK_CHANGE_SURFACES = frozenset(
+    {
+        "auth",
+        "authorization",
+        "database",
+        "data",
+        "migration",
+        "permission",
+        "schema",
+        "security",
+    }
+)
 
 
 @dataclass
@@ -481,6 +497,8 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         threshold_override: int | None = None,
         host_compatibility_min_score_override: int | None = None,
         host_compatibility_min_ready_hosts_override: int | None = None,
+        attested_review_files: dict[str, str] | None = None,
+        residual_review_risk_accepted: bool = False,
     ):
         self.project_dir = Path(project_dir).resolve()
         self.name = resolve_current_artifact_prefix(
@@ -492,6 +510,8 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         self.latest_ui_review_report: Any = None
         self.latest_fresh_verification_dependencies: list[Path] = []
         self.threshold_override = threshold_override
+        self.attested_review_files = dict(attested_review_files or {})
+        self.residual_review_risk_accepted = residual_review_risk_accepted
         config = ConfigManager(self.project_dir).load()
         self.platform = (
             str(self.tech_stack.get("platform") or config.platform or "").strip().lower()
@@ -632,6 +652,45 @@ class QualityGateChecker(QualityGateEvidenceMixin):
     def check(self, redteam_report: Optional["RedTeamReport"] = None) -> QualityGateResult:
         """执行质量门禁检查"""
         checks: list[QualityCheck] = []
+        shadow_summary_error = ""
+        try:
+            shadow_summary = build_shadow_ledger_summary(self.project_dir)
+        except Exception as exc:
+            shadow_summary = {}
+            shadow_summary_error = f"{type(exc).__name__}: {exc}"
+        raw_surfaces = shadow_summary.get("changed_surfaces", [])
+        changed_surfaces = {
+            str(item).strip().lower()
+            for item in (raw_surfaces if isinstance(raw_surfaces, list) else [])
+            if str(item).strip()
+        }
+        scope_determined = bool(
+            shadow_summary.get("scope_advisory_present") is True
+            and shadow_summary.get("scope_complete") is True
+        )
+        identity = resolve_work_item_identity(self.project_dir)
+        explicit_standard_scope = not identity.legacy
+        risk_scope_undetermined = not scope_determined
+        high_risk_change = bool(changed_surfaces & HIGH_RISK_CHANGE_SURFACES) or (
+            explicit_standard_scope and risk_scope_undetermined
+        )
+        if risk_scope_undetermined:
+            checks.append(
+                QualityCheck(
+                    name="High-Risk Scope: undetermined",
+                    category="external_review_advisory",
+                    description=(
+                        "当前标准工作项缺少完整 scope advisory，风险表面按未知处理并保守要求"
+                        "独立复审"
+                        if explicit_standard_scope
+                        else "旧版/兼容工作流未提供完整 scope advisory；风险分类未知，已显式记录"
+                    )
+                    + (f"；读取异常：{shadow_summary_error}" if shadow_summary_error else ""),
+                    status=CheckStatus.WARNING,
+                    score=0,
+                    weight=0.0,
+                )
+            )
 
         # 1. 文档质量检查
         checks.extend(self._check_documentation())
@@ -695,9 +754,20 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         # 8. 加载专家特定的验证规则（如果专家工具箱可用）
         try:
             from ..experts.toolkit import load_expert_toolkits
+            from ..workflow_stage_truth import applicable_experts_for_stage
 
             toolkits = load_expert_toolkits()
+            active_quality_experts = set(
+                applicable_experts_for_stage(
+                    "quality",
+                    changed_surfaces=changed_surfaces,
+                    frontend=str(self.tech_stack.get("frontend", "")),
+                    database=str(self.tech_stack.get("database", "")),
+                )
+            )
             for expert_id, toolkit in toolkits.items():
+                if expert_id not in active_quality_experts:
+                    continue
                 if hasattr(toolkit, "rules") and hasattr(toolkit.rules, "validation_rule_ids"):
                     for rule_id in toolkit.rules.validation_rule_ids:
                         # 检查该规则是否已在 rule_engine 中注册
@@ -721,37 +791,111 @@ class QualityGateChecker(QualityGateEvidenceMixin):
             pass
 
         # 9. 收集外部审查结果 (CodeRabbit / Qodo / GitHub PR / Custom)
+        external = []
+        collection_error = ""
         try:
             from .external_reviews import ExternalReviewCollector
 
-            collector = ExternalReviewCollector(self.project_dir)
+            collector = ExternalReviewCollector(
+                self.project_dir,
+                attested_review_files=self.attested_review_files,
+                high_risk=high_risk_change,
+                residual_risk_accepted=self.residual_review_risk_accepted,
+            )
             external = collector.collect_all()
-            for review in external:
-                checks.append(
-                    QualityCheck(
-                        name=f"External Review: {review.source}",
-                        category="external_review",
-                        description=review.summary,
-                        status=(CheckStatus.PASSED if review.passed else CheckStatus.WARNING),
-                        score=review.score,
-                    )
+        except Exception as exc:
+            collection_error = f"{type(exc).__name__}: {exc}"
+
+        if collection_error:
+            checks.append(
+                QualityCheck(
+                    name="External Review: evidence collection",
+                    category=(
+                        "external_review" if high_risk_change else "external_review_advisory"
+                    ),
+                    description=f"外部评审证据读取失败：{collection_error}",
+                    status=(CheckStatus.FAILED if high_risk_change else CheckStatus.WARNING),
+                    score=0 if high_risk_change else 50,
                 )
-        except Exception:
-            pass
+            )
+
+        independent_review_satisfied = any(
+            review.passed and review.independence == "independent" for review in external
+        )
+        if high_risk_change and not independent_review_satisfied:
+            checks.append(
+                QualityCheck(
+                    name="External Review: required for high-risk change",
+                    category="external_review",
+                    description=(
+                        "高风险变更缺少调用方对当前工作项、目标版本、候选摘要及评审文件摘要"
+                        "共同见证的不同会话只读复审；不能把评审 JSON 自报字段称为独立评审"
+                        if not self.residual_review_risk_accepted
+                        else "高风险独立复审证据未满足；调用方已显式记录残余风险接受，"
+                        "但该结果仍不得称为独立评审"
+                    ),
+                    status=(
+                        CheckStatus.WARNING
+                        if self.residual_review_risk_accepted
+                        else CheckStatus.FAILED
+                    ),
+                    score=50 if self.residual_review_risk_accepted else 0,
+                )
+            )
+
+        for review in external:
+            independence = review.independence
+            trusted_review = independence == "independent"
+            blocking_findings = trusted_review and not review.passed and review.critical_count > 0
+            checks.append(
+                QualityCheck(
+                    name=f"External Review: {review.source}",
+                    category=("external_review" if trusted_review else "external_review_advisory"),
+                    description=(
+                        f"{review.summary}; independence={independence}"
+                        + ("; control_effect=none" if not trusted_review else "")
+                    ),
+                    status=(
+                        CheckStatus.FAILED
+                        if blocking_findings
+                        else (
+                            CheckStatus.PASSED
+                            if trusted_review and review.passed
+                            else CheckStatus.WARNING
+                        )
+                    ),
+                    score=review.score if trusted_review else 0,
+                    weight=1.0 if trusted_review else 0.0,
+                )
+            )
 
         # 10. 交叉审查协议——多专家规则引擎验证
         try:
             from ..experts.review_protocol import CrossReviewEngine
             from ..experts.toolkit import load_expert_toolkits
+            from ..workflow_stage_truth import applicable_experts_for_stage
 
             toolkits = load_expert_toolkits()
-            review_engine = CrossReviewEngine(toolkits)
+            applicable_docs = set(
+                applicable_experts_for_stage(
+                    "docs",
+                    changed_surfaces=changed_surfaces,
+                    frontend=str(self.tech_stack.get("frontend", "")),
+                    database=str(self.tech_stack.get("database", "")),
+                )
+            )
             output_dir = self.project_dir / "output"
 
             if self.frontend_required:
                 # 对 UIUX 文档执行交叉审查
                 uiux_path = output_dir / f"{self.name}-uiux.md"
                 if uiux_path.exists():
+                    ui_reviewers = {
+                        role: toolkit
+                        for role, toolkit in toolkits.items()
+                        if role in applicable_docs and role in {"UI", "UX"}
+                    }
+                    review_engine = CrossReviewEngine(ui_reviewers)
                     uiux_content = uiux_path.read_text(encoding="utf-8", errors="replace")
                     cross_report = review_engine.validate_artifact(uiux_content, "docs")
                     for finding in cross_report.findings:
@@ -773,6 +917,12 @@ class QualityGateChecker(QualityGateEvidenceMixin):
             # 对架构文档执行交叉审查
             arch_path = output_dir / f"{self.name}-architecture.md"
             if arch_path.exists():
+                architecture_reviewers = {
+                    role: toolkit
+                    for role, toolkit in toolkits.items()
+                    if role in applicable_docs and role == "ARCHITECT"
+                }
+                review_engine = CrossReviewEngine(architecture_reviewers)
                 arch_content = arch_path.read_text(encoding="utf-8", errors="replace")
                 cross_report = review_engine.validate_artifact(arch_content, "docs")
                 for finding in cross_report.findings:
@@ -853,7 +1003,9 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         critical_failures = []
         for check in checks:
             config = self.CHECKS_CONFIG.get(check.category, {})
-            if config.get("required", False) and check.status == CheckStatus.FAILED:
+            if (
+                config.get("required", False) or check.category == "external_review"
+            ) and check.status == CheckStatus.FAILED:
                 critical_failures.append(f"[{check.category}] {check.description}")
 
         # 检查是否通过：加权分必须达到阈值，且必检项不能失败。

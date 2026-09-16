@@ -1783,7 +1783,7 @@ class QualityGateEvidenceMixin:
         """
         filtered: list[QualityCheck] = []
         for check in checks:
-            if check.category == "cross_review":
+            if check.category in {"cross_review", "external_review_advisory"}:
                 continue
             if check.category == "validation_rules" and check.status != CheckStatus.FAILED:
                 continue

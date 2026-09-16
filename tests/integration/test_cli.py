@@ -1236,6 +1236,53 @@ class TestCLIQuality:
         assert result == 0
         assert observed == [95]
 
+    def test_quality_passes_explicit_external_review_attestation(
+        self, temp_project_dir: Path, monkeypatch
+    ):
+        from super_dev.reviewers.quality_gate import QualityGateChecker, QualityGateResult
+
+        observed: list[tuple[dict[str, str], bool]] = []
+
+        def fake_check(self, redteam_report=None):
+            observed.append((self.attested_review_files, self.residual_review_risk_accepted))
+            return QualityGateResult(passed=True, total_score=100, weighted_score=100.0)
+
+        monkeypatch.setattr(QualityGateChecker, "check", fake_check)
+        (temp_project_dir / "super-dev.yaml").write_text(
+            "name: demo\nplatform: cli\nfrontend: none\nbackend: python\n",
+            encoding="utf-8",
+        )
+        original_cwd = os.getcwd()
+        os.chdir(temp_project_dir)
+        try:
+            result = SuperDevCLI().run(
+                [
+                    "quality",
+                    "--type",
+                    "all",
+                    "--attest-review",
+                    "review-session=" + "a" * 64,
+                    "--accept-review-residual-risk",
+                ]
+            )
+        finally:
+            os.chdir(original_cwd)
+
+        assert result == 0
+        assert observed == [({"review-session": "a" * 64}, True)]
+
+    def test_quality_rejects_malformed_external_review_attestation(self, temp_project_dir: Path):
+        original_cwd = os.getcwd()
+        os.chdir(temp_project_dir)
+        try:
+            result = SuperDevCLI().run(
+                ["quality", "--type", "all", "--attest-review", "not-a-digest"]
+            )
+        finally:
+            os.chdir(original_cwd)
+
+        assert result == 1
+
     def test_quality_ui_review_generates_report(self, temp_project_dir: Path):
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)

@@ -60,6 +60,34 @@ def test_candidate_digest_changes_for_dirty_staged_and_untracked_content(tmp_pat
     assert len(digests) == 5
 
 
+def test_candidate_digest_ignores_user_local_settings_and_global_excludes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project = _repo(tmp_path)
+    local_settings = project / ".claude" / "settings.local.json"
+    local_settings.parent.mkdir()
+    local_settings.write_text('{"local": true}\n', encoding="utf-8")
+    source = project / "candidate.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+
+    baseline_manifest: dict[str, str] = {}
+    baseline = build_candidate_identity(project, file_manifest=baseline_manifest)
+    assert ".claude/settings.local.json" not in baseline_manifest
+    assert "candidate.py" in baseline_manifest
+
+    excludes_file = tmp_path / "global-ignore"
+    excludes_file.write_text("candidate.py\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.excludesFile")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(excludes_file))
+
+    configured_manifest: dict[str, str] = {}
+    configured = build_candidate_identity(project, file_manifest=configured_manifest)
+
+    assert configured == baseline
+    assert configured_manifest == baseline_manifest
+
+
 def test_candidate_digest_changes_when_git_index_is_unreadable(tmp_path: Path) -> None:
     project = _repo(tmp_path)
     (project / ".git" / "index").write_bytes(b"corrupt index")

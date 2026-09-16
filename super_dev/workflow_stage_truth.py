@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Iterable, Mapping
+from types import MappingProxyType
 
 from .workflow_contract import CANONICAL_NINE_STAGE_IDS
 
@@ -79,7 +81,7 @@ _DOCS_CONFIRM_LATE_STAGES = {
 }
 _PREVIEW_CONFIRM_LATE_STAGES = {"backend", "quality", "delivery"}
 
-WORKFLOW_STAGE_EXPERTS: dict[str, tuple[str, ...]] = {
+_WORKFLOW_STAGE_EXPERTS: dict[str, tuple[str, ...]] = {
     "baseline": ("PRODUCT", "ARCHITECT", "CODE"),
     "research": ("PM", "PRODUCT", "ARCHITECT"),
     "docs": ("PM", "ARCHITECT", "UI", "UX"),
@@ -93,6 +95,9 @@ WORKFLOW_STAGE_EXPERTS: dict[str, tuple[str, ...]] = {
     "build_fullstack": ("PM", "ARCHITECT", "UI", "CODE", "QA"),
     "polish": ("PRODUCT", "UI", "UX", "QA"),
 }
+
+# One canonical, immutable stage-to-expert source for standard and existing SEEAI stages.
+WORKFLOW_STAGE_EXPERTS: Mapping[str, tuple[str, ...]] = MappingProxyType(_WORKFLOW_STAGE_EXPERTS)
 
 
 def normalize_stage_key(stage: str) -> str:
@@ -137,3 +142,36 @@ def stages_require_preview_confirmation(requested_stages: list[str] | None) -> b
 
 def active_experts_for_stage(stage: str) -> tuple[str, ...]:
     return WORKFLOW_STAGE_EXPERTS.get(normalize_stage_key(stage), ())
+
+
+def applicable_experts_for_stage(
+    stage: str,
+    *,
+    changed_surfaces: Iterable[str] = (),
+    frontend: str = "",
+    database: str = "",
+) -> tuple[str, ...]:
+    """Filter canonical candidates only when concrete applicability facts are known."""
+
+    normalized_stage = normalize_stage_key(stage)
+    candidates = list(active_experts_for_stage(normalized_stage))
+    if normalized_stage in {"build_fullstack", "polish"}:
+        return tuple(candidates)
+    surfaces = {str(item).strip().lower() for item in changed_surfaces if str(item).strip()}
+    frontend_value = str(frontend).strip().lower()
+    database_value = str(database).strip().lower()
+    has_context = bool(surfaces or frontend_value or database_value)
+    if not has_context:
+        return tuple(candidates)
+
+    if surfaces:
+        data_relevant = bool(surfaces & {"data", "database", "migration"})
+        ui_relevant = bool(surfaces & {"frontend", "ui", "uiux", "route", "style", "component"})
+    else:
+        data_relevant = database_value not in {"", "none"}
+        ui_relevant = frontend_value not in {"", "none"}
+    if not data_relevant:
+        candidates = [role for role in candidates if role != "DBA"]
+    if not ui_relevant:
+        candidates = [role for role in candidates if role not in {"UI", "UX"}]
+    return tuple(candidates)

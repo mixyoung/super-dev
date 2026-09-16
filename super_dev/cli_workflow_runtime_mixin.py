@@ -13,7 +13,11 @@ from typing import Any, Literal, cast
 from super_dev.artifact_utils import ui_contract_filename
 
 from . import __version__
-from .artifact_utils import resolve_active_change_id, resolve_current_artifact_prefix
+from .artifact_utils import (
+    resolve_active_change_id,
+    resolve_current_artifact_prefix,
+    resolve_work_item_identity,
+)
 from .baseline_governance import inspect_baseline_governance
 from .catalogs import (
     CICD_PLATFORM_IDS,
@@ -244,6 +248,12 @@ class CliWorkflowRuntimeMixin:
             "comment": args.comment.strip(),
             "actor": args.actor.strip() or "user",
             "run_id": args.run_id.strip(),
+            "_control_source": (
+                "user_authorization"
+                if (args.actor.strip() or "user").lower() == "user"
+                else "system_contract"
+            ),
+            "_explicit_user_authority": ((args.actor.strip() or "user").lower() == "user"),
         }
         if review_type == "docs" and args.status == "confirmed":
             file_path, _ = save_bound_docs_confirmation(project_dir, review_payload)
@@ -1386,12 +1396,14 @@ class CliWorkflowRuntimeMixin:
     def _write_workflow_state(self, *, project_dir: Path, payload: dict[str, Any]) -> Path:
         project_dir = Path(project_dir).resolve()
         run_state = self._read_pipeline_run_state(project_dir) or {}
+        current_state = load_workflow_state(project_dir) or {}
+        identity = resolve_work_item_identity(project_dir)
         docs_state = self._get_docs_confirmation_state(project_dir)
         preview_state = self._get_preview_confirmation_state(project_dir)
         ui_state = self._get_ui_revision_state(project_dir)
         architecture_state = self._get_architecture_revision_state(project_dir)
         quality_state = self._get_quality_revision_state(project_dir)
-        workflow_payload = {
+        workflow_payload: dict[str, Any] = {
             "active_change_id": str(payload.get("active_change_id", "")).strip(),
             "artifact_prefix": str(payload.get("artifact_prefix", "")).strip(),
             "status": str(payload.get("status", "")).strip(),
@@ -1439,6 +1451,35 @@ class CliWorkflowRuntimeMixin:
                 "skipped_gates": list(run_state.get("skipped_gates") or []),
             },
         }
+        work_item_id = str(payload.get("work_item_id", "")).strip() or (
+            identity.work_item_id if not identity.legacy else ""
+        )
+        if work_item_id:
+            workflow_payload.update(
+                {
+                    "workflow_state_schema_version": int(
+                        current_state.get("workflow_state_schema_version", 2) or 2
+                    ),
+                    "flow_variant": str(
+                        payload.get("flow_variant", current_state.get("flow_variant", "standard"))
+                    ).strip()
+                    or "standard",
+                    "work_item_id": work_item_id,
+                    "artifact_prefix": identity.artifact_prefix,
+                    "binding_status": str(
+                        payload.get(
+                            "binding_status",
+                            current_state.get("binding_status", identity.binding_status),
+                        )
+                    ).strip(),
+                    "document_binding_digest": str(
+                        payload.get(
+                            "document_binding_digest",
+                            current_state.get("document_binding_digest", ""),
+                        )
+                    ).strip(),
+                }
+            )
         return save_workflow_state(project_dir, workflow_payload)
 
     def _build_session_continuity_rules(self, *, status: str) -> list[str]:
@@ -1918,6 +1959,7 @@ class CliWorkflowRuntimeMixin:
             supports_slash=self._supports_slash_for_prompt(preferred_host),
         )
         enriched = dict(payload)
+        identity = resolve_work_item_identity(project_dir)
         active_change_id = str(payload.get("active_change_id", "")).strip() or (
             resolve_active_change_id(project_dir)
         )
@@ -1933,6 +1975,8 @@ class CliWorkflowRuntimeMixin:
             {
                 "active_change_id": active_change_id,
                 "artifact_prefix": artifact_prefix,
+                "work_item_id": identity.work_item_id if not identity.legacy else "",
+                "binding_status": identity.binding_status if not identity.legacy else "",
                 "current_step_label": current_step_label,
                 "user_next_action": user_next_action,
                 "preferred_host": preferred_host,

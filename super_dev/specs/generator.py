@@ -37,6 +37,11 @@ class SpecGenerator:
         self, change_id: str, title: str, description: str, motivation: str = "", impact: str = ""
     ) -> Change:
         """创建新变更提案"""
+        from ..artifact_utils import resolve_work_item_identity
+        from ..workflow_guard import require_spec_work_item_binding
+
+        if not resolve_work_item_identity(self.project_dir).legacy:
+            require_spec_work_item_binding(self.project_dir, change_id)
         change = Change(
             id=change_id,
             title=title,
