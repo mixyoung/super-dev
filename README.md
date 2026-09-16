@@ -21,19 +21,19 @@
 
 参与本项目开发或让模型修改仓库前，请先读 [贡献指南](CONTRIBUTING.md) 与 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md)。这两份规则只约束 Super Dev 本身的维护，不改变普通用户使用方式。
 
-当前仓库版本：`2.5.1`（尚未发布；最新已发布版本为 `2.5.0`）
+当前仓库版本：`2.5.1`（最新 GitHub-only 正式版本）
 
-- 版本说明：[v2.5.1 修正内容](docs/releases/2.5.1.md)；已发布版本：[v2.5.0](docs/releases/2.5.0.md)
+- 版本说明与发布记录：[v2.5.1](docs/releases/2.5.1.md)
 - 官网更新历史：[superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## 安装
 
 首页安装口径默认使用 uv：
 
-本分支只在 GitHub 发布，未上传 PyPI。已发布的 2.5.0 仍使用旧更新来源，首次过渡须安装包含新更新器的版本；当前开发代码已将启动提示、`update --check` 与 `update` 统一到本 fork 的 GitHub 正式 Release。默认仅刷新当前项目中未被修改的既有宿主文本，用户级刷新须显式 `--include-user`。详见[更新边界与恢复](docs/FORK_UPDATES.md)；本段不表示新版已经发布。
+本分支只在 GitHub 发布，未上传 PyPI。2.5.1 已将启动提示、`update --check` 与 `update` 统一到本 fork 的 GitHub 正式 Release；从 2.5.0 首次过渡时请直接安装 2.5.1。默认仅刷新当前项目中未被修改的既有宿主文本，用户级刷新须显式 `--include-user`。详见[更新边界与恢复](docs/FORK_UPDATES.md)。
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 安装完成后执行：
@@ -104,7 +104,7 @@ super-dev
 普通用户先记住 1 条安装命令和 3 个终端命令：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 ```bash
@@ -375,7 +375,7 @@ Super Dev 内置结构化知识库（`knowledge/` 目录），270+ 个知识文�
 ### 1. uv 安装（推荐）
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 升级：
@@ -387,13 +387,13 @@ super-dev update
 ### 2. 指定版本安装
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 升级：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 super-dev update
 ```
 
@@ -425,7 +425,7 @@ super-dev
 ### 3. GitHub 指定标签安装
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 ### 4. 源码开发安装
@@ -444,13 +444,13 @@ uv run super-dev --version
 当用户执行：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 或：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.0" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
 安装器会自动安装 `pyproject.toml` 中声明的 Python 依赖，例如：
