@@ -44,6 +44,14 @@ else
   exec "$RELEASE_TEST_PYTHON" "$@"
 fi
 """,
+        "uv": """echo "uv $*" >> "$RELEASE_TEST_LOG"
+if [[ "$1" == "build" ]]; then
+  mkdir -p dist
+  printf wheel > dist/super_dev-9.9.9-py3-none-any.whl
+  printf source > dist/super_dev-9.9.9.tar.gz
+fi
+""",
+        "uvx": 'echo "uvx $*" >> "$RELEASE_TEST_LOG"\n',
     }
     for name, body in tools.items():
         path = bin_dir / name
@@ -97,6 +105,19 @@ def test_default_prepares_github_artifacts_without_upload(release_sandbox):
     assert "git push" not in calls
     assert "mixyoung/super-dev" in result.stdout
     assert "no GitHub Release published" in result.stdout
+
+
+def test_locked_project_builds_and_checks_with_uv(release_sandbox):
+    root, run = release_sandbox
+    (root / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    result, calls = run()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "uv build" in calls
+    assert "uvx twine check" in calls
+    assert "python3 -m build" not in calls
+    assert "python3 -m twine check" not in calls
 
 
 def test_explicit_github_release_is_bound_to_fork_with_checksums(release_sandbox):
