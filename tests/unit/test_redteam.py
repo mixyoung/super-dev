@@ -273,7 +273,7 @@ def load_users(users, db):
             tech_stack={"backend": "python", "frontend": "react"},
         )
 
-        assert reviewer._find_package_json_files() == [frontend_package]
+        assert reviewer._find_package_json_files() == [frontend_package.resolve()]
 
     def test_inactive_node_scaffolds_are_outside_python_cli_release_surface(
         self, temp_project_dir: Path, monkeypatch
