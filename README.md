@@ -28,26 +28,74 @@
 
 ## 安装
 
-首页安装口径默认使用 uv：
+本分支只在 GitHub 发布，未上传 PyPI。推荐统一使用 `uv`，并区分老用户升级与新用户首次安装。
 
-本分支只在 GitHub 发布，未上传 PyPI。2.5.1 已将启动提示、`update --check` 与 `update` 统一到本 fork 的 GitHub 正式 Release；从 2.5.0 首次过渡时请直接安装 2.5.1。默认仅刷新当前项目中未被修改的既有宿主文本，用户级刷新须显式 `--include-user`。详见[更新边界与恢复](docs/FORK_UPDATES.md)。
+### 老用户：从 2.5.0 或更早版本升级
+
+旧 2.5.0 不包含本 fork 的新更新链，第一次过渡不能只运行旧版 `super-dev update`。请直接安装已发布的 2.5.1 Tag：
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
 ```
 
-安装完成后执行：
+关闭并重新打开终端，然后确认实际生效版本：
 
 ```bash
+super-dev --version
+```
+
+应显示 `2.5.1`。随后进入每个需要刷新接入规则的老项目：
+
+```bash
+cd 你的项目目录
+super-dev update
+```
+
+默认只刷新当前项目中已经存在、仍与旧模板一致的 Super Dev 托管文本；不会改变项目工作流状态，也不会覆盖自定义内容。如果以前明确安装过用户级/全局接入面，并且本次也要刷新，须显式执行：
+
+```bash
+super-dev update --include-user
+```
+
+已经处于 2.5.1 的用户不必重复安装，可直接在目标项目中运行 `super-dev update` 做同版核验与项目级刷新。以后从 2.5.1 升级后续正式版本，可以使用：
+
+```bash
+super-dev update --check
+super-dev update
+```
+
+### 新用户：首次安装
+
+要求 Python 3.10+，并已安装 `uv`。执行：
+
+```bash
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+super-dev --version
+```
+
+版本确认后，进入准备开发的项目并启动宿主接入：
+
+```bash
+cd 你的项目目录
 super-dev
 ```
 
-源码安装、指定版本回滚等次级安装方式保留在 [docs/INSTALL_OPTIONS.md](docs/INSTALL_OPTIONS.md)。
+在交互式安装器中选择 Codex、Claude Code、OpenCode 等目标宿主。安装完成后：
 
-跨平台说明：
+1. 查看 `output/maintenance/host-onboard-smoke-*.md`
+2. 复制里面的“标准流第一句”或“比赛流第一句”
+3. 回到宿主内触发该首句
+4. 确认首次回复进入 `research -> 三文档 -> 等待确认`
 
+### 共同注意事项
+
+- 不要运行 `pip install super-dev==2.5.1`：本 fork 没有发布到 PyPI
+- `super-dev update` 只刷新已有宿主接入面，不会自动安装新宿主；新增宿主请重新运行 `super-dev`
+- 源码/editable、来源不明或自定义依赖组合的安装不会被 `super-dev update` 自动覆盖，应手工更新源码或改装正式 Tag 版本
 - Windows、macOS、Linux 都先安装包，再直接运行 `super-dev`
 - 仓库内的 `install.sh` 只是 macOS/Linux 便捷入口，不是 Windows 唯一入口
+
+完整安装方式见 [docs/INSTALL_OPTIONS.md](docs/INSTALL_OPTIONS.md)，更新范围、备份与恢复规则见 [docs/FORK_UPDATES.md](docs/FORK_UPDATES.md)。
 
 ---
 
