@@ -29,7 +29,7 @@ def release_sandbox(tmp_path):
     bin_dir = tmp_path / "fakebin"
     bin_dir.mkdir()
     tools = {
-        "git": 'echo "git $*" >> "$RELEASE_TEST_LOG"\nif [[ "$1" == branch ]]; then echo main; fi\nif [[ "$1" == rev-parse ]]; then exit 1; fi\n',
+        "git": 'echo "git $*" >> "$RELEASE_TEST_LOG"\nif [[ "$1" == branch ]]; then echo main; fi\nif [[ "$1" == rev-parse ]]; then exit 1; fi\nif [[ "$1" == rev-list ]]; then echo abc123def456; fi\n',
         "gh": 'echo "gh $*" >> "$RELEASE_TEST_LOG"\nif [[ "$1 $2" == "release view" ]]; then exit 1; fi\n',
         "python3": """echo "python3 $*" >> "$RELEASE_TEST_LOG"
 if [[ "$*" == *"from super_dev import __version__"* ]]; then
@@ -129,6 +129,49 @@ def test_explicit_github_release_is_bound_to_fork_with_checksums(release_sandbox
     assert "dist/SHA256SUMS.txt" in gh_calls[-1]
     assert (root / "dist/SHA256SUMS.txt").read_text().count("\n") == 2
     assert "publish.sh" not in calls
+
+
+def test_explicit_github_release_records_fact_for_active_workflow(release_sandbox):
+    root, run = release_sandbox
+    superdev = root / ".super-dev"
+    superdev.mkdir()
+    (superdev / "workflow-state.json").write_text(
+        '{"work_item_id":"release-test","artifact_prefix":"release-test",'
+        '"binding_status":"bound","active_change_id":"release-test"}',
+        encoding="utf-8",
+    )
+
+    result, calls = run("--github-release")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "python3 -m super_dev.release_observation" in calls
+    observation = root / "output" / "release" / "release-test-9.9.9-release-observation.json"
+    assert observation.is_file()
+
+
+def test_tag_without_github_release_does_not_record_released_fact(release_sandbox):
+    root, run = release_sandbox
+    result, calls = run("--push-tag")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "git tag -a v9.9.9" in calls
+    assert "super_dev.release_observation" not in calls
+    assert not (root / "output" / "release").exists()
+
+
+def test_external_release_success_with_local_record_failure_stops_without_retry(
+    release_sandbox,
+):
+    root, run = release_sandbox
+    superdev = root / ".super-dev"
+    superdev.mkdir()
+    (superdev / "workflow-state.json").write_text("{}", encoding="utf-8")
+
+    result, calls = run("--github-release")
+
+    assert result.returncode == 1
+    assert calls.count("gh release create") == 1
+    assert "请先只读核对，不要直接重发" in result.stdout
 
 
 def test_pypi_route_requires_explicit_selection(release_sandbox):

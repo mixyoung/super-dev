@@ -18,6 +18,7 @@ from .artifact_utils import (
     resolve_current_artifact_prefix,
     resolve_work_item_identity,
 )
+from .atomic_io import atomic_write_text
 from .baseline_governance import inspect_baseline_governance
 from .catalogs import (
     CICD_PLATFORM_IDS,
@@ -1404,6 +1405,10 @@ class CliWorkflowRuntimeMixin:
         architecture_state = self._get_architecture_revision_state(project_dir)
         quality_state = self._get_quality_revision_state(project_dir)
         workflow_payload: dict[str, Any] = {
+            "revision": int(current_state.get("revision", 0) or 0),
+            "workflow_mode": str(
+                payload.get("workflow_mode", current_state.get("workflow_mode", ""))
+            ).strip(),
             "active_change_id": str(payload.get("active_change_id", "")).strip(),
             "artifact_prefix": str(payload.get("artifact_prefix", "")).strip(),
             "status": str(payload.get("status", "")).strip(),
@@ -1441,16 +1446,65 @@ class CliWorkflowRuntimeMixin:
                 },
             },
             "pipeline_run_state": {
-                "status": str(run_state.get("status", "")).strip(),
-                "current_stage": str(run_state.get("current_stage", "")).strip(),
-                "current_stage_title": str(run_state.get("current_stage_title", "")).strip(),
-                "scope_coverage_status": str(run_state.get("scope_coverage_status", "")).strip(),
+                "status": str(
+                    run_state.get(
+                        "status",
+                        _dict_value(current_state.get("pipeline_run_state")).get("status", ""),
+                    )
+                ).strip(),
+                "current_stage": str(
+                    run_state.get(
+                        "current_stage",
+                        _dict_value(current_state.get("pipeline_run_state")).get(
+                            "current_stage", ""
+                        ),
+                    )
+                ).strip(),
+                "current_stage_title": str(
+                    run_state.get(
+                        "current_stage_title",
+                        _dict_value(current_state.get("pipeline_run_state")).get(
+                            "current_stage_title", ""
+                        ),
+                    )
+                ).strip(),
+                "scope_coverage_status": str(
+                    run_state.get(
+                        "scope_coverage_status",
+                        _dict_value(current_state.get("pipeline_run_state")).get(
+                            "scope_coverage_status", ""
+                        ),
+                    )
+                ).strip(),
                 "scope_high_priority_gap_count": int(
-                    run_state.get("scope_high_priority_gap_count", 0) or 0
+                    run_state.get(
+                        "scope_high_priority_gap_count",
+                        _dict_value(current_state.get("pipeline_run_state")).get(
+                            "scope_high_priority_gap_count", 0
+                        ),
+                    )
+                    or 0
                 ),
-                "skipped_gates": list(run_state.get("skipped_gates") or []),
+                "skipped_gates": list(
+                    run_state.get(
+                        "skipped_gates",
+                        _dict_value(current_state.get("pipeline_run_state")).get(
+                            "skipped_gates", []
+                        ),
+                    )
+                    or []
+                ),
             },
         }
+        for preserved_key in (
+            "current_stage",
+            "engine_progress",
+            "delivery_facts",
+            "candidate_digest",
+            "state_store_schema_version",
+        ):
+            if preserved_key in current_state:
+                workflow_payload[preserved_key] = current_state[preserved_key]
         work_item_id = str(payload.get("work_item_id", "")).strip() or (
             identity.work_item_id if not identity.legacy else ""
         )
@@ -1494,6 +1548,9 @@ class CliWorkflowRuntimeMixin:
         project_dir = Path(project_dir).resolve()
         brief_path = self._session_brief_path(project_dir)
         brief_path.parent.mkdir(parents=True, exist_ok=True)
+        presentation_payload = dict(payload)
+        self._write_workflow_state(project_dir=project_dir, payload=payload)
+        payload = {**presentation_payload, **(load_workflow_state(project_dir) or {})}
         preferred_host_name = str(
             payload.get("preferred_host_name", "")
         ).strip() or host_display_name(
@@ -1511,11 +1568,13 @@ class CliWorkflowRuntimeMixin:
             f"- 动作类型: {self._workflow_mode_label(str(payload.get('workflow_mode', '')).strip())}",
             f"- 当前步骤: {payload.get('current_step_label', payload.get('status', '-'))}",
             f"- 当前状态: {payload.get('status', '-')}",
+            f"- 来源工作项: {payload.get('work_item_id', '-')}",
+            f"- 状态修订: {payload.get('revision', '-')}",
             f"- 用户下一步: {payload.get('user_next_action', payload.get('recommended_command', '-'))}",
             f"- 系统建议动作: {payload.get('recommended_command', '-')}",
             f"- 推荐宿主: {preferred_host_name or '-'}",
-            "- 工作流状态 JSON: " f"{self._workflow_state_path(project_dir).resolve().as_posix()}",
-            "- 最新历史快照: " f"{latest_workflow_snapshot_file(project_dir).resolve().as_posix()}",
+            f"- 工作流状态 JSON: {self._workflow_state_path(project_dir).resolve().as_posix()}",
+            f"- 最新历史快照: {latest_workflow_snapshot_file(project_dir).resolve().as_posix()}",
             f"- 事件日志: {workflow_event_log_file(project_dir).resolve().as_posix()}",
             f"- Hook 审计日志: {HookManager.hook_history_file(project_dir).resolve().as_posix()}",
         ]
@@ -1590,7 +1649,6 @@ class CliWorkflowRuntimeMixin:
             lines.extend(["", "## 会话连续性规则"])
             for item in continuity_rules:
                 lines.append(f"- {item}")
-        self._write_workflow_state(project_dir=project_dir, payload=payload)
         recent_snapshots = load_recent_workflow_snapshots(project_dir, limit=3)
         if recent_snapshots:
             lines.extend(["", "## 最近流程快照"])
@@ -1641,7 +1699,7 @@ class CliWorkflowRuntimeMixin:
                 "- 如果只想知道现在先做什么，就在宿主里说“现在下一步是什么”。",
             ]
         )
-        brief_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        atomic_write_text(brief_path, "\n".join(lines) + "\n")
         return brief_path
 
     def _build_host_continue_prompt(

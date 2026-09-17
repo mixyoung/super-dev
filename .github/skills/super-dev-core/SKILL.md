@@ -207,7 +207,7 @@ super-dev spec list                     # 查看规范与变更
 
 ## 编码阶段持续治理
 
-读取 `.super-dev/pipeline-state.json` 了解当前在哪个阶段。
+读取 `.super-dev/workflow-state.json` 了解当前工作项和阶段。
 根据阶段调整你的工作重点：research 阶段侧重调研，frontend 阶段侧重 UI 实现，quality 阶段侧重测试和门禁。
 
 每次进入新阶段时宣告: `Super Dev | [N/9] 阶段名 开始 | 主导专家: XXX`

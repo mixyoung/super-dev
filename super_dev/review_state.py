@@ -11,6 +11,7 @@ from .artifact_utils import (
     sanitize_artifact_name,
 )
 from .atomic_io import atomic_write_text
+from .state_store import StateStore
 from .workflow_contract import ContentEffect, ControlSource, ensure_control_effect_allowed
 
 _WORKFLOW_EVENT_LABELS = {
@@ -55,7 +56,7 @@ def _normalize_controlled_payload(
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> Path:
-    return atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2))
+    return Path(atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2)))
 
 
 def _bind_current_work_item(project_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -368,7 +369,7 @@ def load_docs_confirmation(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_baseline_confirmation(project_dir: Path) -> dict[str, Any] | None:
@@ -412,7 +413,7 @@ def load_preview_confirmation(project_dir: Path) -> dict[str, Any] | None:
         payload = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception:
         return None
-    return payload if isinstance(payload, dict) else None
+    return _only_for_current_work_item(project_dir, payload if isinstance(payload, dict) else None)
 
 
 def load_architecture_revision(project_dir: Path) -> dict[str, Any] | None:
@@ -449,22 +450,8 @@ def load_host_runtime_validation(project_dir: Path) -> dict[str, Any] | None:
 
 
 def load_workflow_state(project_dir: Path) -> dict[str, Any] | None:
-    file_path = workflow_state_file(project_dir)
-    latest_snapshot = latest_workflow_snapshot_file(project_dir)
-
-    def _load_payload(path: Path) -> dict[str, Any] | None:
-        if not path.exists():
-            return None
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return None
-        return payload if isinstance(payload, dict) else None
-
-    payload = _load_payload(file_path)
-    if payload is not None:
-        return payload
-    return _load_payload(latest_snapshot)
+    payload = StateStore(Path(project_dir)).load_workflow()
+    return payload or None
 
 
 def save_docs_confirmation(project_dir: Path, payload: dict[str, Any]) -> Path:
@@ -614,30 +601,25 @@ def save_host_runtime_validation(project_dir: Path, payload: dict[str, Any]) -> 
 
 
 def save_workflow_state(project_dir: Path, payload: dict[str, Any]) -> Path:
-    state_dir = review_state_dir(project_dir)
-    state_dir.mkdir(parents=True, exist_ok=True)
     normalized = _normalize_work_item_fields(
         _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
     )
-    normalized["updated_at"] = _utc_now()
-    file_path = workflow_state_file(project_dir)
-    serialized = json.dumps(normalized, ensure_ascii=False, indent=2)
-    atomic_write_text(file_path, serialized)
-    history_dir = workflow_state_history_dir(project_dir)
-    history_dir.mkdir(parents=True, exist_ok=True)
-    latest_file = latest_workflow_snapshot_file(project_dir)
-    atomic_write_text(latest_file, serialized)
-    stamp = normalized["updated_at"].replace(":", "").replace("-", "").replace(".", "")
-    snapshot_file = history_dir / f"workflow-state-{stamp}.json"
-    atomic_write_text(snapshot_file, serialized)
-    _append_workflow_event(
-        project_dir,
-        event="workflow_state_saved",
-        payload=normalized,
-        source_path=file_path,
-        extra={
-            "recommended_command": str(normalized.get("recommended_command", "")).strip(),
-            "snapshot_path": str(snapshot_file),
-        },
-    )
-    return file_path
+    result = StateStore(Path(project_dir)).commit_workflow(normalized)
+    try:
+        from .hooks.manager import HookManager
+
+        HookManager.dispatch_workflow_event(
+            project_dir,
+            {
+                "timestamp": str(result.payload.get("updated_at", "")).strip(),
+                "event": "workflow_state_saved",
+                "revision": result.revision,
+                "work_item_id": str(result.payload.get("work_item_id", "")).strip(),
+                "status": str(result.payload.get("status", "")).strip(),
+                "current_step_label": str(result.payload.get("current_step_label", "")).strip(),
+                "source_path": str(result.path),
+            },
+        )
+    except Exception:
+        pass
+    return result.path

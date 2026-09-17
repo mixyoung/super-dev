@@ -27,7 +27,11 @@ from super_dev.review_state import (
 )
 from super_dev.skills import SkillManager
 from super_dev.specs.generator import SpecGenerator
-from super_dev.workflow_guard import save_bound_docs_confirmation, save_bound_preview_confirmation
+from super_dev.workflow_guard import (
+    record_stage_progress,
+    save_bound_docs_confirmation,
+    save_bound_preview_confirmation,
+)
 
 
 def _confirm_docs(temp_project_dir: Path) -> None:
@@ -376,6 +380,17 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
+    for stage in (
+        "research",
+        "docs",
+        "docs_confirm",
+        "spec",
+        "frontend",
+        "preview_confirm",
+        "quality",
+        "delivery",
+    ):
+        record_stage_progress(project_dir, stage=stage, status="completed", actor="pytest")
 
 
 def _prepare_proof_pack_project(project_dir: Path) -> None:
@@ -714,6 +729,26 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         "# Tasks\n\n- [x] 支持邮箱密码登录\n- [x] 提供运营数据概览\n",
         encoding="utf-8",
     )
+    ui_contract = output_dir / f"{project_dir.name}-ui-contract.json"
+    uiux = output_dir / f"{project_dir.name}-uiux.md"
+    ui_review = output_dir / f"{project_dir.name}-ui-review.json"
+    ui_alignment = output_dir / f"{project_dir.name}-ui-contract-alignment.json"
+    frontend_runtime = output_dir / f"{project_dir.name}-frontend-runtime.json"
+    quality_gate = output_dir / f"{project_dir.name}-quality-gate.json"
+    refreshed = (
+        (ui_review, "ui-review", [ui_contract, uiux]),
+        (ui_alignment, "ui-contract-alignment", [ui_contract, uiux]),
+        (frontend_runtime, "frontend-runtime", [ui_contract, ui_alignment]),
+        (quality_gate, "quality-gate", [ui_review, ui_alignment, uiux]),
+    )
+    for path, artifact_name, dependencies in refreshed:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["evidence_identity"] = build_evidence_identity(
+            project_dir,
+            artifact_name=artifact_name,
+            dependencies=dependencies,
+        )
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     final_base_time = time.time() + 5
     for index, artifact_name in enumerate(
         (

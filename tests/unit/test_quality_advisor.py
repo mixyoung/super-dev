@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -329,6 +330,29 @@ class TestQualityAdvisorAnalyze:
         assert len(md) > 100
 
     def test_analyze_emits_governance_advice_for_layered_runtime_gap(self, tmp_path: Path):
+        (tmp_path / "super-dev.yaml").write_text(
+            "name: demo\nplatform: web\nfrontend: uni-app\nbackend: python\n",
+            encoding="utf-8",
+        )
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        (output_dir / "demo-ui-contract.json").write_text(
+            json.dumps(
+                {
+                    "analysis": {"frontend": "uni-app"},
+                    "framework_playbook": {
+                        "framework": "uni-app",
+                        "implementation_modules": ["navigation"],
+                        "platform_constraints": ["safe area"],
+                        "execution_guardrails": ["freeze pages.json"],
+                        "native_capabilities": ["login provider"],
+                        "validation_surfaces": ["mini-program navigation"],
+                        "delivery_evidence": ["platform matrix"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         save_workflow_state(
             tmp_path,
             {
@@ -356,7 +380,7 @@ class TestQualityAdvisorAnalyze:
 
         governance_advices = [a for a in report.advices if a.category == "governance"]
         assert governance_advices
-        advice = governance_advices[0]
+        advice = next(item for item in governance_advices if "宿主 runtime" in item.title)
         assert advice.priority == "critical"
         assert "codex-cli" in advice.description
         assert "宿主真人验收记录" in advice.action

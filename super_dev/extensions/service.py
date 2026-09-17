@@ -587,6 +587,7 @@ class ExtensionService:
         actor: str = "cli",
         cancel_event: Event | None = None,
         on_start: Callable[[PytestVerificationPlan | None], None] | None = None,
+        on_progress: Callable[[float], None] | None = None,
     ) -> ProbeOutcome:
         if not self.enabled():
             return ProbeOutcome(
@@ -624,6 +625,7 @@ class ExtensionService:
                 stage=stage,
                 actor=actor,
                 cancel_event=cancel_event,
+                on_progress=on_progress,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             return self._blocked_fresh_receipt(
@@ -661,6 +663,7 @@ class ExtensionService:
         stage: str,
         actor: str,
         cancel_event: Event | None,
+        on_progress: Callable[[float], None] | None,
     ) -> ProbeOutcome:
         self._event(
             event=ExtensionEventType.REQUESTED,
@@ -873,6 +876,8 @@ class ExtensionService:
             env=env,
             output_limit_bytes=4 * 1024 * 1024,
             cancel_event=cancel_event,
+            progress_interval_seconds=60.0,
+            progress_callback=on_progress,
         )
         self._event(
             event=ExtensionEventType.STARTED,

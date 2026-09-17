@@ -1,3 +1,9 @@
+"""Canonical workflow, authority, and lifecycle contracts.
+
+Requirement traceability: ENGINE-001 preserves canonical stage projection for the legacy engine.
+Requirement traceability: FLOW-001 preserves user confirmation and lifecycle authority boundaries.
+"""
+
 from __future__ import annotations
 
 import hashlib

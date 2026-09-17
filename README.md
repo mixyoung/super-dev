@@ -21,9 +21,10 @@
 
 参与本项目开发或让模型修改仓库前，请先读 [贡献指南](CONTRIBUTING.md) 与 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md)。这两份规则只约束 Super Dev 本身的维护，不改变普通用户使用方式。
 
-当前仓库版本：`2.5.1`（最新 GitHub-only 正式版本）
+当前开发版本：`2.6.0`；最新已发布 GitHub-only 正式版本仍为 `2.5.1`。
 
-- 版本说明与发布记录：[v2.5.1](docs/releases/2.5.1.md)
+- 2.6.0 候选说明：[v2.6.0](docs/releases/2.6.0.md)
+- 最新正式发布记录：[v2.5.1](docs/releases/2.5.1.md)
 - 官网更新历史：[superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## 安装
@@ -511,7 +512,7 @@ super-dev bootstrap --name my-project --platform web --frontend next --backend n
 
 ## 架构概览
 
-Super Dev 2.5.1 由五个职责面协同：**宿主接入**、**合同与编排核心**、**知识与专家注入**、**生成与实现指导**、**验证与交付审计**。宿主保留模型、搜索、终端与代码写入；Super Dev Core 是唯一生命周期所有者，项目状态与证据落在 `output/` 和 `.super-dev/`。
+Super Dev 2.6.0 由五个职责面协同：**宿主接入**、**合同与编排核心**、**知识与专家注入**、**生成与实现指导**、**验证与交付审计**。宿主保留模型、搜索、终端与代码写入；Super Dev Core 是唯一生命周期所有者，项目状态与证据落在 `output/` 和 `.super-dev/`。
 
 下方静态图用于 README 快速阅读；每张图同时保留 Archify JSON 图源和可交互 HTML，可查看源码证据、关系路径、亮暗主题与导出能力。
 

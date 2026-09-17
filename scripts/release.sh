@@ -252,6 +252,31 @@ if [[ "$CREATE_GITHUB_RELEASE" -eq 1 ]]; then
         gh release create "${CREATE_ARGS[@]}" --repo "$RELEASE_GITHUB_REPO"
         echo "[PASS] GitHub Release created: ${TAG}"
     fi
+
+    if [[ -f ".super-dev/workflow-state.json" ]]; then
+        TARGET_SHA="$(git rev-list -n 1 "$TAG")"
+        RELEASE_URL="https://github.com/${RELEASE_GITHUB_REPO}/releases/tag/${TAG}"
+        OBSERVATION_ARGS=(
+            "-m" "super_dev.release_observation"
+            "--project-dir" "."
+            "--target-version" "$VERSION"
+            "--tag" "$TAG"
+            "--repository" "$RELEASE_GITHUB_REPO"
+            "--target-sha" "$TARGET_SHA"
+            "--release-url" "$RELEASE_URL"
+            "--source" "scripts/release.sh"
+        )
+        for asset in "${ASSETS[@]}"; do
+            OBSERVATION_ARGS+=("--asset" "$asset")
+        done
+        if ! "$PYTHON_BIN" "${OBSERVATION_ARGS[@]}"; then
+            echo "[ERROR] GitHub Release 已成功，但本地发布事实记录失败。请先只读核对，不要直接重发。"
+            exit 1
+        fi
+        echo "[PASS] Local release observation recorded: ${TAG}"
+    else
+        echo "[WARN] GitHub Release 已成功，但当前目录没有 Super Dev 工作流状态；未写本地发布事实。"
+    fi
 fi
 
 if [[ "$REPOSITORY" == "github" && "$CREATE_GITHUB_RELEASE" -ne 1 ]]; then

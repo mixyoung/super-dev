@@ -23,6 +23,7 @@ from .review_state import (
     workflow_event_log_file,
     workflow_state_file,
 )
+from .state_store import StateStore
 
 
 @dataclass
@@ -162,16 +163,20 @@ class WorkflowHarnessBuilder:
         state_path = workflow_state_file(self.project_dir)
         latest_snapshot = latest_workflow_snapshot_file(self.project_dir)
         event_log = workflow_event_log_file(self.project_dir)
+        session_brief = self.project_dir / ".super-dev" / "SESSION_BRIEF.md"
+        session_brief_health = StateStore(self.project_dir).session_brief_health(repair=True)
         report.source_files = {
             "workflow_state": str(state_path),
             "latest_snapshot": str(latest_snapshot),
             "workflow_event_log": str(event_log),
+            "session_brief": str(session_brief),
         }
 
         report.checks["workflow_state_present"] = state_payload is not None
         report.checks["workflow_snapshots_present"] = bool(recent_snapshots)
         report.checks["workflow_events_present"] = bool(recent_events)
         report.checks["operational_timeline_present"] = bool(recent_timeline)
+        report.checks["session_brief_current"] = bool(session_brief_health.get("current"))
 
         if not report.checks["workflow_state_present"]:
             report.blockers.append("workflow-state.json 缺失或无法读取")
@@ -181,6 +186,8 @@ class WorkflowHarnessBuilder:
             report.blockers.append("workflow-events.jsonl 缺失或没有事件")
         if not report.checks["operational_timeline_present"]:
             report.blockers.append("统一运行时时间线缺失")
+        if not report.checks["session_brief_current"]:
+            report.blockers.append("SESSION_BRIEF.md 缺失或落后于当前工作流状态")
 
         if not report.checks["workflow_state_present"]:
             report.next_actions.append(
@@ -197,6 +204,10 @@ class WorkflowHarnessBuilder:
         if not report.checks["operational_timeline_present"]:
             report.next_actions.append(
                 "补齐统一运行时时间线，确保流程快照、语义事件和 Hook 事件可被恢复链与发布摘要直接消费。"
+            )
+        if not report.checks["session_brief_current"]:
+            report.next_actions.append(
+                "根据最新 workflow-state 状态修订重新生成 SESSION_BRIEF.md。"
             )
         if not report.next_actions:
             report.next_actions.append(

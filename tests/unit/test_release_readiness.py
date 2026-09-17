@@ -539,6 +539,27 @@ def test_release_readiness_fails_when_host_runtime_validation_repo_probe_breaks(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: web\nfrontend: uni-app\nbackend: python\n",
+        encoding="utf-8",
+    )
+    (temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json").write_text(
+        json.dumps(
+            {
+                "analysis": {"frontend": "uni-app"},
+                "framework_playbook": {
+                    "framework": "uni-app",
+                    "implementation_modules": ["navigation"],
+                    "platform_constraints": ["safe area"],
+                    "execution_guardrails": ["freeze pages.json"],
+                    "native_capabilities": ["login provider"],
+                    "validation_surfaces": ["mini-program navigation"],
+                    "delivery_evidence": ["platform matrix"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     (temp_project_dir / ".super-dev").mkdir(parents=True, exist_ok=True)
     save_workflow_state(
         temp_project_dir,

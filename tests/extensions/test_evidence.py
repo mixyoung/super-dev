@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from super_dev.extensions import evidence as evidence_module
 from super_dev.extensions.evidence import (
     EvidenceStore,
     build_candidate_identity,
@@ -100,6 +101,43 @@ def test_candidate_digest_changes_when_git_index_is_unreadable(tmp_path: Path) -
     assert before.candidate_digest != after.candidate_digest
 
 
+def test_candidate_digest_ignores_super_dev_runtime_state(tmp_path: Path) -> None:
+    project = _repo(tmp_path)
+    before = build_candidate_identity(project)
+    superdev = project / ".super-dev"
+    (superdev / "workflow-history").mkdir(parents=True)
+    (superdev / "review-state").mkdir(parents=True)
+    (superdev / "workflow-state.json").write_text('{"revision": 1}', encoding="utf-8")
+    (superdev / "SESSION_BRIEF.md").write_text("# brief\n", encoding="utf-8")
+    (superdev / "state.lock").write_bytes(b"\0")
+    (superdev / "workflow-history" / "latest.json").write_text('{"revision": 1}', encoding="utf-8")
+    (superdev / "review-state" / "document-confirmation.json").write_text(
+        '{"status": "confirmed"}', encoding="utf-8"
+    )
+
+    after = build_candidate_identity(project)
+
+    assert after == before
+
+
+def test_candidate_identity_falls_back_when_git_is_not_installed(
+    tmp_path: Path, monkeypatch
+) -> None:
+    project = tmp_path / "no-git"
+    project.mkdir()
+    (project / "candidate.py").write_text("value = 1\n", encoding="utf-8")
+
+    def missing_git(*args, **kwargs):
+        raise FileNotFoundError("git missing")
+
+    monkeypatch.setattr(evidence_module.subprocess, "run", missing_git)
+    candidate = build_candidate_identity(project)
+
+    assert candidate.repository == str(project.resolve())
+    assert candidate.head_sha == ""
+    assert candidate.candidate_digest.startswith("sha256:")
+
+
 def test_result_is_invalid_after_candidate_changes(tmp_path: Path) -> None:
     project = _repo(tmp_path)
     current = build_candidate_identity(project)
@@ -141,7 +179,10 @@ def test_evidence_store_writes_atomically_and_skips_bad_history(tmp_path: Path) 
     with store.history_path.open("a", encoding="utf-8") as stream:
         stream.write("not-json\n")
 
-    assert json.loads(path.read_text(encoding="utf-8"))["status"] == "PASS"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["status"] == "PASS"
+    assert payload["evidence_envelope"]["candidate_digest"] == candidate.candidate_digest
+    assert payload["evidence_envelope"]["status"] == "PASS"
     history = store.load_recent(limit=5)
     assert len(history.events) == 1
     assert history.warnings

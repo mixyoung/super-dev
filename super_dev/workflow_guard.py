@@ -373,6 +373,8 @@ def save_bound_docs_confirmation(
         )
     binding = collect_docs_artifact_binding(project_dir)
     normalized = dict(payload)
+    if not identity.legacy and identity.work_item_id:
+        normalized["work_item_id"] = identity.work_item_id
     normalized["artifact_binding"] = binding
     file_path = save_docs_confirmation(project_dir, normalized)
     ledger_entry = _update_stage_ledger(
@@ -392,8 +394,11 @@ def save_bound_docs_confirmation(
 def save_bound_preview_confirmation(
     project_dir: Path, payload: dict[str, Any]
 ) -> tuple[Path, dict[str, Any]]:
+    identity = resolve_work_item_identity(project_dir)
     binding = collect_preview_artifact_binding(project_dir)
     normalized = dict(payload)
+    if not identity.legacy and identity.work_item_id:
+        normalized["work_item_id"] = identity.work_item_id
     normalized["artifact_binding"] = binding
     file_path = save_preview_confirmation(project_dir, normalized)
     ledger_entry = _update_stage_ledger(

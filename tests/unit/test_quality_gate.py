@@ -1045,6 +1045,29 @@ class TestQualityGateChecker:
     def test_quality_gate_executive_summary_explains_layered_host_runtime_gap(
         self, temp_project_dir: Path, monkeypatch
     ):
+        (temp_project_dir / "super-dev.yaml").write_text(
+            "name: demo\nplatform: web\nfrontend: uni-app\nbackend: python\n",
+            encoding="utf-8",
+        )
+        output_dir = temp_project_dir / "output"
+        output_dir.mkdir(exist_ok=True)
+        (output_dir / "demo-ui-contract.json").write_text(
+            json.dumps(
+                {
+                    "analysis": {"frontend": "uni-app"},
+                    "framework_playbook": {
+                        "framework": "uni-app",
+                        "implementation_modules": ["navigation"],
+                        "platform_constraints": ["safe area"],
+                        "execution_guardrails": ["freeze pages.json"],
+                        "native_capabilities": ["login provider"],
+                        "validation_surfaces": ["mini-program navigation"],
+                        "delivery_evidence": ["platform matrix"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         save_workflow_state(
             temp_project_dir,
             {

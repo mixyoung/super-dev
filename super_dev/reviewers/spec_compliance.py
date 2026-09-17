@@ -198,7 +198,7 @@ def _parse_change_spec_requirements(spec_path: Path) -> list[tuple[str, str]]:
             continue
         if not current_heading:
             continue
-        if line.startswith("#### ") or line.startswith("### "):
+        if line.startswith("#"):
             append_current()
             current_heading = ""
             current_body = []
