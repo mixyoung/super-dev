@@ -49,6 +49,11 @@ def _digest(text: str) -> str:
     return f"sha256:{hashlib.sha256(text.encode('utf-8', errors='replace')).hexdigest()}"
 
 
+def _windows_last_error() -> int:
+    getter = getattr(ctypes, "get_last_error", None)
+    return int(getter()) if callable(getter) else 0
+
+
 def _redact(text: str, explicit_values: tuple[str, ...] = ()) -> str:
     redacted = _SENSITIVE_RE.sub(lambda match: f"{match.group(1)}=***REDACTED***", text)
     for value in explicit_values:
@@ -156,7 +161,7 @@ class _WindowsJob:
         kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
         self.handle = kernel32.CreateJobObjectW(None, None)
         if not self.handle:
-            raise OSError(ctypes.get_last_error(), "无法创建 Windows Job Object")
+            raise OSError(_windows_last_error(), "无法创建 Windows Job Object")
         info = _JobExtendedLimitInformation()
         info.BasicLimitInformation.LimitFlags = self.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
         if not kernel32.SetInformationJobObject(
@@ -165,7 +170,7 @@ class _WindowsJob:
             ctypes.byref(info),
             ctypes.sizeof(info),
         ):
-            error = ctypes.get_last_error()
+            error = _windows_last_error()
             kernel32.CloseHandle(self.handle)
             self.handle = None
             raise OSError(error, "无法配置 Windows Job Object")
@@ -175,11 +180,11 @@ class _WindowsJob:
             raise OSError("Windows Job Object 仅适用于 Windows")
         process_handle = ctypes.c_void_p(int(process._handle))  # type: ignore[attr-defined]
         if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
-            raise OSError(ctypes.get_last_error(), "无法把进程加入 Windows Job Object")
+            raise OSError(_windows_last_error(), "无法把进程加入 Windows Job Object")
 
     def terminate(self) -> None:
         if self.handle and not self._kernel32.TerminateJobObject(self.handle, 1):
-            raise OSError(ctypes.get_last_error(), "无法终止 Windows Job Object")
+            raise OSError(_windows_last_error(), "无法终止 Windows Job Object")
 
     def close(self) -> None:
         if self.handle:
