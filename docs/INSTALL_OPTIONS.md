@@ -1,10 +1,10 @@
-# Super Dev 安装方式（2.5.1 fork）
+# Super Dev 安装方式（2.6.0 fork）
 
-本分支只在 GitHub 发布。安装/升级到已发布 2.5.1 使用本文的标签命令；该版本已统一 fork 更新源、制品校验和新进程刷新。从 2.5.0 首次过渡时直接安装 2.5.1；默认项目范围，用户级文本刷新须显式选择。详见[更新边界与恢复](FORK_UPDATES.md)。
+本分支只在 GitHub 发布。安装/升级到已发布 2.6.0 使用本文的标签命令；从 2.5.0 或更早版本首次过渡时直接安装 2.6.0，2.5.1 用户可使用内置更新命令升级。默认只刷新项目范围，用户级文本刷新须显式选择。详见[更新边界与恢复](FORK_UPDATES.md)。
 
 先说结论：
 
-- 首页和默认安装口径统一以 `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev` 为主
+- 首页和默认安装口径统一以 `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev` 为主
 - `uv` 是默认安装方式
 - `super-dev` 是跨平台入口：Windows、macOS、Linux 都先装包再直接运行 `super-dev`
 - 仓库内的 `install.sh` 只是 macOS/Linux 便捷入口，不是 Windows 的唯一安装方式
@@ -17,7 +17,7 @@
 ## 方式 1：uv 安装（推荐）
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 适用：本机命令行工具安装、独立环境、默认官网安装路径。
@@ -31,7 +31,7 @@ super-dev update
 ## 方式 2：安装指定版本（复现/回滚）
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 适用：需要稳定复现、灰度回滚。
@@ -102,7 +102,7 @@ super-dev
 
 ## 安装后 5 分钟应该完成什么
 
-1. `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev`
+1. `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev`
 2. 在项目目录运行 `super-dev`
 3. 让安装器写入项目级接入面
 4. 打开 `output/maintenance/host-onboard-smoke-*.md`
@@ -115,7 +115,7 @@ super-dev
 ## 方式 3：GitHub 直装（Tag）
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 适用：希望直接基于 GitHub Tag 安装。
@@ -175,14 +175,14 @@ super-dev uninstall --dry-run
 
 宿主接入完成后，普通用户应直接回宿主做真实触发与恢复验证。只有维护者在补正式验收证据时，才进入 `integrate smoke` 这条维护链。
 
-## 升级到本分支 2.5.1
+## 升级到本分支 2.6.0
 
 ```bash
 # uv 方式
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 
 # GitHub 方式
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 升级后建议立刻做两件事：

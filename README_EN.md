@@ -19,19 +19,19 @@
 
 ## Version
 
-Current development version: `2.6.0`; the latest published GitHub-only release remains `2.5.1`.
+Current version: `2.6.0`; the latest published GitHub-only release is `2.6.0`.
 
-- 2.6.0 candidate notes: [v2.6.0](docs/releases/2.6.0.md)
-- Latest published release record: [v2.5.1](docs/releases/2.5.1.md)
+- Release notes: [v2.6.0](docs/releases/2.6.0.md)
+- GitHub Release: [Super Dev 2.6.0](https://github.com/mixyoung/super-dev/releases/tag/v2.6.0)
 
 ## Install
 
 The homepage installation story is now intentionally uv-first:
 
-This fork is released on GitHub only, not PyPI. Version 2.5.1 unifies startup hints, `update --check`, and `update` on this fork's stable GitHub Releases; install 2.5.1 directly for the first transition from 2.5.0. Existing, unmodified project text is refreshed by default; user-level refresh requires explicit `--include-user`. See [update boundaries and recovery](docs/FORK_UPDATES.md).
+This fork is released on GitHub only, not PyPI. Version 2.6.0 is the current stable release. Users on 2.5.1 can upgrade with `super-dev update --check` followed by `super-dev update`; users on 2.5.0 or earlier should install the 2.6.0 tag directly. Existing, unmodified project text is refreshed by default; user-level refresh requires explicit `--include-user`. See [update boundaries and recovery](docs/FORK_UPDATES.md).
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 Then run:
@@ -144,7 +144,7 @@ In practice:
 Regular users should remember 1 install command and 3 terminal commands:
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 ```bash
@@ -413,7 +413,7 @@ New features follow the full pipeline. Bug fixes follow a lightweight patch path
 ### 1. uv (recommended)
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 Upgrade:
@@ -425,13 +425,13 @@ super-dev update
 ### 2. Pin a specific version
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 Upgrade:
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 super-dev update
 ```
 
@@ -448,7 +448,7 @@ This generates `.super-dev/WORKFLOW.md` and `output/*-bootstrap.md` to lock down
 ### 3. Install from GitHub tag
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 ### 4. Source install for development

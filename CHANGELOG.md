@@ -2,7 +2,7 @@
 
 本文件记录 Super Dev 的所有重要变更。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [2.6.0] - Unreleased
+## [2.6.0] - 2026-09-18
 
 ### 可靠性收敛
 
@@ -13,6 +13,11 @@
 - 新增正式发布观察记录，只更新 `released`，不推导部署或运营成功。
 - Fresh Verification 改用受控临时文件收集输出，不再被测试内后台子进程继承的管道拖住；长时运行每分钟显示心跳，并强化正常结束、超时与取消时的子进程清理。可选的目标隔离模式会在同一候选和总预算下分别运行各测试目标，避免长生命期 pytest 进程的跨文件资源累积，最后汇总为一份 JUnit 和证据信封。
 - 本版本不增加阶段、Agent Runtime、多项目调度、Memory 2.0、UI 或通用插件市场。
+
+### 发布
+
+- 通过 `mixyoung/super-dev` 的 GitHub Release 正式发布 wheel、sdist 与 `SHA256SUMS.txt`，不上传 PyPI。
+- 发布标签为 `v2.6.0`，正式说明见 [docs/releases/2.6.0.md](docs/releases/2.6.0.md)。
 
 ## [2.5.1] - 2026-09-16
 

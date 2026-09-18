@@ -21,10 +21,10 @@
 
 参与本项目开发或让模型修改仓库前，请先读 [贡献指南](CONTRIBUTING.md) 与 [项目演进与贡献准则](docs/CONTRIBUTION_POLICY.md)。这两份规则只约束 Super Dev 本身的维护，不改变普通用户使用方式。
 
-当前开发版本：`2.6.0`；最新已发布 GitHub-only 正式版本仍为 `2.5.1`。
+当前版本：`2.6.0`；最新已发布 GitHub-only 正式版本为 `2.6.0`。
 
-- 2.6.0 候选说明：[v2.6.0](docs/releases/2.6.0.md)
-- 最新正式发布记录：[v2.5.1](docs/releases/2.5.1.md)
+- 正式发布说明：[v2.6.0](docs/releases/2.6.0.md)
+- GitHub Release：[Super Dev 2.6.0](https://github.com/mixyoung/super-dev/releases/tag/v2.6.0)
 
 ## 安装
 
@@ -32,10 +32,10 @@
 
 ### 老用户：从 2.5.0 或更早版本升级
 
-旧 2.5.0 不包含本 fork 的新更新链，第一次过渡不能只运行旧版 `super-dev update`。请直接安装已发布的 2.5.1 Tag：
+旧 2.5.0 不包含本 fork 的新更新链，第一次过渡不能只运行旧版 `super-dev update`。请直接安装已发布的 2.6.0 Tag：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 关闭并重新打开终端，然后确认实际生效版本：
@@ -44,7 +44,7 @@ uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2
 super-dev --version
 ```
 
-应显示 `2.5.1`。随后进入每个需要刷新接入规则的老项目：
+应显示 `2.6.0`。随后进入每个需要刷新接入规则的老项目：
 
 ```bash
 cd 你的项目目录
@@ -57,7 +57,7 @@ super-dev update
 super-dev update --include-user
 ```
 
-已经处于 2.5.1 的用户不必重复安装，可直接在目标项目中运行 `super-dev update` 做同版核验与项目级刷新。以后从 2.5.1 升级后续正式版本，可以使用：
+已经处于 2.5.1 的用户可以直接运行下面两条命令升级到 2.6.0；已处于 2.6.0 时，同一命令用于版本核验与项目级刷新：
 
 ```bash
 super-dev update --check
@@ -69,7 +69,7 @@ super-dev update
 要求 Python 3.10+，并已安装 `uv`。执行：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 super-dev --version
 ```
 
@@ -89,7 +89,7 @@ super-dev
 
 ### 共同注意事项
 
-- 不要运行 `pip install super-dev==2.5.1`：本 fork 没有发布到 PyPI
+- 不要运行 `pip install super-dev==2.6.0`：本 fork 没有发布到 PyPI
 - `super-dev update` 只刷新已有宿主接入面，不会自动安装新宿主；新增宿主请重新运行 `super-dev`
 - 源码/editable、来源不明或自定义依赖组合的安装不会被 `super-dev update` 自动覆盖，应手工更新源码或改装正式 Tag 版本
 - Windows、macOS、Linux 都先安装包，再直接运行 `super-dev`
@@ -141,7 +141,7 @@ super-dev
 普通用户先记住 1 条安装命令和 3 个终端命令：
 
 ```bash
-uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.5.1" super-dev
+uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
 ```bash
