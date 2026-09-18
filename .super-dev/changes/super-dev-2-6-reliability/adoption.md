@@ -24,6 +24,7 @@
 ## 改动范围
 
 - .super-dev/changes/super-dev-2-6-reliability/checklist.md
+- .super-dev/changes/super-dev-2-6-reliability/adoption.md
 - .super-dev/changes/super-dev-2-6-reliability/ledger.json
 - .super-dev/changes/super-dev-2-6-reliability/plan.md
 - .super-dev/changes/super-dev-2-6-reliability/proposal.md
@@ -41,9 +42,18 @@
 - .claude/skills/super-dev/SKILL.md
 - .github/skills/super-dev-core/SKILL.md
 - .gitignore
+- AGENTS.md
+- CLAUDE.md
 - CHANGELOG.md
 - README.md
 - README_EN.md
+- docs/HOST_CAPABILITY_AUDIT.md
+- docs/HOST_USAGE_GUIDE.md
+- docs/INSTALL_OPTIONS.md
+- docs/PUBLISHING.md
+- docs/QUICKSTART.md
+- docs/WORKFLOW_GUIDE.md
+- docs/WORKFLOW_GUIDE_EN.md
 - docs/releases/2.6.0.md
 - plugins/super-dev-claude/skills/super-dev/SKILL.md
 - plugins/super-dev-codex/skills/super-dev-seeai/SKILL.md
@@ -100,7 +110,7 @@
 
 ## 验证与未验证
 
-基线定向测试为 `104 passed, 2 skipped`。当前候选的 2.6 核心回归为 `163 passed, 1 skipped`；合规解析与状态/证据回归为 `19 passed`；其余 unit/extensions/e2e/integration 分区为 `2986 passed, 6 skipped`，Web API 为 `107 passed`。CLI 功能用例 `227/227` 通过，但会话结束时检测到外部程序重写真实 Gemini 用户配置，因此用户目录隔离门禁未通过；本轮未覆盖或回退该文件。Fresh Verification 稳定性修复后，正式计划 `392 collected, 390 executed, 2 skipped, 0 failed`，候选前后一致且进程树清理已确认；目标隔离模式进一步完成 `395 collected, 393 executed, 2 skipped, 0 failed`，共享 1800 秒总预算并汇总为单一候选证据。Ruff、本轮 Black、22 项类型门、核心模块 Mypy、compileall、贡献范围、Skill 同步、Bash 语法和 diff check 通过。Spec Compliance 已由 `65/100` 修复为 `100/100`，Red Team 为 `76/100 PASS`。2.6.0 wheel/sdist 构建及 Twine 检查通过；批次隔离版 wheel SHA256 为 `53BF606EB661E78F649E6AB9413D485904A806FFE445D4D5B66784575C657B2E`，sdist SHA256 为 `95E2F0DB32BA2A23718E58C727A4671B3159263FCF484CAB9E336D611DC7341D`。初轮质量/发布就绪/Proof Pack 阻断已保留，当前冻结候选将重跑完成前验证与最终交付门禁；未提交、未推送、未合并、未发布、未部署。
+基线定向测试为 `104 passed, 2 skipped`。当前候选的 2.6 核心回归为 `163 passed, 1 skipped`；合规解析与状态/证据回归为 `19 passed`；其余 unit/extensions/e2e/integration 分区为 `2986 passed, 6 skipped`，Web API 为 `107 passed`。CLI 功能用例 `227/227` 通过，但会话结束时检测到外部程序重写真实 Gemini 用户配置，因此用户目录隔离门禁未通过；本轮未覆盖或回退该文件。Fresh Verification 稳定性修复后，正式计划 `392 collected, 390 executed, 2 skipped, 0 failed`，候选前后一致且进程树清理已确认；目标隔离模式进一步完成 `395 collected, 393 executed, 2 skipped, 0 failed`，共享 1800 秒总预算并汇总为单一候选证据。Ruff、本轮 Black、22 项类型门、核心模块 Mypy、compileall、贡献范围、Skill 同步、Bash 语法和 diff check 通过。Spec Compliance 已由 `65/100` 修复为 `100/100`，Red Team 为 `76/100 PASS`。最终干净候选的 Fresh Verification 为通过（PASS），Quality Gate 为 `90.3/90`，Release Readiness 为 `100/85`，Proof Pack 为 `35/35`。PR #17 通过全部检查并合并为 `c90960711112aea26d53fc63d4f2ce0577f4541c`；`v2.6.0` Tag 与 GitHub Release 已于 2026-09-18 正式发布。正式 wheel SHA256 为 `387012C4714C2F2673088C3CDD13B26912E6AA5DD6EAB0EA6E5AB3BB142232BA`，sdist SHA256 为 `BE23F818562601E3206E39C2715A73CDECFC255B22CD09C3ABBF2A377CA4A822`，`SHA256SUMS.txt` SHA256 为 `E149F182EAA3376BACF3E939962EAF8D6D6F97F687BC0FCFA36B6C7FAC536BA9`；三项与 GitHub Release 资产摘要一致。本机安装 `super-dev 2.6.0` 已验证，未据此推导业务环境正在运行。
 
 ## 决定与回退
 
