@@ -105,3 +105,10 @@
 ## 决定与回退
 
 决定：采用并进入实现。若统一状态服务无法满足跨平台和旧项目恢复要求，回退本批代码，但保留迁移前快照和证据；不得恢复 `pipeline-state.json` 为第二当前状态。外部发布已经发生时只回退本地记录逻辑，不删除或重发外部 Release。
+
+## CI 跨平台类型适配跟进
+
+- 来源：PR #17 的 Python 3.10/3.11/3.12 Release type gate 在 Linux 上报出 Windows 专用 `msvcrt` 和 `ctypes.get_last_error` 类型缺口。
+- 取舍：只把 Windows 专用 API 改为动态、可类型检查的访问，不改文件锁、Job Object、超时或子进程清理语义。
+- 范围：`super_dev/state_store.py`、`super_dev/extensions/executor.py`。
+- 证据：定向 Mypy、Ruff、Black 通过；状态存储与执行器回归 `15 passed, 1 skipped`。
