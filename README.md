@@ -25,7 +25,6 @@
 
 - 2.6.0 候选说明：[v2.6.0](docs/releases/2.6.0.md)
 - 最新正式发布记录：[v2.5.1](docs/releases/2.5.1.md)
-- 官网更新历史：[superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## 安装
 
@@ -109,15 +108,6 @@ super-dev
 扫码添加开发者好友，或加入 SuperDev AI 社区微信群、飞书群
 
 </div>
-
----
-
-## 演示视频
-
-<video controls playsinline preload="metadata" src="https://shangyankeji.github.io/super-dev/demo.mp4" width="100%"></video>
-
-- 在线播放：[观看演示视频](https://shangyankeji.github.io/super-dev/demo.mp4)
-- 仓库文件：[demo.mp4](super-dev-website/public/demo.mp4)
 
 ---
 
