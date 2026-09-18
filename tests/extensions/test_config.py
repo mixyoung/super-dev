@@ -51,6 +51,7 @@ def test_fresh_verification_config_is_strict_and_supported() -> None:
             "plan_id": "completion-pilot",
             "args": ["-q", "tests/extensions"],
             "timeout_seconds": 300,
+            "isolate_targets": True,
         },
     }
 

@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess  # nosec B404
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +47,11 @@ def _utc_now() -> str:
 
 def _digest(text: str) -> str:
     return f"sha256:{hashlib.sha256(text.encode('utf-8', errors='replace')).hexdigest()}"
+
+
+def _windows_last_error() -> int:
+    getter = getattr(ctypes, "get_last_error", None)
+    return int(getter()) if callable(getter) else 0
 
 
 def _redact(text: str, explicit_values: tuple[str, ...] = ()) -> str:
@@ -155,7 +161,7 @@ class _WindowsJob:
         kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
         self.handle = kernel32.CreateJobObjectW(None, None)
         if not self.handle:
-            raise OSError(ctypes.get_last_error(), "无法创建 Windows Job Object")
+            raise OSError(_windows_last_error(), "无法创建 Windows Job Object")
         info = _JobExtendedLimitInformation()
         info.BasicLimitInformation.LimitFlags = self.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
         if not kernel32.SetInformationJobObject(
@@ -164,7 +170,7 @@ class _WindowsJob:
             ctypes.byref(info),
             ctypes.sizeof(info),
         ):
-            error = ctypes.get_last_error()
+            error = _windows_last_error()
             kernel32.CloseHandle(self.handle)
             self.handle = None
             raise OSError(error, "无法配置 Windows Job Object")
@@ -174,11 +180,11 @@ class _WindowsJob:
             raise OSError("Windows Job Object 仅适用于 Windows")
         process_handle = ctypes.c_void_p(int(process._handle))  # type: ignore[attr-defined]
         if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
-            raise OSError(ctypes.get_last_error(), "无法把进程加入 Windows Job Object")
+            raise OSError(_windows_last_error(), "无法把进程加入 Windows Job Object")
 
     def terminate(self) -> None:
-        if self.handle:
-            self._kernel32.TerminateJobObject(self.handle, 1)
+        if self.handle and not self._kernel32.TerminateJobObject(self.handle, 1):
+            raise OSError(_windows_last_error(), "无法终止 Windows Job Object")
 
     def close(self) -> None:
         if self.handle:
@@ -230,7 +236,15 @@ class StructuredExecutor:
             raise ValueError("timeout_seconds 必须是 1-3600 的整数")
         if spec.output_limit_bytes < 1024:
             raise ValueError("output_limit_bytes 不能小于 1024")
+        if isinstance(spec.progress_interval_seconds, bool) or spec.progress_interval_seconds <= 0:
+            raise ValueError("progress_interval_seconds 必须大于 0")
         return resolved_executable, cwd
+
+    @staticmethod
+    def _read_capture(stream) -> str:
+        stream.flush()
+        stream.seek(0)
+        return bytes(stream.read()).decode("utf-8", errors="replace")
 
     @staticmethod
     def _environment(spec: CommandSpec) -> dict[str, str]:
@@ -288,7 +302,13 @@ class StructuredExecutor:
         stderr = ""
         exit_code: int | None = None
         error = ""
+        stdout_capture = None
+        stderr_capture = None
         try:
+            capture_dir = self.project_dir / ".super-dev" / "extensions" / "command-captures"
+            capture_dir.mkdir(parents=True, exist_ok=True)
+            stdout_capture = tempfile.TemporaryFile(mode="w+b", dir=capture_dir)
+            stderr_capture = tempfile.TemporaryFile(mode="w+b", dir=capture_dir)
             if os.name == "nt":
                 job = _WindowsJob()
             if os.name == "nt":
@@ -303,8 +323,8 @@ class StructuredExecutor:
                     cwd=str(cwd),
                     env=env,
                     stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=stdout_capture,
+                    stderr=stderr_capture,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
@@ -316,8 +336,8 @@ class StructuredExecutor:
                     cwd=str(cwd),
                     env=env,
                     stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=stdout_capture,
+                    stderr=stderr_capture,
                     text=True,
                     encoding="utf-8",
                     errors="replace",
@@ -337,34 +357,47 @@ class StructuredExecutor:
                     process.wait(timeout=5)
                     raise
             deadline = time.monotonic() + spec.timeout_seconds
+            next_progress = time.monotonic() + spec.progress_interval_seconds
             while True:
                 if spec.cancel_event is not None and spec.cancel_event.is_set():
                     cancelled = True
                     break
-                remaining = deadline - time.monotonic()
+                now = time.monotonic()
+                remaining = deadline - now
                 if remaining <= 0:
                     timed_out = True
                     break
+                if spec.progress_callback is not None and now >= next_progress:
+                    try:
+                        spec.progress_callback(now - started)
+                    except Exception:
+                        pass
+                    next_progress = now + spec.progress_interval_seconds
                 try:
-                    stdout, stderr = process.communicate(timeout=min(0.1, remaining))
+                    process.wait(timeout=min(0.2, remaining))
                     break
                 except subprocess.TimeoutExpired:
                     continue
             if timed_out or cancelled:
                 if job is not None:
-                    job.terminate()
+                    try:
+                        job.terminate()
+                    except OSError:
+                        process_tree_clean = False
+                        process.kill()
                 else:
                     process_tree_clean = _terminate_process_group(process.pid)
                 try:
-                    tail_out, tail_err = process.communicate(timeout=5)
-                    stdout = (stdout or "") + (tail_out or "")
-                    stderr = (stderr or "") + (tail_err or "")
+                    process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     process_tree_clean = False
                     process.kill()
-                    tail_out, tail_err = process.communicate()
-                    stdout = (stdout or "") + (tail_out or "")
-                    stderr = (stderr or "") + (tail_err or "")
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process_tree_clean = False
+            elif job is None:
+                process_tree_clean = _terminate_process_group(process.pid)
             exit_code = process.returncode
         except (OSError, ValueError) as exc:
             error = str(exc)
@@ -372,7 +405,11 @@ class StructuredExecutor:
             if process is not None and process.poll() is None:
                 try:
                     if job is not None:
-                        job.terminate()
+                        try:
+                            job.terminate()
+                        except OSError:
+                            process_tree_clean = False
+                            process.kill()
                     else:
                         process_tree_clean = _terminate_process_group(process.pid)
                     process.wait(timeout=5)
@@ -383,6 +420,12 @@ class StructuredExecutor:
         finally:
             if job is not None:
                 job.close()
+            if stdout_capture is not None:
+                stdout = self._read_capture(stdout_capture)
+                stdout_capture.close()
+            if stderr_capture is not None:
+                stderr = self._read_capture(stderr_capture)
+                stderr_capture.close()
 
         sensitive_values = tuple(
             value

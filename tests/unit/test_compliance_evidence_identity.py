@@ -8,6 +8,7 @@ from super_dev.reviewers.architecture_drift import (
     run_architecture_drift,
 )
 from super_dev.reviewers.spec_compliance import (
+    _parse_change_spec_requirements,
     inspect_spec_compliance_artifact,
     run_spec_compliance,
 )
@@ -35,6 +36,31 @@ def _write_config(project_dir: Path, *, frontend: str) -> None:
         project_dir / "super-dev.yaml",
         f"name: demo\nplatform: cli\nfrontend: {frontend}\nbackend: python\n",
     )
+
+
+def test_change_spec_requirement_stops_at_next_markdown_heading(tmp_path: Path) -> None:
+    spec_path = tmp_path / "specs" / "current-change" / "spec.md"
+    _write(
+        spec_path,
+        """### Requirement: FLOW-001 Confirmation boundary
+
+The workflow keeps explicit confirmation authority.
+
+## Out of Scope
+
+- Agent Runtime
+- Fleet scheduler
+""",
+    )
+
+    requirements = _parse_change_spec_requirements(spec_path)
+
+    assert requirements == [
+        (
+            "current-change-001",
+            "FLOW-001 Confirmation boundary The workflow keeps explicit confirmation authority.",
+        )
+    ]
 
 
 def test_spec_compliance_persists_and_reuses_evidence_identity(temp_project_dir: Path) -> None:

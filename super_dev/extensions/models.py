@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -150,6 +151,8 @@ class CommandSpec:
     env: dict[str, str] = field(default_factory=dict)
     output_limit_bytes: int = 64 * 1024
     cancel_event: Event | None = None
+    progress_interval_seconds: float = 60.0
+    progress_callback: Callable[[float], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -184,6 +187,7 @@ class PytestVerificationPlan:
     plan_id: str
     args: tuple[str, ...]
     timeout_seconds: int
+    isolate_targets: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

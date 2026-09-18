@@ -2,7 +2,7 @@
 name: super-dev-seeai
 description: Activate the Super Dev SEEAI competition mode inside Codex CLI.
 metadata:
-  version: "2.5.1"
+  version: "2.6.0"
 ---
 # Super Dev SEEAI - 赛事极速版 (Codex)
 

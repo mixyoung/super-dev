@@ -85,8 +85,9 @@ def parse_pytest_verification_plan(value: Any) -> PytestVerificationPlan:
         raise PytestPlanValidationError(["extensions.fresh_verification 必须是对象"])
 
     required = {"profile", "plan_id", "args", "timeout_seconds"}
+    allowed = required | {"isolate_targets"}
     missing = sorted(required - set(value))
-    unknown = sorted(set(value) - required)
+    unknown = sorted(set(value) - allowed)
     if missing:
         errors.append(f"extensions.fresh_verification 缺少字段: {missing}")
     if unknown:
@@ -140,6 +141,11 @@ def parse_pytest_verification_plan(value: Any) -> PytestVerificationPlan:
         errors.append("extensions.fresh_verification.timeout_seconds 必须是 1-3600 的整数")
         timeout = 300
 
+    isolate_targets = value.get("isolate_targets", False)
+    if not isinstance(isolate_targets, bool):
+        errors.append("extensions.fresh_verification.isolate_targets 必须是布尔值")
+        isolate_targets = False
+
     if errors:
         raise PytestPlanValidationError(errors)
     return PytestVerificationPlan(
@@ -147,4 +153,5 @@ def parse_pytest_verification_plan(value: Any) -> PytestVerificationPlan:
         plan_id=plan_id,
         args=args,
         timeout_seconds=timeout,
+        isolate_targets=isolate_targets,
     )

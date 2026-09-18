@@ -44,6 +44,13 @@ class CliReleaseQualityMixin:
                 markup=False,
             )
 
+    def _verification_progress(self, elapsed_seconds: float) -> None:
+        elapsed_minutes = max(1, int(elapsed_seconds // 60))
+        self.console.print(
+            f"完成前验证仍在运行：已用时约 {elapsed_minutes} 分钟。",
+            style="dim",
+        )
+
     def _verification_summary(self, outcome: ProbeOutcome, check: ReleaseReadinessCheck) -> None:
         label = {ExtensionStatus.PASS: "通过（PASS）", ExtensionStatus.FAIL: "失败（FAIL）"}.get(
             outcome.status,
@@ -189,6 +196,7 @@ class CliReleaseQualityMixin:
                         verbose=bool(getattr(args, "verbose", False)),
                     )
                 ),
+                on_progress=(None if args.json else self._verification_progress),
             )
         except (OSError, RuntimeError, ValueError) as exc:
             verification_outcome = ProbeOutcome(

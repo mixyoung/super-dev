@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import subprocess
 import unicodedata
@@ -10,6 +9,8 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .state_store import StateStore
 
 ARTIFACT_SUFFIX_WEIGHTS: dict[str, int] = {
     "-prd.md": 5,
@@ -147,12 +148,7 @@ def normalize_work_item_id(value: Any) -> str:
 
 
 def _load_workflow_identity_payload(project_dir: Path) -> dict[str, Any]:
-    state_path = Path(project_dir).resolve() / ".super-dev" / "workflow-state.json"
-    try:
-        payload = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return StateStore(Path(project_dir)).load_workflow()
 
 
 def resolve_work_item_identity(project_dir: Path) -> WorkItemIdentity:

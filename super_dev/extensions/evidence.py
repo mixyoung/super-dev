@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..evidence_contract import EvidenceArtifact, EvidenceEnvelope, EvidenceStatus
 from .models import CandidateIdentity, ExtensionEvent, ExtensionResult
 
 # Owned by KnowledgeStatsDB, not project source or application databases.
@@ -24,6 +25,24 @@ _RUNTIME_CACHE_PATHS = (
 _CANDIDATE_EXCLUDED_PATHS = (
     *_RUNTIME_CACHE_PATHS,
     ".claude/settings.local.json",
+    ".super-dev/SESSION_BRIEF.md",
+    ".super-dev/hook-history.jsonl",
+    ".super-dev/install-manifest.json",
+    ".super-dev/pipeline-state.json",
+    ".super-dev/policy.yaml",
+    ".super-dev/project.md",
+    ".super-dev/state.lock",
+    ".super-dev/workflow-events.jsonl",
+    ".super-dev/workflow-state.json",
+)
+_CANDIDATE_EXCLUDED_ROOTS = (
+    ".super-dev/baselines/windows-test-foundation/runs",
+    ".super-dev/checkpoints",
+    ".super-dev/decisions",
+    ".super-dev/extensions",
+    ".super-dev/review-state",
+    ".super-dev/runs",
+    ".super-dev/workflow-history",
 )
 
 
@@ -40,19 +59,22 @@ def _canonical_digest(payload: dict[str, Any]) -> str:
 
 
 def _git_bytes(project_dir: Path, *args: str) -> bytes | None:
-    completed = subprocess.run(  # nosec B603
-        [
-            "git",
-            "-c",
-            "core.quotepath=false",
-            "-c",
-            "core.excludesFile=",
-            *args,
-        ],
-        cwd=str(project_dir),
-        check=False,
-        capture_output=True,
-    )
+    try:
+        completed = subprocess.run(  # nosec B603
+            [
+                "git",
+                "-c",
+                "core.quotepath=false",
+                "-c",
+                "core.excludesFile=",
+                *args,
+            ],
+            cwd=str(project_dir),
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        return None
     if completed.returncode != 0:
         return None
     return completed.stdout
@@ -69,8 +91,8 @@ def _filesystem_snapshot_digest(project: Path, file_manifest: dict[str, str] | N
     hasher = hashlib.sha256()
     excluded_roots = {
         (project / ".git").resolve(strict=False),
-        (project / ".super-dev" / "extensions").resolve(strict=False),
         (project / "output").resolve(strict=False),
+        *((project / item).resolve(strict=False) for item in _CANDIDATE_EXCLUDED_ROOTS),
     }
     for path in sorted(
         (item for item in project.rglob("*") if item.is_file()),
@@ -121,8 +143,8 @@ def build_candidate_identity(
     resolved_base = base_sha.strip() or head_sha
     git_common = ""
     excluded_paths = (
-        ":!.super-dev/extensions",
         ":!output",
+        *(f":!{path}" for path in _CANDIDATE_EXCLUDED_ROOTS),
         *(f":!{path}" for path in _CANDIDATE_EXCLUDED_PATHS),
     )
 
@@ -225,7 +247,7 @@ def candidate_matches(result_payload: dict[str, Any], current: CandidateIdentity
     candidate = result_payload.get("candidate", {})
     if not isinstance(candidate, dict):
         return False
-    return str(candidate.get("candidate_digest", "")) == current.candidate_digest
+    return bool(str(candidate.get("candidate_digest", "")) == current.candidate_digest)
 
 
 @dataclass(frozen=True)
@@ -288,7 +310,41 @@ class EvidenceStore:
 
     def write_result(self, result: ExtensionResult) -> Path:
         path = self.run_dir(result.run_id) / "result.json"
-        self._atomic_json(path, result.to_dict())
+        payload = result.to_dict()
+        workflow_state_path = self.project_dir / ".super-dev" / "workflow-state.json"
+        workflow_state: dict[str, Any] = {}
+        try:
+            loaded = json.loads(workflow_state_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                workflow_state = loaded
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            pass
+        work_item_id = str(workflow_state.get("work_item_id", "")).strip() or self.project_dir.name
+        operation = tuple(
+            " ".join((item.executable, *item.args)).strip() for item in result.commands
+        )
+        envelope = EvidenceEnvelope(
+            schema_version=1,
+            evidence_id=f"{result.extension_id}-{result.run_id}",
+            evidence_type=result.extension_id,
+            subject_type="candidate",
+            subject_digest=result.candidate.candidate_digest,
+            work_item_id=work_item_id,
+            candidate_digest=result.candidate.candidate_digest,
+            producer=result.extension_id,
+            run_id=result.run_id,
+            status=EvidenceStatus(result.status.value),
+            started_at=result.started_at,
+            finished_at=result.finished_at,
+            observed_at=(
+                result.finished_at or result.started_at or datetime.now(timezone.utc).isoformat()
+            ),
+            operation=operation,
+            artifacts=tuple(EvidenceArtifact(path=item) for item in result.writes),
+            invalidation_triggers=("candidate_changed", "work_item_changed"),
+        )
+        payload["evidence_envelope"] = envelope.to_dict()
+        self._atomic_json(path, payload)
         return path
 
     def write_run_json(self, run_id: str, name: str, payload: dict[str, Any]) -> Path:

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from .config import ConfigManager
+from .review_state import load_workflow_state
 from .shadow_ledger_store import build_shadow_ledger_summary
 from .workflow_guard import load_stage_ledger
 from .workflow_stage_truth import (
@@ -18,15 +18,16 @@ _LEDGER_STAGE_FALLBACKS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _load_pipeline_state(project_dir: Path) -> dict[str, Any]:
-    file_path = Path(project_dir).resolve() / ".super-dev" / "pipeline-state.json"
-    if not file_path.exists():
-        return {}
-    try:
-        payload = json.loads(file_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+def _load_workflow_progress(project_dir: Path) -> dict[str, Any]:
+    workflow_state = load_workflow_state(project_dir) or {}
+    engine_progress = workflow_state.get("engine_progress", {})
+    if not isinstance(engine_progress, dict):
+        engine_progress = {}
+    return {
+        **engine_progress,
+        "canonical_phase": str(workflow_state.get("current_stage", "")).strip()
+        or str(engine_progress.get("canonical_phase", "")).strip(),
+    }
 
 
 def _ledger_entry_for_stage(ledger: dict[str, Any], stage: str) -> dict[str, Any]:
@@ -56,7 +57,7 @@ def collect_expert_stage_governance(
     stage_statuses: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     project_dir = Path(project_dir).resolve()
-    pipeline_state = _load_pipeline_state(project_dir)
+    workflow_progress = _load_workflow_progress(project_dir)
     ledger = load_stage_ledger(project_dir)
     config = ConfigManager(project_dir).config
     shadow_summary = build_shadow_ledger_summary(project_dir)
@@ -71,9 +72,9 @@ def collect_expert_stage_governance(
         if str(key).strip()
     }
 
-    current_stage = str(pipeline_state.get("canonical_phase", "")).strip()
+    current_stage = str(workflow_progress.get("canonical_phase", "")).strip()
     current_active_experts = _extract_recorded_experts(
-        {"active_experts": pipeline_state.get("active_experts", [])}
+        {"active_experts": workflow_progress.get("active_experts", [])}
     )
 
     stages: list[dict[str, Any]] = []

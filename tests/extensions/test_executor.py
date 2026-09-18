@@ -80,6 +80,53 @@ def test_output_is_redacted_and_truncated(tmp_path: Path) -> None:
     assert "output truncated" in result.stdout
 
 
+def test_background_child_inheriting_output_does_not_hold_executor_open(tmp_path: Path) -> None:
+    marker = tmp_path / "background-child-survived.txt"
+    child_code = f"import time; time.sleep(2); open(r'{marker}', 'w').write('bad')"
+    parent_code = (
+        "import subprocess,sys; "
+        f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
+        "print('parent-finished')"
+    )
+
+    started = time.monotonic()
+    result = StructuredExecutor(project_dir=tmp_path).run(
+        CommandSpec(
+            executable=Path(sys.executable),
+            args=("-c", parent_code),
+            cwd=tmp_path,
+            timeout_seconds=5,
+        )
+    )
+    elapsed = time.monotonic() - started
+    time.sleep(2.2)
+
+    assert result.status == ExtensionStatus.PASS
+    assert result.process_tree_clean is True
+    assert result.stdout.strip() == "parent-finished"
+    assert elapsed < 1.5
+    assert not marker.exists()
+
+
+def test_progress_callback_reports_long_running_command(tmp_path: Path) -> None:
+    progress: list[float] = []
+
+    result = StructuredExecutor(project_dir=tmp_path).run(
+        CommandSpec(
+            executable=Path(sys.executable),
+            args=("-c", "import time; time.sleep(0.35)"),
+            cwd=tmp_path,
+            timeout_seconds=5,
+            progress_interval_seconds=0.05,
+            progress_callback=progress.append,
+        )
+    )
+
+    assert result.status == ExtensionStatus.PASS
+    assert progress
+    assert progress == sorted(progress)
+
+
 def test_timeout_cleans_child_process_tree(tmp_path: Path) -> None:
     marker = tmp_path / "child-survived.txt"
     child_code = f"import time; time.sleep(1.5); open(r'{marker}', 'w').write('bad')"

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from super_dev.analyzer import (
@@ -157,6 +158,29 @@ def test_product_audit_detects_layered_host_runtime_gap(temp_project_dir: Path) 
     )
     (docs_dir / "PRODUCT_AUDIT.md").write_text(
         "super-dev product-audit\nproof-pack\nrelease readiness\n", encoding="utf-8"
+    )
+    (temp_project_dir / "super-dev.yaml").write_text(
+        "name: demo\nplatform: web\nfrontend: uni-app\nbackend: python\n",
+        encoding="utf-8",
+    )
+    output_dir = temp_project_dir / "output"
+    output_dir.mkdir(exist_ok=True)
+    (output_dir / "demo-ui-contract.json").write_text(
+        json.dumps(
+            {
+                "analysis": {"frontend": "uni-app"},
+                "framework_playbook": {
+                    "framework": "uni-app",
+                    "implementation_modules": ["navigation"],
+                    "platform_constraints": ["safe area"],
+                    "execution_guardrails": ["freeze pages.json"],
+                    "native_capabilities": ["login provider"],
+                    "validation_surfaces": ["mini-program navigation"],
+                    "delivery_evidence": ["platform matrix"],
+                },
+            }
+        ),
+        encoding="utf-8",
     )
 
     save_workflow_state(

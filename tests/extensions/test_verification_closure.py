@@ -82,6 +82,8 @@ def test_cli_announces_before_execution_and_keeps_default_short(
 
     def execute(self, spec):
         before.append(capsys.readouterr().out)
+        assert spec.progress_callback is not None
+        spec.progress_callback(61.0)
         return original(self, spec)
 
     monkeypatch.setattr(StructuredExecutor, "run", execute)
@@ -93,6 +95,7 @@ def test_cli_announces_before_execution_and_keeps_default_short(
     assert "耗时：" in output
     assert "进程清理：" in output
     assert "下一步：" in output
+    assert "已用时约 1 分钟" in output
     assert ("result_path" in output) == detail
     if not detail:
         assert str(project) not in output

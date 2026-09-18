@@ -19,9 +19,10 @@
 
 ## Version
 
-Current repository version: `2.5.1` (latest GitHub-only release)
+Current development version: `2.6.0`; the latest published GitHub-only release remains `2.5.1`.
 
-- Version notes and release record: [v2.5.1](docs/releases/2.5.1.md)
+- 2.6.0 candidate notes: [v2.6.0](docs/releases/2.6.0.md)
+- Latest published release record: [v2.5.1](docs/releases/2.5.1.md)
 - Website changelog: [superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## Install

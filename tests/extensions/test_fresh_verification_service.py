@@ -13,7 +13,13 @@ from super_dev.extensions.models import ExtensionStatus
 from super_dev.extensions.service import ExtensionService
 
 
-def _configure(project_dir: Path, *, args: list[str], timeout: int = 30) -> None:
+def _configure(
+    project_dir: Path,
+    *,
+    args: list[str],
+    timeout: int = 30,
+    isolate_targets: bool = False,
+) -> None:
     (project_dir / "super-dev.yaml").write_text(
         yaml.safe_dump(
             {
@@ -28,6 +34,7 @@ def _configure(project_dir: Path, *, args: list[str], timeout: int = 30) -> None
                         "plan_id": "completion-pilot",
                         "args": args,
                         "timeout_seconds": timeout,
+                        "isolate_targets": isolate_targets,
                     },
                 },
             },
@@ -55,6 +62,57 @@ def test_service_runs_fresh_pytest_and_never_reuses_run_id(tmp_path: Path) -> No
     payload = json.loads(first.result_path.read_text(encoding="utf-8"))
     assert payload["run_id"] == first.run_id
     assert "invocation_id" not in json.dumps(payload)
+
+
+def test_service_isolates_targets_and_aggregates_one_candidate_receipt(tmp_path: Path) -> None:
+    _configure(
+        tmp_path,
+        args=["-q", "test_first.py", "test_second.py"],
+        isolate_targets=True,
+    )
+    (tmp_path / "test_first.py").write_text(
+        "def test_first():\n    assert True\n", encoding="utf-8"
+    )
+    (tmp_path / "test_second.py").write_text(
+        "def test_second():\n    assert True\n", encoding="utf-8"
+    )
+
+    outcome = ExtensionService(tmp_path).run_fresh_verification()
+
+    assert outcome.status == ExtensionStatus.PASS
+    assert outcome.summary is not None
+    assert outcome.summary.tests == 2
+    assert outcome.summary.executed == 2
+    assert outcome.result is not None
+    assert len(outcome.result.commands) == 2
+    assert all(item.status == ExtensionStatus.PASS for item in outcome.result.commands)
+    assert outcome.result_path is not None
+    payload = json.loads(outcome.result_path.read_text(encoding="utf-8"))
+    assert payload["commands"][0]["args"][-1] == "test_first.py"
+    assert payload["commands"][1]["args"][-1] == "test_second.py"
+    summary_payload = json.loads(
+        (outcome.result_path.parent / "pytest-summary.json").read_text(encoding="utf-8")
+    )
+    assert summary_payload["plan"]["isolate_targets"] is True
+
+
+def test_isolated_targets_preserve_failures_in_aggregate_junit(tmp_path: Path) -> None:
+    _configure(
+        tmp_path,
+        args=["-q", "test_pass.py", "test_fail.py"],
+        isolate_targets=True,
+    )
+    (tmp_path / "test_pass.py").write_text("def test_pass():\n    assert True\n", encoding="utf-8")
+    (tmp_path / "test_fail.py").write_text("def test_fail():\n    assert False\n", encoding="utf-8")
+
+    outcome = ExtensionService(tmp_path).run_fresh_verification()
+
+    assert outcome.status == ExtensionStatus.FAIL
+    assert outcome.summary is not None
+    assert outcome.summary.tests == 2
+    assert outcome.summary.failures == 1
+    assert outcome.result is not None
+    assert len(outcome.result.commands) == 2
 
 
 def test_service_never_reuses_old_pass_after_candidate_changes(tmp_path: Path) -> None:

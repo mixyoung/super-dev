@@ -26,6 +26,7 @@ except ImportError:
 
 from ..config.manager import ConfigManager, get_config_manager
 from ..exceptions import PhaseExecutionError, QualityGateError
+from ..review_state import load_workflow_state, save_workflow_state
 from ..shadow_ledger_store import build_shadow_ledger_summary
 from ..terminal import create_console
 from ..utils import get_logger
@@ -77,13 +78,6 @@ try:
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False
-
-try:
-    from ..session.brief import SessionBrief
-
-    SESSION_BRIEF_AVAILABLE = True
-except ImportError:
-    SESSION_BRIEF_AVAILABLE = False
 
 try:
     from ..pipeline_cost import PipelineCostTracker
@@ -267,16 +261,6 @@ class WorkflowEngine:
         ``pipeline_completed``.  Each subsystem handles errors internally
         so a failing listener never breaks the pipeline.
         """
-        if event == "phase_started" and SESSION_BRIEF_AVAILABLE:
-            try:
-                SessionBrief.update_section(
-                    self.project_dir,
-                    "Current State",
-                    f"Running phase: {phase}",
-                )
-            except Exception:
-                pass
-
         if event == "phase_completed" and self.memory_extractor:
             try:
                 ctx = kwargs.get("context")
@@ -343,17 +327,13 @@ class WorkflowEngine:
                 except Exception:
                     pass
 
-    def _emit_pipeline_state(
+    def _record_engine_progress(
         self,
         current_phase: str,
         phases: list[Phase],
         results: dict[Phase, PhaseResult],
     ) -> None:
-        """Write current pipeline state to .super-dev/pipeline-state.json.
-
-        This file is read by ``super-dev status`` and can be referenced in
-        SKILL.md so the host knows which phase the pipeline is in.
-        """
+        """Record engine progress in the authoritative workflow state."""
         try:
             all_names = [p.value for p in phases]
             completed = [p.value for p in phases if p in results and results[p].success]
@@ -384,7 +364,7 @@ class WorkflowEngine:
                     database=config.database,
                 )
             )
-            state = {
+            engine_progress = {
                 "current_phase": current_phase,
                 "canonical_phase": canonical_current_phase,
                 "phase_index": phase_idx + 1,
@@ -394,25 +374,33 @@ class WorkflowEngine:
                 "canonical_phases_completed": canonical_completed,
                 "canonical_phases_remaining": canonical_remaining,
                 "active_experts": stage_experts,
-                "started_at": self._pipeline_started_at,
+                "started_at": getattr(self, "_pipeline_started_at", ""),
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
-
-            state_dir = self.project_dir / ".super-dev"
-            state_dir.mkdir(parents=True, exist_ok=True)
-            state_path = state_dir / "pipeline-state.json"
-            state_path.write_text(
-                json.dumps(state, indent=2, ensure_ascii=False) + "\n",
-                encoding="utf-8",
+            workflow_state = load_workflow_state(self.project_dir) or {}
+            workflow_state.update(
+                {
+                    "current_stage": canonical_current_phase,
+                    "engine_progress": engine_progress,
+                    "pipeline_run_state": {
+                        "status": "running",
+                        "current_stage": canonical_current_phase,
+                        "current_stage_title": canonical_current_phase,
+                        "scope_coverage_status": "",
+                        "scope_high_priority_gap_count": 0,
+                        "skipped_gates": [],
+                    },
+                }
             )
+            save_workflow_state(self.project_dir, workflow_state)
             current_stage_status = "completed" if current_phase in completed else "running"
             record_stage_progress(
                 self.project_dir,
                 stage=canonical_current_phase,
                 status=current_stage_status,
-                run_id=str(self._pipeline_started_at or "").strip(),
+                run_id=str(getattr(self, "_pipeline_started_at", "") or "").strip(),
                 active_experts=stage_experts,
-                source="pipeline_state",
+                source="workflow_state",
                 details={
                     "engine_phase": current_phase,
                     "phase_index": phase_idx + 1,
@@ -428,16 +416,16 @@ class WorkflowEngine:
                     self.project_dir,
                     stage=completed_stage,
                     status="completed",
-                    run_id=str(self._pipeline_started_at or "").strip(),
-                    source="pipeline_state",
+                    run_id=str(getattr(self, "_pipeline_started_at", "") or "").strip(),
+                    source="workflow_state",
                     details={
                         "engine_phase": current_phase,
                         "phase_index": phase_idx + 1,
                         "total_phases": len(phases),
                     },
                 )
-        except Exception:
-            pass  # Never break the pipeline for state tracking
+        except Exception as exc:
+            self.logger.warning("工作流状态记录失败: %s", exc)
 
     def _register_default_handlers(self) -> None:
         """注册默认阶段处理器"""
@@ -653,7 +641,7 @@ class WorkflowEngine:
             self._print_phase_start(phase, phase_idx, len(phases))
 
             # Emit pipeline state for host awareness
-            self._emit_pipeline_state(phase.value, phases, results)
+            self._record_engine_progress(phase.value, phases, results)
 
             # Cost tracker: mark phase start
             if self.cost_tracker:
@@ -809,7 +797,7 @@ class WorkflowEngine:
                     self._save_checkpoint(phase, result, context)
 
                 # Update pipeline state after phase completion
-                self._emit_pipeline_state(phase.value, phases, results)
+                self._record_engine_progress(phase.value, phases, results)
 
                 # Cost tracker: mark phase end
                 if self.cost_tracker:
@@ -879,7 +867,7 @@ class WorkflowEngine:
                     if self.console:
                         try:
                             self.console.print(
-                                f"[yellow]⚠[/yellow] {phase.value}: " f"执行失败但已跳过 ({e})"
+                                f"[yellow]⚠[/yellow] {phase.value}: 执行失败但已跳过 ({e})"
                             )
                         except Exception:
                             pass
@@ -903,18 +891,6 @@ class WorkflowEngine:
                 )
             except Exception as e:
                 self.logger.warning(f"Overseer 最终报告生成失败: {e}")
-
-        # Session Brief: update status
-        if SESSION_BRIEF_AVAILABLE:
-            try:
-                SessionBrief.update_section(
-                    self.project_dir,
-                    "Current State",
-                    f"Pipeline completed. Phases: {', '.join(p.value for p in results)}. "
-                    f"Success: {sum(1 for r in results.values() if r.success)}/{len(results)}.",
-                )
-            except Exception as e:
-                self.logger.warning(f"Session Brief 更新失败: {e}")
 
         # Memory: trigger dream consolidation if conditions met
         if self.memory_consolidator:
@@ -2086,7 +2062,7 @@ class WorkflowEngine:
 
     def _print_phase_failed(self, phase: Phase, result: PhaseResult) -> None:
         if self.console:
-            self.console.print(f"[red]✗[/red] {phase.value}: " f"失败 ({', '.join(result.errors)})")
+            self.console.print(f"[red]✗[/red] {phase.value}: 失败 ({', '.join(result.errors)})")
 
     def _print_quality_gate_failed(self, phase: Phase, result: PhaseResult) -> None:
         if self.console:
@@ -2119,7 +2095,7 @@ class WorkflowEngine:
 
             self.console.print(table)
             self.console.print(
-                f"\n总计: {success_count}/{len(results)} 成功, " f"总耗时: {total_duration:.1f}s"
+                f"\n总计: {success_count}/{len(results)} 成功, 总耗时: {total_duration:.1f}s"
             )
 
     def _save_report(self, results: dict[Phase, PhaseResult]) -> None:

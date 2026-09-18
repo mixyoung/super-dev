@@ -191,10 +191,25 @@ def test_plan_parser_accepts_bounded_pytest_plan() -> None:
             "plan_id": "completion-pilot",
             "args": ["-q", "tests/extensions"],
             "timeout_seconds": 300,
+            "isolate_targets": True,
         }
     )
 
     assert plan.args == ("-q", "tests/extensions")
+    assert plan.isolate_targets is True
+
+
+def test_plan_parser_rejects_non_boolean_target_isolation() -> None:
+    with pytest.raises(PytestPlanValidationError, match="isolate_targets"):
+        parse_pytest_verification_plan(
+            {
+                "profile": "pytest-current-python",
+                "plan_id": "completion-pilot",
+                "args": ["-q", "tests/extensions"],
+                "timeout_seconds": 300,
+                "isolate_targets": "yes",
+            }
+        )
 
 
 def test_plan_parser_allows_safe_compact_expression() -> None:

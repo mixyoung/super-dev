@@ -31,9 +31,10 @@ extensions:
     - tests/unit/test_proof_pack_enhanced.py
     - tests/unit/test_delivery_packager.py
     - tests/unit/test_analyzer.py
-    plan_id: completion-verification-candidate-006
+    plan_id: super-dev-2-6-reliability-final
     profile: pytest-current-python
     timeout_seconds: 1800
+    isolate_targets: true
 frontend: none
 host_compatibility_min_ready_hosts: 1
 host_compatibility_min_score: 80
@@ -78,4 +79,4 @@ quality_gate: 90
 state_management: []
 testing_frameworks:
 - pytest
-version: 2.5.0
+version: 2.6.0

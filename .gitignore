@@ -99,4 +99,5 @@ dist_2_0_9/
 .super-dev/pipeline-state.json
 .super-dev/SESSION_BRIEF.md
 .super-dev/workflow-state.json
+.super-dev/state.lock
 .super-dev/project.md

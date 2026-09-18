@@ -24,7 +24,7 @@ from ..seeai_design_system import (
 )
 from ..workflow_contract import knowledge_authority_guidance, readonly_request_guidance
 
-SUPER_DEV_VERSION = "2.5.1"
+SUPER_DEV_VERSION = "2.6.0"
 SEEAI_SKILL_NAME = "super-dev-seeai"
 
 
