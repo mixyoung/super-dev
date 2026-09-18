@@ -190,5 +190,5 @@ vim templates/README.md
 ---
 
 **需要帮助？**
-- GitHub: https://github.com/shangyankeji/super-dev
-- Issues: https://github.com/shangyankeji/super-dev/issues
+- GitHub: https://github.com/mixyoung/super-dev
+- Issues: https://github.com/mixyoung/super-dev/issues

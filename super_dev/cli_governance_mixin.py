@@ -337,7 +337,7 @@ class CliGovernanceMixin:
 
     def _cmd_feedback(self, _args: Any) -> int:
         """打开 GitHub Issues 页面。"""
-        url = "https://github.com/shangyankeji/super-dev/issues"
+        url = "https://github.com/mixyoung/super-dev/issues"
         try:
             import webbrowser
 

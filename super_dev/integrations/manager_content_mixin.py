@@ -529,10 +529,10 @@ class IntegrationManagerContentMixin:
             "author": {
                 "name": "Shangyan Technology",
                 "email": "11964948@qq.com",
-                "url": "https://github.com/shangyankeji/super-dev",
+                "url": "https://github.com/mixyoung/super-dev",
             },
-            "homepage": "https://github.com/shangyankeji/super-dev",
-            "repository": "https://github.com/shangyankeji/super-dev",
+            "homepage": "https://github.com/mixyoung/super-dev",
+            "repository": "https://github.com/mixyoung/super-dev",
             "license": "MIT",
             "keywords": ["codex", "super-dev", "workflow", "skills", "agents"],
             "skills": "./skills/",
@@ -543,9 +543,9 @@ class IntegrationManagerContentMixin:
                 "developerName": "Shangyan Technology",
                 "category": "Productivity",
                 "capabilities": ["Interactive", "Write"],
-                "websiteURL": "https://github.com/shangyankeji/super-dev",
-                "privacyPolicyURL": "https://github.com/shangyankeji/super-dev/blob/main/README_EN.md",
-                "termsOfServiceURL": "https://github.com/shangyankeji/super-dev/blob/main/README_EN.md",
+                "websiteURL": "https://github.com/mixyoung/super-dev",
+                "privacyPolicyURL": "https://github.com/mixyoung/super-dev/blob/main/README_EN.md",
+                "termsOfServiceURL": "https://github.com/mixyoung/super-dev/blob/main/README_EN.md",
                 "defaultPrompt": [
                     "Use Super Dev to research and design this product before coding.",
                     "Continue the current Super Dev workflow from the active gate.",
@@ -608,8 +608,8 @@ class IntegrationManagerContentMixin:
                 "name": "Shangyan Technology",
                 "email": "11964948@qq.com",
             },
-            "homepage": "https://github.com/shangyankeji/super-dev",
-            "repository": "https://github.com/shangyankeji/super-dev",
+            "homepage": "https://github.com/mixyoung/super-dev",
+            "repository": "https://github.com/mixyoung/super-dev",
             "license": "MIT",
         }
         return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"

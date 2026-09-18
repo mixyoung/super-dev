@@ -23,7 +23,6 @@ Current development version: `2.6.0`; the latest published GitHub-only release r
 
 - 2.6.0 candidate notes: [v2.6.0](docs/releases/2.6.0.md)
 - Latest published release record: [v2.5.1](docs/releases/2.5.1.md)
-- Website changelog: [superdev.goder.ai/changelog](https://superdev.goder.ai/changelog)
 
 ## Install
 
@@ -113,15 +112,6 @@ Cross-platform note:
 - Core release gates, knowledge gates, delivery smoke, host compatibility, build, and twine checks are green again
 
 For the full breakdown, see [docs/releases/2.4.0.md](docs/releases/2.4.0.md).
-
----
-
-## Demo Video
-
-<video controls playsinline preload="metadata" src="https://shangyankeji.github.io/super-dev/demo.mp4" width="100%"></video>
-
-- Stream online: [Watch the demo](https://shangyankeji.github.io/super-dev/demo.mp4)
-- Repository file: [demo.mp4](super-dev-website/public/demo.mp4)
 
 ---
 
