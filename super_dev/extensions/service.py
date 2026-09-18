@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import importlib.util
+import math
 import os
 import sys
 import sysconfig
 import time
 import uuid
+import xml.etree.ElementTree as ElementTree
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +20,7 @@ from typing import Any, cast
 
 from ..config import get_config_manager
 from ..user_directories import UserDirectoryContext
+from .builtins.fresh_verification import parse_junit_summary
 from .evidence import EvidenceStore, build_candidate_identity, candidate_matches, utc_now
 from .executor import StructuredExecutor
 from .manifest import ManifestValidationError, load_manifest
@@ -350,6 +354,110 @@ class ExtensionService:
     def _relative(project_dir: Path, path: Path) -> str:
         return str(path.relative_to(project_dir)).replace("\\", "/")
 
+    def _pytest_target_batches(
+        self,
+        plan: PytestVerificationPlan,
+    ) -> tuple[tuple[str, ...], ...]:
+        if not plan.isolate_targets:
+            return (plan.args,)
+
+        shared_args: list[str] = []
+        targets: list[str] = []
+        target_mode = False
+        for item in plan.args:
+            if not target_mode and item.startswith("-"):
+                shared_args.append(item)
+                continue
+            target_mode = True
+            if item.startswith("-"):
+                raise ValueError("isolate_targets 只支持选项在前、测试路径在后的参数顺序")
+            target = (self.project_dir / item).resolve(strict=False)
+            try:
+                inside_project = os.path.commonpath((self.project_dir, target)) == str(
+                    self.project_dir
+                )
+            except ValueError:
+                inside_project = False
+            if not inside_project or not target.exists():
+                raise ValueError(f"isolate_targets 测试目标不存在或越界: {item}")
+            targets.append(item)
+        if not targets:
+            raise ValueError("isolate_targets 至少需要一个测试路径")
+        return tuple((*shared_args, target) for target in targets)
+
+    @staticmethod
+    def _aggregate_junit(batch_paths: list[Path], destination: Path) -> PytestSummary:
+        summaries = [parse_junit_summary(path) for path in batch_paths]
+        root = ElementTree.Element("testsuites", {"name": "fresh-verification-batches"})
+        for index, summary in enumerate(summaries, start=1):
+            ElementTree.SubElement(
+                root,
+                "testsuite",
+                {
+                    "name": f"batch-{index}",
+                    "tests": str(summary.tests),
+                    "failures": str(summary.failures),
+                    "errors": str(summary.errors),
+                    "skipped": str(summary.skipped),
+                    "time": f"{summary.duration_seconds:.6f}",
+                },
+            )
+        destination.write_bytes(ElementTree.tostring(root, encoding="utf-8", xml_declaration=True))
+        return parse_junit_summary(destination)
+
+    @staticmethod
+    def _aggregate_executions(
+        executions: list[CommandExecution],
+        *,
+        plan: PytestVerificationPlan,
+    ) -> CommandExecution:
+        if not executions:
+            raise ValueError("完成前验证没有可汇总的命令结果")
+        if len(executions) == 1:
+            return executions[0]
+        blocked_execution = next(
+            (
+                item
+                for item in executions
+                if item.status == ExtensionStatus.BLOCKED or item.exit_code not in {0, 1}
+            ),
+            None,
+        )
+        if blocked_execution is not None:
+            status = ExtensionStatus.BLOCKED
+            exit_code = blocked_execution.exit_code
+        elif any(item.status == ExtensionStatus.FAIL for item in executions):
+            status = ExtensionStatus.FAIL
+            exit_code = 1
+        else:
+            status = ExtensionStatus.PASS
+            exit_code = 0
+        stdout = "\n".join(item.stdout for item in executions if item.stdout)
+        stderr = "\n".join(item.stderr for item in executions if item.stderr)
+        errors = "; ".join(item.error for item in executions if item.error)
+        return CommandExecution(
+            status=status,
+            executable=executions[0].executable,
+            args=("-m", "pytest", *plan.args),
+            cwd=executions[0].cwd,
+            exit_code=exit_code,
+            stdout=stdout,
+            stderr=stderr,
+            stdout_digest=(
+                "sha256:" + hashlib.sha256(stdout.encode("utf-8", errors="replace")).hexdigest()
+            ),
+            stderr_digest=(
+                "sha256:" + hashlib.sha256(stderr.encode("utf-8", errors="replace")).hexdigest()
+            ),
+            started_at=executions[0].started_at,
+            finished_at=executions[-1].finished_at,
+            duration_ms=sum(item.duration_ms for item in executions),
+            timed_out=any(item.timed_out for item in executions),
+            cancelled=any(item.cancelled for item in executions),
+            process_tree_clean=all(item.process_tree_clean for item in executions),
+            error=errors,
+        )
+
     def _finish_fresh_verification(
         self,
         *,
@@ -368,6 +476,7 @@ class ExtensionService:
         summary: PytestSummary | None,
         advisories: tuple[VerificationAdvisory, ...],
         blocking_findings: list[str],
+        executions: list[CommandExecution] | None = None,
         file_manifest_before: dict[str, str] | None = None,
         file_manifest_after: dict[str, str] | None = None,
     ) -> ProbeOutcome:
@@ -415,14 +524,22 @@ class ExtensionService:
             canonical_stage=stage,
             source_digest=source_digest,
             candidate=candidate,
-            commands=[execution] if execution is not None else [],
+            commands=(
+                list(executions)
+                if executions is not None
+                else ([execution] if execution is not None else [])
+            ),
             writes=writes,
             blocking_findings=list(blocking_findings),
             advisory_findings=list(advisories),
             started_at=started_at,
             finished_at=finished_at,
             duration_ms=(time.monotonic() - started) * 1000,
-            process_tree_clean=(execution.process_tree_clean if execution is not None else True),
+            process_tree_clean=(
+                all(item.process_tree_clean for item in executions)
+                if executions is not None
+                else (execution.process_tree_clean if execution is not None else True)
+            ),
         )
         written_result = None
         try:
@@ -843,42 +960,28 @@ class ExtensionService:
             home_drive, home_path = os.path.splitdrive(str(isolated_home))
             env["HOMEDRIVE"] = home_drive
             env["HOMEPATH"] = home_path or "\\"
-        command = CommandSpec(
-            executable=Path(sys.executable).resolve(),
-            args=(
-                "-m",
-                "pytest",
-                "-rX",
-                f"--junitxml={junit_path}",
-                f"--basetemp={pytest_temp}",
-                "-p",
-                "no:cacheprovider",
-                *plan.args,
-            ),
-            cwd=self.project_dir,
-            timeout_seconds=plan.timeout_seconds,
-            env_allowlist=(
-                "HOME",
-                "USERPROFILE",
-                "HOMEDRIVE",
-                "HOMEPATH",
-                "XDG_CONFIG_HOME",
-                "XDG_CACHE_HOME",
-                "XDG_DATA_HOME",
-                "APPDATA",
-                "LOCALAPPDATA",
-                "PYTHONDONTWRITEBYTECODE",
-                "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
-                "PYTHONNOUSERSITE",
-                "PYTHONPATH",
-                "GIT_CEILING_DIRECTORIES",
-            ),
-            env=env,
-            output_limit_bytes=4 * 1024 * 1024,
-            cancel_event=cancel_event,
-            progress_interval_seconds=60.0,
-            progress_callback=on_progress,
-        )
+        try:
+            batches = self._pytest_target_batches(plan)
+        except ValueError as exc:
+            return self._finish_fresh_verification(
+                manifest=manifest,
+                run_id=run_id,
+                stage=stage,
+                actor=actor,
+                source_digest=source.identity_digest,
+                candidate=candidate,
+                final_candidate=candidate,
+                started_at=started_at,
+                started=started,
+                status=ExtensionStatus.BLOCKED,
+                plan=plan,
+                execution=None,
+                summary=None,
+                advisories=(),
+                blocking_findings=[str(exc)],
+                file_manifest_before=file_manifest_before,
+                file_manifest_after=file_manifest_before,
+            )
         self._event(
             event=ExtensionEventType.STARTED,
             run_id=run_id,
@@ -888,7 +991,98 @@ class ExtensionService:
             source_digest=source.identity_digest,
             candidate_digest=candidate.candidate_digest,
         )
-        execution = StructuredExecutor(project_dir=self.project_dir).run(command)
+        env_allowlist = (
+            "HOME",
+            "USERPROFILE",
+            "HOMEDRIVE",
+            "HOMEPATH",
+            "XDG_CONFIG_HOME",
+            "XDG_CACHE_HOME",
+            "XDG_DATA_HOME",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "PYTHONDONTWRITEBYTECODE",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD",
+            "PYTHONNOUSERSITE",
+            "PYTHONPATH",
+            "GIT_CEILING_DIRECTORIES",
+        )
+        executor = StructuredExecutor(project_dir=self.project_dir)
+        executions: list[CommandExecution] = []
+        batch_junit_paths: list[Path] = []
+        execution_started = time.monotonic()
+        deadline = execution_started + plan.timeout_seconds
+        deadline_exhausted = False
+        progress_callback = None
+        if on_progress is not None:
+
+            def report_total_progress(_elapsed: float) -> None:
+                on_progress(time.monotonic() - execution_started)
+
+            progress_callback = report_total_progress
+        for index, batch_args in enumerate(batches, start=1):
+            remaining = math.ceil(deadline - time.monotonic())
+            if remaining <= 0:
+                deadline_exhausted = True
+                break
+            if plan.isolate_targets:
+                batch_root = pytest_temp / f"batch-{index:02d}"
+                batch_root.mkdir(parents=True, exist_ok=True)
+                batch_junit_path = batch_root / "pytest.xml"
+                batch_temp = batch_root / "pytest-temp"
+            else:
+                batch_junit_path = junit_path
+                batch_temp = pytest_temp
+            command = CommandSpec(
+                executable=Path(sys.executable).resolve(),
+                args=(
+                    "-m",
+                    "pytest",
+                    "-rX",
+                    f"--junitxml={batch_junit_path}",
+                    f"--basetemp={batch_temp}",
+                    "-p",
+                    "no:cacheprovider",
+                    *batch_args,
+                ),
+                cwd=self.project_dir,
+                timeout_seconds=min(plan.timeout_seconds, remaining),
+                env_allowlist=env_allowlist,
+                env=env,
+                output_limit_bytes=4 * 1024 * 1024,
+                cancel_event=cancel_event,
+                progress_interval_seconds=60.0,
+                progress_callback=progress_callback,
+            )
+            batch_execution = executor.run(command)
+            executions.append(batch_execution)
+            if batch_junit_path.is_file():
+                batch_junit_paths.append(batch_junit_path)
+            if batch_execution.status == ExtensionStatus.BLOCKED:
+                break
+
+        execution = self._aggregate_executions(executions, plan=plan)
+        if deadline_exhausted and execution.status != ExtensionStatus.BLOCKED:
+            execution = CommandExecution(
+                status=ExtensionStatus.BLOCKED,
+                executable=execution.executable,
+                args=execution.args,
+                cwd=execution.cwd,
+                exit_code=None,
+                stdout=execution.stdout,
+                stderr=execution.stderr,
+                stdout_digest=execution.stdout_digest,
+                stderr_digest=execution.stderr_digest,
+                started_at=execution.started_at,
+                finished_at=execution.finished_at,
+                duration_ms=execution.duration_ms,
+                timed_out=True,
+                cancelled=execution.cancelled,
+                process_tree_clean=execution.process_tree_clean,
+                error=f"命令执行超时 ({plan.timeout_seconds}s)",
+            )
+        if plan.isolate_targets and execution.status != ExtensionStatus.BLOCKED:
+            self._aggregate_junit(batch_junit_paths, junit_path)
         try:
             adapter_result = self._call_builtin(
                 manifest,
@@ -943,6 +1137,7 @@ class ExtensionService:
             status=status,
             plan=plan,
             execution=execution,
+            executions=executions,
             summary=summary,
             advisories=advisories,
             blocking_findings=blocking,

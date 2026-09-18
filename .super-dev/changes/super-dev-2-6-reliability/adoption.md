@@ -67,6 +67,7 @@
 - super_dev/extensions/evidence.py
 - super_dev/extensions/executor.py
 - super_dev/extensions/models.py
+- super_dev/extensions/pytest_plan.py
 - super_dev/extensions/service.py
 - super_dev/orchestrator/engine.py
 - super_dev/release_observation.py
@@ -79,6 +80,9 @@
 - super_dev/workflow_contract.py
 - tests/extensions/test_evidence.py
 - tests/extensions/test_executor.py
+- tests/extensions/test_config.py
+- tests/extensions/test_fresh_verification.py
+- tests/extensions/test_fresh_verification_service.py
 - tests/extensions/test_verification_closure.py
 - tests/integration/test_cli.py
 - tests/unit/test_evidence_contract.py
@@ -96,7 +100,7 @@
 
 ## 验证与未验证
 
-基线定向测试为 `104 passed, 2 skipped`。当前候选的 2.6 核心回归为 `163 passed, 1 skipped`；合规解析与状态/证据回归为 `19 passed`；其余 unit/extensions/e2e/integration 分区为 `2986 passed, 6 skipped`，Web API 为 `107 passed`。CLI 功能用例 `227/227` 通过，但会话结束时检测到外部程序重写真实 Gemini 用户配置，因此用户目录隔离门禁未通过；本轮未覆盖或回退该文件。Fresh Verification 稳定性修复后，正式计划 `392 collected, 390 executed, 2 skipped, 0 failed`，候选前后一致且进程树清理已确认；执行器回归 `10 passed, 1 skipped`，服务/CLI 回归 `44 passed`，完整扩展回归 `165 passed, 2 skipped`。Ruff、本轮 Black、22 项类型门、核心模块 Mypy、compileall、贡献范围、Skill 同步、Bash 语法和 diff check 通过。Spec Compliance 已由 `65/100` 修复为 `100/100`，Red Team 为 `76/100 PASS`。2.6.0 wheel/sdist 构建及 Twine 检查通过；稳定版 wheel SHA256 为 `A3D5DA902733FF4258A5270F03CA55B46F7C322156100609CBF404439D71B3A2`，sdist SHA256 为 `F0B432FB254A0F1AE05BAF414B7B3BCBB4B4ACA93D49D9920720FF8FA3113877`。初轮质量/发布就绪/Proof Pack 阻断已保留，当前冻结候选将重跑完成前验证与最终交付门禁；未提交、未推送、未合并、未发布、未部署。
+基线定向测试为 `104 passed, 2 skipped`。当前候选的 2.6 核心回归为 `163 passed, 1 skipped`；合规解析与状态/证据回归为 `19 passed`；其余 unit/extensions/e2e/integration 分区为 `2986 passed, 6 skipped`，Web API 为 `107 passed`。CLI 功能用例 `227/227` 通过，但会话结束时检测到外部程序重写真实 Gemini 用户配置，因此用户目录隔离门禁未通过；本轮未覆盖或回退该文件。Fresh Verification 稳定性修复后，正式计划 `392 collected, 390 executed, 2 skipped, 0 failed`，候选前后一致且进程树清理已确认；目标隔离模式进一步完成 `395 collected, 393 executed, 2 skipped, 0 failed`，共享 1800 秒总预算并汇总为单一候选证据。Ruff、本轮 Black、22 项类型门、核心模块 Mypy、compileall、贡献范围、Skill 同步、Bash 语法和 diff check 通过。Spec Compliance 已由 `65/100` 修复为 `100/100`，Red Team 为 `76/100 PASS`。2.6.0 wheel/sdist 构建及 Twine 检查通过；批次隔离版 wheel SHA256 为 `53BF606EB661E78F649E6AB9413D485904A806FFE445D4D5B66784575C657B2E`，sdist SHA256 为 `95E2F0DB32BA2A23718E58C727A4671B3159263FCF484CAB9E336D611DC7341D`。初轮质量/发布就绪/Proof Pack 阻断已保留，当前冻结候选将重跑完成前验证与最终交付门禁；未提交、未推送、未合并、未发布、未部署。
 
 ## 决定与回退
 

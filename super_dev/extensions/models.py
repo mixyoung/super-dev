@@ -187,6 +187,7 @@ class PytestVerificationPlan:
     plan_id: str
     args: tuple[str, ...]
     timeout_seconds: int
+    isolate_targets: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

@@ -12,13 +12,14 @@
 - 2.6.0 wheel/sdist 构建成功并通过 Twine；wheel 内含 `state_store.py`、`evidence_contract.py`、`release_observation.py`。
 - Fresh Verification 稳定性修复后，正式计划完整运行 `392 collected, 390 executed, 2 skipped, 0 failed`，用时约 14 分钟，候选前后一致，进程树清理已确认。
 - 修复实现后执行器回归 `10 passed, 1 skipped`，Fresh Verification 服务/CLI 回归 `44 passed`，完整扩展回归 `165 passed, 2 skipped`。
+- 提交后整组运行仍在约 55% 处受跨文件资源累积影响；增加测试目标隔离后，正式计划完成 `395 collected, 393 executed, 2 skipped, 0 failed`，全部批次共享 1800 秒总预算，候选前后一致，进程树清理已确认。
 
 ## 制品
 
-- wheel: `output/release/2.6.0-stable/super_dev-2.6.0-py3-none-any.whl`
-- wheel SHA256: `A3D5DA902733FF4258A5270F03CA55B46F7C322156100609CBF404439D71B3A2`
-- sdist: `output/release/2.6.0-stable/super_dev-2.6.0.tar.gz`
-- sdist SHA256: `F0B432FB254A0F1AE05BAF414B7B3BCBB4B4ACA93D49D9920720FF8FA3113877`
+- wheel: `output/release/2.6.0-batched/super_dev-2.6.0-py3-none-any.whl`
+- wheel SHA256: `53BF606EB661E78F649E6AB9413D485904A806FFE445D4D5B66784575C657B2E`
+- sdist: `output/release/2.6.0-batched/super_dev-2.6.0.tar.gz`
+- sdist SHA256: `95E2F0DB32BA2A23718E58C727A4671B3159263FCF484CAB9E336D611DC7341D`
 
 ## 当前阻断与未完成
 
