@@ -55,7 +55,11 @@
 
 ## 批 E：覆盖与验收收尾（已执行，2026-09-30，基线 18385f2）
 
-- [x] 跨入口"未确认不得推进"覆盖清单落档：Web run（显式/空 phases）、WorkflowEngine（显式/默认）、creators 任务执行（既有 test_task_executor）均有测试；本批补齐 SpecBuilder 阻塞/放行两路径（tests/unit/test_spec_gate_unified.py，2 项）
-- [x] 本仓库真实 `super-dev release readiness` 评估：D2 三维度与 blocked_unknowns 在真实数据上的输出留档 output/（结果见 adoption 批 E 记录）
-- [ ] 真人宿主 runtime validation 录入（归维护者，命令见 adoption）后复跑 readiness 验证三维度全绿路径
+- [x] 跨入口"未确认不得推进"覆盖清单落档：Web run（显式/空 phases）、WorkflowEngine（显式/默认）、creators 任务执行（既有）、SpecBuilder（本批补齐阻塞/放行，tests/unit/test_spec_gate_unified.py 2 项）
+- [x] 真实 readiness 评估两次留档（证据 output/super-dev-2-6-reliability-release-readiness.md）：
+  - 第一次（工作区含未提交改动）：51/100 FAIL——完成前验证如实报告"验证期间代码变化"+1 个 replay 失败；该失败为夹具依赖旧口径的真实回归，本批以"合成项目真实就绪"修复（不放宽断言）
+  - 第二次（干净树，提交 e98ff31）：65/100 FAIL——完成前验证 PASS（393 执行 0 失败，replay 修复经真实运行验证）、代码变化=否；三维度 process_evidence=not_ready / scope_verified=partial_unknown(unknown=49) / host_accepted=unknown；待收尾 Host Runtime Validation、Spec Quality、Delivery Closure。对比历史"100/100 通过 + unknown=49"，新口径不再吸收未核实项
+- [x] 夹具诚实化：_prepare_release_ready_project 升级为 D2 下真实就绪（PRD 功能 + 任务勾选 + codex-cli 验收录入），全绿断言恢复且为诚实全绿；readiness/replay/门覆盖回归 47 项通过
+- [ ] 真人宿主 runtime validation 录入（归维护者：`super-dev review runtime-validation --host <目标宿主> --status passed`，或鉴权 POST /api/hosts/runtime-validation）后复跑 readiness 验证三维度全绿
+- [ ] 下一发布周期重生成 Delivery Closure / Spec Quality 证据（当前产物相对整改后代码已陈旧，属发布工作非本整改范围）
 - [ ] 维护者复核并合并
