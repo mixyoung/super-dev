@@ -41,6 +41,10 @@ from super_dev.workflow_guard import (
     save_bound_docs_confirmation,
     save_bound_preview_confirmation,
 )
+from tests.support.release_ready_inputs import (
+    record_release_ready_acceptance,
+    write_release_ready_docs,
+)
 
 # Fixed API key for all integration tests
 _TEST_API_KEY = "test-integration-key-super-dev-2026"
@@ -565,7 +569,10 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     save_bound_preview_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
     record_stage_progress(project_dir, stage="quality", status="completed")
     record_stage_progress(project_dir, stage="delivery", status="completed")
+    # 批 D2 语义：文档/任务先于身份水化；确认与验收在水化后按最终产物重绑。
+    write_release_ready_docs(project_dir)
     _hydrate_release_governance_artifacts(project_dir)
+    record_release_ready_acceptance(project_dir)
 
 
 def _prepare_proof_pack_project(project_dir: Path) -> None:
@@ -979,6 +986,9 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ts = final_base_time + index
         os.utime(output_dir / artifact_name, (ts, ts))
     _hydrate_release_governance_artifacts(project_dir)
+    # 本夹具在水化前覆盖了 architecture/uiux，水化也会重写 preview 绑定文件：
+    # 确认与验收必须在一切写入完成后按最终产物重绑。
+    record_release_ready_acceptance(project_dir)
 
 
 class TestWebAPI:
