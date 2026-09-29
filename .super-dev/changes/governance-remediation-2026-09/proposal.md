@@ -10,7 +10,7 @@
 - **批 A2（已执行）**：官网身份切换至 GitHub Pages——SITE_URL、仓库链接、star API 全部从原维护者（shangyankeji / superdev.goder.ai）切至 mixyoung/super-dev；删除 CNAME 启用内置 `/super-dev` basePath（即 https://mixyoung.github.io/super-dev/）；Footer 的 PyPI 链接改 GitHub Releases；新增仅手动触发（workflow_dispatch）的 Pages 部署 workflow。实际部署待维护者启用 Pages 后手动执行。
 - **批 C（已批准并执行，核心：权限）**：Web 接口权限边界收紧——repair/persist/verify 类写操作改鉴权 POST、project_dir 限定获准工作区、GET 评估只读零落盘。授权：维护者 2026-09-29 会话（"合并 批准继续"，按 A → C → B 既定顺序）。
 - **批 B（已批准并执行，核心：状态/确认合同）**：StateStore 严格 CAS 协议（损坏阻断 + 恢复候选 + 共享锁）、确认记录统一锁提交、运行路径保留并显式携带 revision、api/engine 门禁对最终阶段列表统一真阻断（修复已定位的 Web 空 phases 绕过）、治理降级落 governance-gaps 记录。授权：维护者 2026-09-29 会话（"全部批准"）。
-- **批 D1（有界缺陷）**：架构漂移否定句误报算法修复（SQLite 案例）。
+- **批 D1（已批准并执行，有界缺陷）**：架构漂移否定语境误报修复——否定命中的技术名归入 negated_tech_stack 单独呈现，不再判缺失；不改门槛与通过语义。授权：维护者 2026-09-29 会话（"全部批准"）。
 - **批 D2（待批准，核心：证据语义）**：发布就绪三维度呈现、unknown 不折算 PASS、无宿主验收不判 PASS、spec_compliance 解析不到需求不给 100 分。
 - **批 E（待排期）**：跨入口、跨宿主覆盖测试与实际验收收尾。
 

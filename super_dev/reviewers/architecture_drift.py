@@ -70,6 +70,7 @@ class DriftReport:
     declared_modules: list[str] = field(default_factory=list)
     actual_modules: list[str] = field(default_factory=list)
     declared_tech_stack: list[str] = field(default_factory=list)
+    negated_tech_stack: list[str] = field(default_factory=list)
     actual_tech_stack: list[str] = field(default_factory=list)
     drifts: list[DriftItem] = field(default_factory=list)
     score: int = 0
@@ -90,6 +91,7 @@ class DriftReport:
             "declared_modules": self.declared_modules,
             "actual_modules": self.actual_modules,
             "declared_tech_stack": self.declared_tech_stack,
+            "negated_tech_stack": self.negated_tech_stack,
             "actual_tech_stack": self.actual_tech_stack,
             "drifts": [asdict(d) for d in self.drifts],
             "score": self.score,
@@ -131,12 +133,43 @@ class DriftReport:
                 lines.append(f"- {t}{marker}")
             lines.append("")
 
+        if self.negated_tech_stack:
+            lines.extend(["## Explicitly Excluded Tech", ""])
+            for t in self.negated_tech_stack:
+                lines.append(f"- {t}（架构文档明确排除，不计入缺失）")
+            lines.append("")
+
         return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
 # Architecture doc parser
 # ---------------------------------------------------------------------------
+
+
+_NEGATION_MARKERS = (
+    "不采用",
+    "不使用",
+    "不引入",
+    "不用",
+    "不基于",
+    "不依赖",
+    "排除",
+    "而非",
+    "not using",
+    "without",
+    "rather than",
+    "instead of",
+)
+
+
+def _line_negates_match(line: str, match_start: int) -> bool:
+    """判断技术名命中是否处于否定语境（否定词出现在同一行命中的前面）。
+
+    仅按前缀判定，宁少排不误排：无法确认否定语境的技术名仍按声明处理。
+    """
+    prefix = line[:match_start].lower()
+    return any(marker in prefix for marker in _NEGATION_MARKERS)
 
 
 def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
@@ -146,9 +179,11 @@ def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
         "modules": [],
         "dependencies": [],
         "tech_stack": [],
+        "negated_tech_stack": [],
     }
 
-    # Extract tech stack mentions
+    # Extract tech stack mentions; negate-context hits (e.g. "不采用 SQLite") are
+    # recorded separately and never treated as declared-and-missing.
     tech_patterns = [
         r"(?:React|Next\.js|Vue|Angular|Svelte|Nuxt)\s*[\d.]*",
         r"(?:FastAPI|Flask|Django|Express|NestJS|Spring)\s*[\d.]*",
@@ -159,11 +194,17 @@ def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
         r"(?:Redis|RabbitMQ|Kafka|Celery)\s*[\d.]*",
     ]
     for pat in tech_patterns:
-        found = re.findall(pat, content, re.IGNORECASE)
-        for f in found:
-            cleaned = f.strip()
-            if cleaned and cleaned.lower() not in [t.lower() for t in result["tech_stack"]]:
-                result["tech_stack"].append(cleaned)
+        for line in content.splitlines():
+            for match in re.finditer(pat, line, re.IGNORECASE):
+                cleaned = match.group(0).strip()
+                if not cleaned:
+                    continue
+                if _line_negates_match(line, match.start()):
+                    if cleaned.lower() not in [t.lower() for t in result["negated_tech_stack"]]:
+                        result["negated_tech_stack"].append(cleaned)
+                    continue
+                if cleaned and cleaned.lower() not in [t.lower() for t in result["tech_stack"]]:
+                    result["tech_stack"].append(cleaned)
 
     # Extract module/section names from headings
     heading_pattern = re.compile(
@@ -523,6 +564,7 @@ def run_architecture_drift(
     declared = _parse_architecture_doc(arch_files[0])
     report.declared_modules = declared["modules"]
     report.declared_tech_stack = declared["tech_stack"]
+    report.negated_tech_stack = declared.get("negated_tech_stack", [])
 
     # Scan actual
     _scan_imports(project_dir)

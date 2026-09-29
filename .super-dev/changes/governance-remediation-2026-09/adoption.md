@@ -99,3 +99,13 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：新增 14 项测试通过（4 门禁统一 + 2 原子性 + 8 状态存储含 2 项扩展）；tests/unit 状态/守卫相关 7 个文件 47 项通过；tests/integration/test_web_api.py 107 项通过；ruff/black 清洁。批内曾以 git stash 演示修复前红态，因当时测试文件导入笔误未取得有效红态记录，绕过结论仍以静态链条（前次汇报）+ 修复后绿测为准。未验证：tests/integration/test_cli.py 全量回归于本批提交前在后台执行，结果补记于提交信息；跨进程并发锁竞争仅靠单元级验证，未做真实多进程压测。
 
 回退：`git revert` 本批提交；旧状态文件读取兼容不受影响，写入协议退回可选项。
+
+## 2026-09-29 批 D1：架构漂移否定语境误报（有界缺陷修复）
+
+问题与现有覆盖：`_parse_architecture_doc` 按全文正则抓取技术名，不区分否定语境。实证：`output/super-dev-2-6-reliability-architecture-drift.md:17` 把 "SQLite [NOT FOUND]" 列为技术缺失，而架构文档第 6 行明确"不采用……SQLite 状态数据库"。本批只修误报算法，不改质量门槛或"通过"含义（后者属批 D2）。
+
+改动（分支 ocx/governance-remediation-batch-d1-drift-negation，基线 12b04f0）：super_dev/reviewers/architecture_drift.py——技术名提取改为逐行匹配，命中前缀含否定词（不采用/不使用/不引入/不用/不基于/不依赖/排除/而非/not using/without/rather than/instead of）的归入 negated_tech_stack，不再进入声明清单；DriftReport 增加 negated_tech_stack 字段（to_dict 同步），markdown 新增 "Explicitly Excluded Tech" 小节标注"明确排除，不计入缺失"。仅按前缀判定、宁少排不误排：无法确认否定语境的技术名仍按声明处理。新增 tests/unit/test_architecture_drift_negation.py（3 项：SQLite 否定案例不入声明清单、markdown 不再标 NOT FOUND、肯定句技术名正常声明）。
+
+验证与未验证：3 项新测试通过；ruff/black 清洁；drift 相邻单测（compliance_evidence_identity / quality_gate）通过（见提交记录）；未验证：全库重跑 drift 报告对比（历史报告按约定不回溯重生成）。
+
+回退：`git revert` 本批提交即恢复全文抓取行为。
