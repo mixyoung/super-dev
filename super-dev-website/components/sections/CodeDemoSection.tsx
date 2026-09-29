@@ -15,7 +15,7 @@ const TABS = {
       id: 'five-minute',
       label: '5 分钟上手',
       filename: 'Terminal',
-      code: `uv tool install super-dev
+      code: `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 
 # 进入宿主安装引导
 super-dev
@@ -70,7 +70,7 @@ output/delivery/manifest.json`,
       id: 'five-minute',
       label: 'Five-minute path',
       filename: 'Terminal',
-      code: `uv tool install super-dev
+      code: `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 
 # open the host installer
 super-dev

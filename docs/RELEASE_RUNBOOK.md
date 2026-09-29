@@ -99,7 +99,7 @@
 
 ## 4. 发布后验证
 
-- `uv tool install super-dev==<version>`
+- `uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v<version>" super-dev`
 - 核心命令冒烟：
   - `super-dev --help`
   - `super-dev`

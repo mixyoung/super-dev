@@ -26,7 +26,7 @@ python3 --version
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
 
-源码安装、指定版本回滚等方式保留在 [INSTALL_OPTIONS.md](/Users/weiyou/Documents/kaifa/super-dev/docs/INSTALL_OPTIONS.md)。
+源码安装、指定版本回滚等方式保留在 [INSTALL_OPTIONS.md](INSTALL_OPTIONS.md)。
 
 ### 方式 B：安装指定版本（复现/回滚）
 

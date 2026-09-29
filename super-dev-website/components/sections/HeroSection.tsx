@@ -85,7 +85,7 @@ export function HeroSection({ locale = 'zh' }: { locale?: SiteLocale }) {
           </ul>
 
           <div id="get-started" className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap sm:items-center">
-            <CopyCommand command="uv tool install super-dev" className="sm:w-auto" />
+            <CopyCommand command='uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev' className="sm:w-auto" />
             <Link
               href={localizedPath(locale, '/docs')}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-border-default px-4 py-3 text-sm font-medium text-text-secondary transition-all duration-150 hover:border-border-emphasis hover:text-text-primary"

@@ -1,7 +1,7 @@
 # Super Dev 集成维护指南
 
 > 普通用户如何在宿主里触发和继续流程，请优先看：
-> [HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
+> [HOST_USAGE_GUIDE.md](HOST_USAGE_GUIDE.md)
 
 这份文档只面向维护者。目标不是教普通用户手敲一长串 CLI，而是说明：
 

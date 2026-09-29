@@ -425,8 +425,7 @@ done
 
 if ! command -v super-dev >/dev/null 2>&1; then
   error "未检测到 super-dev 命令。请先安装 super-dev 后再运行本脚本。"
-  error "示例: pip install -U super-dev"
-  error "可选: uv tool install super-dev"
+  error "示例: uv tool install --force --from \"git+https://github.com/mixyoung/super-dev.git@v2.6.0\" super-dev"
   error "开发模式: uv sync && uv run super-dev"
   error "或使用 pip 开发安装: pip install -e ."
   exit 1

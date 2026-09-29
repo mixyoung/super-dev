@@ -177,7 +177,7 @@ export function ShowcasePageContent({ locale = 'zh' }: { locale?: SiteLocale }) 
                 : 'One command gives you a complete research, documentation, implementation, quality, and delivery pipeline.'}
             </p>
             <code className="inline-block px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default font-mono text-sm text-accent-blue">
-              uv tool install super-dev
+              uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
             </code>
           </div>
         </section>

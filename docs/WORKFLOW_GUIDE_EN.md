@@ -1,9 +1,9 @@
 # Super Dev Workflow Guide (2.6.0)
 
 > End users should start with:
-> - [README.md](/Users/weiyou/Documents/kaifa/super-dev/README.md)
-> - [docs/QUICKSTART.md](/Users/weiyou/Documents/kaifa/super-dev/docs/QUICKSTART.md)
-> - [docs/HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
+> - [README.md](../README.md)
+> - [docs/QUICKSTART.md](QUICKSTART.md)
+> - [docs/HOST_USAGE_GUIDE.md](HOST_USAGE_GUIDE.md)
 >
 > This guide also contains maintainer workflow controls, Spec/Task loops, and release boundaries. It is not the first document most end users should read.
 

@@ -130,7 +130,7 @@ const zhContent: Content = {
     '安装完成后会直接显示推荐宿主、标准流第一句、比赛流第一句和接入后先验；Droid CLI 已纳入统一矩阵。',
   ],
   installCode:
-    'uv tool install super-dev\n\n# 打开安装引导\nsuper-dev\n\n# Droid CLI / Claude Code / Codex 等宿主都在安装器中统一接入\n\n# 终端公开维护入口\nsuper-dev update\nsuper-dev uninstall',
+    'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev\n\n# 打开安装引导\nsuper-dev\n\n# Droid CLI / Claude Code / Codex 等宿主都在安装器中统一接入\n\n# 终端公开维护入口\nsuper-dev update\nsuper-dev uninstall',
   firstMinutesTitle: '安装后 5 分钟',
   firstMinutesBody:
     '这里决定用户会觉得产品丝滑，还是觉得只是又一个安装页。终端在安装后就应该退场，用户马上回宿主里复制首句、看框架焦点、按烟测指南确认宿主真的在按商业项目流程工作。',
@@ -305,7 +305,7 @@ const zhContent: Content = {
   commands: [
     {
       title: '终端公开入口',
-      code: 'uv tool install super-dev\n\nsuper-dev          # 进入宿主安装引导\nsuper-dev update   # 更新到最新版\nsuper-dev uninstall # 清理宿主注入面',
+      code: 'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev\n\nsuper-dev          # 进入宿主安装引导\nsuper-dev update   # 更新到最新版\nsuper-dev uninstall # 清理宿主注入面',
       filename: 'Terminal',
     },
     {
@@ -383,7 +383,7 @@ const enContent: Content = {
     'The installer now exposes the recommended host, first prompts, and post-onboard checks. Droid CLI is part of the unified matrix.',
   ],
   installCode:
-    'uv tool install super-dev\n\n# open the installer\nsuper-dev\n\n# Droid CLI / Claude Code / Codex and other hosts are onboarded from the same installer\n\n# public terminal maintenance entrypoints\nsuper-dev update\nsuper-dev uninstall',
+    'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev\n\n# open the installer\nsuper-dev\n\n# Droid CLI / Claude Code / Codex and other hosts are onboarded from the same installer\n\n# public terminal maintenance entrypoints\nsuper-dev update\nsuper-dev uninstall',
   firstMinutesTitle: 'The first 5 minutes after install',
   firstMinutesBody:
     'This is where the product either feels sharp or feels like just another setup page. After install, the terminal should get out of the way. Users should go straight back into the host, copy the first prompt, read the framework coaching focus, and confirm the host really enters the commercial delivery flow.',
@@ -558,7 +558,7 @@ const enContent: Content = {
   commands: [
     {
       title: 'Public terminal entrypoints',
-      code: 'uv tool install super-dev\n\nsuper-dev           # open the host installer\nsuper-dev update    # update to the latest version\nsuper-dev uninstall # remove injected host surfaces',
+      code: 'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev\n\nsuper-dev           # open the host installer\nsuper-dev update    # update to the latest version\nsuper-dev uninstall # remove injected host surfaces',
       filename: 'Terminal',
     },
     {
@@ -683,10 +683,10 @@ export function DocsPageContent({ locale = 'zh' }: { locale?: SiteLocale }) {
                   : '先安装 CLI。然后在终端输入 super-dev，进入宿主安装引导并写入所需接入面。'}
               </p>
               <div className="rounded-2xl border border-border-default bg-bg-primary/80 p-4">
-                <CopyCommand command="uv tool install super-dev" className="w-full" />
+                <CopyCommand command='uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev' className="w-full" />
                 <div className="mt-3">
                   <CodeBlock
-                    code={`uv tool install super-dev\n\nsuper-dev\nsuper-dev update\nsuper-dev uninstall`}
+                    code={`uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev\n\nsuper-dev\nsuper-dev update\nsuper-dev uninstall`}
                     filename={locale === 'en' ? 'Install' : '安装'}
                     className="bg-bg-primary"
                   />

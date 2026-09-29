@@ -12,7 +12,7 @@
 
 宿主详细试用方式请看：
 
-- [HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
+- [HOST_USAGE_GUIDE.md](HOST_USAGE_GUIDE.md)
 
 ## 方式 1：uv 安装（推荐）
 
