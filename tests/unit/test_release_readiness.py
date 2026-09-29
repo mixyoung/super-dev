@@ -5,6 +5,7 @@ from pathlib import Path
 from super_dev import __version__
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.hooks.manager import HookManager
+from super_dev.host_runtime_validation import update_host_runtime_validation_state
 from super_dev.release_readiness import (
     ReleaseReadinessCheck,
     ReleaseReadinessEvaluator,
@@ -130,6 +131,22 @@ def _prepare_release_ready_project(
             "ok\n",
             encoding="utf-8",
         )
+    # 批 D2 语义后，"发布就绪"夹具必须真实就绪：范围可核实（PRD 功能 + 任务完成）
+    # 与宿主真人验收记录齐备，不再依赖 unknown/缺失折算为 PASS 的旧口径。
+    # 这些输入必须先于下方带 evidence_identity 的产物水化写入，保证身份摘要自洽。
+    (
+        project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / "tasks.md"
+    ).write_text(
+        "# Tasks\n\n- [x] 版本信息展示：README 与包内版本一致\n",
+        encoding="utf-8",
+    )
+    update_host_runtime_validation_state(
+        project_dir=project_dir,
+        host="codex-cli",
+        status="passed",
+        comment="release-ready fixture",
+        actor="fixture",
+    )
     (project_dir / "output" / f"{project_name}-redteam.json").write_text(
         (
             "{\n"
@@ -294,7 +311,7 @@ def _prepare_release_ready_project(
         encoding="utf-8",
     )
     (project_dir / "output" / f"{project_name}-prd.md").write_text(
-        "# PRD\n\n- delivery workflow\n",
+        "# PRD\n\n## 2. 功能需求\n\n### 版本信息展示\n\n在 README 与包内元数据中展示当前版本号。\n",
         encoding="utf-8",
     )
     (project_dir / "output" / f"{project_name}-architecture.md").write_text(
@@ -460,7 +477,12 @@ def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir
     files = evaluator.write(report)
 
     failed = {check.name: check for check in report.checks if not check.passed}
+    # 批 D2 语义后夹具真实就绪（宿主验收录入 + PRD 功能清单），全绿是诚实结果；
+    # 范围维度按清单逐项核对状态呈现（verified/partial_unknown 均为通过）。
     assert failed == {}
+    assert report.evidence_dimensions["host_accepted"] == "accepted"
+    assert report.evidence_dimensions["scope_verified"] in {"verified", "partial_unknown"}
+    assert not any(item.startswith("host_runtime_validation:") for item in report.blocked_unknowns)
     assert files["markdown"].exists()
     assert files["json"].exists()
     delivery_check = next(check for check in report.checks if check.name == "Delivery Closure")

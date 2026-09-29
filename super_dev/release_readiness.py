@@ -101,6 +101,8 @@ class ReleaseReadinessReport:
     governance_notes: list[str] = field(default_factory=list)
     delivery_facts: DeliveryFacts | dict[str, Any] | None = None
     operational_outcomes: list[OperationalOutcome | dict[str, Any]] = field(default_factory=list)
+    evidence_dimensions: dict[str, str] = field(default_factory=dict)
+    blocked_unknowns: list[str] = field(default_factory=list)
 
     def _weight(self, severity: str) -> int:
         mapping = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -150,11 +152,19 @@ class ReleaseReadinessReport:
         focus_summary = str(self.operational_focus.get("summary", "")).strip()
         focus_text = f" 当前治理焦点：{focus_summary}。" if focus_summary else ""
         if self.passed:
+            unknown_note = ""
+            if self.blocked_unknowns:
+                unknown_note = (
+                    " 注意：仍存在未核实验收项（"
+                    + "；".join(self.blocked_unknowns[:3])
+                    + "）。通过仅指流程证据就绪，不代表全部需求已验证。"
+                )
             return (
-                f"当前仓库已达到发布阈值，score={self.score}/100。"
-                " 从发布决策视角看，当前版本已经具备对外演示、验收和上线评审的基础可信度。"
-                f"{workflow_text}{layered_runtime_text}{baseline_text}{compliance_text}"
-                f"{frontend_governance_text}{framework_text}{focus_text}"
+                f"当前仓库流程证据就绪，score={self.score}/100（阈值 {self.threshold}）。"
+                " “通过”含义：流程证据齐备；需求范围核实与目标宿主验收状态以"
+                " Evidence Dimensions 三维度为准。"
+                f"{unknown_note}{workflow_text}{layered_runtime_text}{baseline_text}"
+                f"{compliance_text}{frontend_governance_text}{framework_text}{focus_text}"
             )
         failed_names = "、".join(check.name for check in self.failed_checks[:3]) or "关键检查"
         return (
@@ -350,6 +360,8 @@ class ReleaseReadinessReport:
             "workflow_context": dict(self.workflow_context),
             "baseline_governance": dict(self.baseline_governance),
             "governance_notes": list(self.governance_notes),
+            "evidence_dimensions": dict(self.evidence_dimensions),
+            "blocked_unknowns": list(self.blocked_unknowns),
             "delivery_facts": delivery_facts,
             "operational_outcomes": operational_outcomes,
         }
@@ -388,7 +400,18 @@ class ReleaseReadinessReport:
             "",
             self.executive_summary,
             "",
+            "## Evidence Dimensions",
+            "",
+            f"- 流程证据就绪 process_evidence: {self.evidence_dimensions.get('process_evidence', 'not_evaluated')}",
+            f"- 需求范围已核实 scope_verified: {self.evidence_dimensions.get('scope_verified', 'not_evaluated')}",
+            f"- 目标宿主已验收 host_accepted: {self.evidence_dimensions.get('host_accepted', 'not_evaluated')}",
         ]
+        if self.blocked_unknowns:
+            lines.append("")
+            lines.append("未核实验收项（unknown/blocked，不折算为通过）：")
+            for unknown_item in self.blocked_unknowns:
+                lines.append(f"- {unknown_item}")
+        lines.append("")
         facts = self._delivery_facts_payload()
         lines.extend(
             [
@@ -547,10 +570,13 @@ class ReleaseReadinessEvaluator:
     ]
     VERSIONED_HOST_SURFACE_RULES = frozenset({"/.claude/", "/.cursor/"})
 
-    def __init__(self, project_dir: Path):
+    def __init__(self, project_dir: Path, *, persist_artifacts: bool = True):
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # persist_artifacts=False 用于只读评估（Web GET）：不创建目录、不落盘任何报告。
+        self.persist_artifacts = persist_artifacts
+        if self.persist_artifacts:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
         self.active_change_id = resolve_active_change_id(self.project_dir)
         self.project_name = resolve_current_artifact_prefix(
             self.project_dir,
@@ -660,6 +686,9 @@ class ReleaseReadinessEvaluator:
             current_facts,
             preserved_facts if isinstance(preserved_facts, dict) else {},
         )
+        dimensions, blocked_unknowns = self._evidence_dimensions(report)
+        report.evidence_dimensions = dimensions
+        report.blocked_unknowns = blocked_unknowns
         return report
 
     def write(self, report: ReleaseReadinessReport) -> dict[str, Path]:
@@ -916,10 +945,17 @@ class ReleaseReadinessEvaluator:
         if not isinstance(hosts, dict) or not hosts:
             return ReleaseReadinessCheck(
                 name="Host Runtime Validation",
-                passed=True,
-                detail="no host runtime validation state recorded",
-                severity="low",
-                recommendation="如当前交付依赖宿主内继续执行或恢复，请先完成一次真人宿主验收，并把 runtime validation 状态记录到当前项目。",
+                passed=False,
+                detail=(
+                    "no host runtime validation state recorded "
+                    "(unknown → blocked：目标宿主真人验收缺失，不能折算为通过)"
+                ),
+                severity="high",
+                recommendation=(
+                    "先在目标宿主完成一次真人 runtime validation 并把状态录入当前项目，"
+                    "再申请发布评审；缺失记录自批 D2 起不再计为通过。"
+                ),
+                evidence={"dimension": "host_accepted", "state": "unknown"},
             )
 
         pending_hosts: list[str] = []
@@ -964,6 +1000,7 @@ class ReleaseReadinessEvaluator:
             detail=detail,
             severity="medium" if not passed else "low",
             recommendation=recommendation,
+            evidence={"dimension": "host_accepted", "state": "recorded"},
         )
 
     def _check_release_spec_exists(self) -> ReleaseReadinessCheck:
@@ -1067,7 +1104,8 @@ class ReleaseReadinessEvaluator:
     def _check_scope_coverage(self) -> ReleaseReadinessCheck:
         builder = FeatureChecklistBuilder(self.project_dir)
         report = builder.build()
-        builder.write(report)
+        if self.persist_artifacts:
+            builder.write(report)
 
         coverage_text = (
             f"{report.coverage_rate:.1f}%" if report.coverage_rate is not None else "unknown"
@@ -1080,10 +1118,19 @@ class ReleaseReadinessEvaluator:
         if report.status == "unknown":
             return ReleaseReadinessCheck(
                 name="Scope Coverage",
-                passed=True,
-                detail=detail,
-                severity="low",
-                recommendation="如需确认 PRD 全量覆盖率，先执行 `super-dev product-audit` 或交付审查，查看范围完成度与显式缺口。",
+                passed=False,
+                detail=detail + " (unknown → blocked：范围未核实)",
+                severity="medium",
+                recommendation=(
+                    "范围覆盖状态未知：先执行 `super-dev product-audit` 或交付审查生成功能清单，"
+                    "再评估发布；unknown 自批 D2 起不再折算为通过。"
+                ),
+                evidence={
+                    "dimension": "scope_verified",
+                    "status": "unknown",
+                    "unknown_count": int(report.unknown_count),
+                    "coverage_rate": report.coverage_rate,
+                },
             )
 
         passed = report.high_priority_gap_count == 0 and report.missing_count == 0
@@ -1098,6 +1145,12 @@ class ReleaseReadinessEvaluator:
             detail=detail,
             severity="high" if not passed else "low",
             recommendation=recommendation,
+            evidence={
+                "dimension": "scope_verified",
+                "status": report.status,
+                "unknown_count": int(report.unknown_count),
+                "coverage_rate": report.coverage_rate,
+            },
         )
 
     def _check_compliance_closure(self) -> ReleaseReadinessCheck:
@@ -1111,7 +1164,9 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_spec_compliance_artifact(self.project_dir, self.output_dir)
-            spec_report = run_spec_compliance(self.project_dir, self.output_dir)
+            spec_report = run_spec_compliance(
+                self.project_dir, self.output_dir, persist=self.persist_artifacts
+            )
             if spec_report.total_requirements > 0:
                 details.append(
                     f"spec={inspection['status']},coverage={spec_report.coverage_percent}%/"
@@ -1133,7 +1188,9 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_architecture_drift_artifact(self.project_dir, self.output_dir)
-            architecture_report = run_architecture_drift(self.project_dir, self.output_dir)
+            architecture_report = run_architecture_drift(
+                self.project_dir, self.output_dir, persist=self.persist_artifacts
+            )
             if architecture_report.total_drifts > 0 or architecture_report.declared_tech_stack:
                 details.append(
                     f"architecture={inspection['status']},drifts:"
@@ -1160,7 +1217,9 @@ class ReleaseReadinessEvaluator:
                 )
 
                 inspection = inspect_uiux_compliance_artifact(self.project_dir, self.output_dir)
-                uiux_report = run_uiux_compliance(self.project_dir, self.output_dir)
+                uiux_report = run_uiux_compliance(
+                    self.project_dir, self.output_dir, persist=self.persist_artifacts
+                )
                 if uiux_report.files_scanned > 0:
                     details.append(
                         f"uiux={inspection['status']},violations:"
@@ -1805,6 +1864,50 @@ class ReleaseReadinessEvaluator:
             recommendation=recommendation,
         )
 
+    def _evidence_dimensions(
+        self, report: ReleaseReadinessReport
+    ) -> tuple[dict[str, str], list[str]]:
+        """三维度证据呈现：流程证据 / 范围核实 / 宿主验收；unknown 不折算为通过。"""
+
+        def find(name: str) -> ReleaseReadinessCheck | None:
+            return next((check for check in report.checks if check.name == name), None)
+
+        dimensions: dict[str, str] = {"process_evidence": "ready" if report.passed else "not_ready"}
+        blocked: list[str] = []
+
+        scope = find("Scope Coverage")
+        if scope is None:
+            dimensions["scope_verified"] = "not_evaluated"
+        elif not scope.passed:
+            dimensions["scope_verified"] = "blocked"
+            blocked.append(f"scope_coverage: {str(scope.detail)[:100]}")
+        else:
+            evidence = scope.evidence if isinstance(scope.evidence, dict) else {}
+            unknown_count = int(evidence.get("unknown_count", 0) or 0)
+            if evidence.get("status") == "unknown":
+                dimensions["scope_verified"] = "unknown"
+                blocked.append(f"scope_coverage: status=unknown (unknown_count={unknown_count})")
+            elif unknown_count > 0:
+                dimensions["scope_verified"] = "partial_unknown"
+                blocked.append(f"scope_coverage: unknown items={unknown_count}")
+            else:
+                dimensions["scope_verified"] = "verified"
+
+        host = find("Host Runtime Validation")
+        if host is None:
+            dimensions["host_accepted"] = "not_evaluated"
+        elif host.passed:
+            dimensions["host_accepted"] = "accepted"
+        else:
+            evidence = host.evidence if isinstance(host.evidence, dict) else {}
+            if evidence.get("state") == "unknown":
+                dimensions["host_accepted"] = "unknown"
+                blocked.append("host_runtime_validation: no recorded human acceptance")
+            else:
+                dimensions["host_accepted"] = "blocked"
+                blocked.append(f"host_runtime_validation: {str(host.detail)[:100]}")
+        return dimensions, blocked
+
     def _governance_artifact_notes(self) -> list[str]:
         """List optional materials without treating file presence as pass evidence."""
         groups = {
@@ -1829,11 +1932,18 @@ class ReleaseReadinessEvaluator:
                 *self.output_dir.glob("*-validation-results*.md"),
             ],
         }
-        return [
+        notes = [
             f"{label}：发现 {len({path for path in paths if path.is_file()})} 份资料；"
             "仅目录发现，未核验本次适用性与内容，不计分。仅按当前需求补充或审查。"
             for label, paths in groups.items()
         ]
+        gaps_file = self.project_dir / ".super-dev" / "governance-gaps.jsonl"
+        if gaps_file.is_file():
+            notes.append(
+                "治理降级：检测到 governance-gaps.jsonl 记录（可选治理组件曾以降级模式继续运行）。"
+                "降级只说明该组件缺席，不改变确认门要求；发布决策前应人工核对这些记录。"
+            )
+        return notes
 
     def _extract_regex(self, file_path: Path, pattern: str) -> str:
         if not file_path.exists():

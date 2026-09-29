@@ -9,6 +9,7 @@ from super_dev.state_store import (
     PipelineStateMigrationError,
     StateConflictError,
     StateStore,
+    StateStoreError,
 )
 
 
@@ -135,3 +136,49 @@ def test_session_brief_health_repairs_stale_summary(tmp_path: Path) -> None:
     brief = store.session_brief_path.read_text(encoding="utf-8")
     assert "来源工作项: repair-test" in brief
     assert f"状态修订: {committed.revision}" in brief
+
+
+def test_state_store_requires_revision_cas_when_state_exists(tmp_path: Path) -> None:
+    store = StateStore(tmp_path)
+    store.commit_workflow({"work_item_id": "strict-test", "status": "research"})
+
+    with pytest.raises(StateConflictError, match="stale-write protection"):
+        store.commit_workflow({"status": "docs"})
+
+    # 授权的整体重置必须显式声明
+    reset = store.commit_workflow(
+        {"work_item_id": "strict-test", "status": "research"},
+        allow_unconditional=True,
+    )
+    assert reset.revision == 2
+
+
+def test_state_store_blocks_commit_on_corrupt_current_and_recovers(tmp_path: Path) -> None:
+    store = StateStore(tmp_path)
+    first = store.commit_workflow({"work_item_id": "corrupt-test", "status": "research"})
+    store.workflow_path.write_text("{corrupted", encoding="utf-8")
+
+    with pytest.raises(StateStoreError, match="损坏"):
+        store.commit_workflow({"status": "docs"}, expected_revision=first.revision)
+
+    health = store.workflow_health()
+    assert health["status"] == "corrupt"
+    assert health["candidates"]
+    assert health["candidates"][0]["revision"] == first.revision
+
+    candidate = store.prepare_recovery()
+    assert candidate is not None
+    assert candidate["revision"] == first.revision
+
+    recovered = store.apply_recovery(candidate)
+    assert recovered["revision"] == first.revision
+    assert store.load_workflow()["status"] == "research"
+    events = (tmp_path / ".super-dev" / "workflow-events.jsonl").read_text(encoding="utf-8")
+    assert "state_recovered" in events
+
+    # 恢复后恢复正常提交协议
+    second = store.commit_workflow(
+        {**store.load_workflow(), "status": "docs"},
+        expected_revision=first.revision,
+    )
+    assert second.revision == first.revision + 1

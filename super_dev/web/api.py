@@ -85,10 +85,8 @@ from super_dev.workflow_stage_truth import resolve_engine_phase_names
 
 from .api_host_support import (
     _build_detected_host_decision_card,
-    _build_host_compatibility_summary,
     _build_host_runtime_validation_payload,
     _build_host_tool_catalog_payload,
-    _build_primary_repair_action,
     _build_runtime_evidence_record,
     _build_session_resume_card,
     _collect_host_diagnostics,
@@ -97,10 +95,10 @@ from .api_host_support import (
     _explain_detection_details,
     _host_runtime_status_label,
     _public_host_targets,
-    _repair_host_diagnostics,
     _serialize_host_usage_profile,
     _update_host_runtime_validation_state,
     _validate_project_dir,
+    run_host_doctor,
 )
 
 try:
@@ -1079,20 +1077,23 @@ async def run_workflow(
                     status_code=400, detail=f"无效阶段: {', '.join(invalid_phases)}"
                 )
             phases = [phase_map[p] for p in resolved_phase_names]
-            require_docs_confirmation(
-                project_dir_path,
-                action="workflow_run",
-                requested_phases=requested_phase_names,
-                require_context=False,
-            )
-            require_preview_confirmation(
-                project_dir_path,
-                action="workflow_run",
-                requested_phases=requested_phase_names,
-                require_context=True,
-            )
         else:
             requested_phase_names = list(manager.config.phases)
+
+        # 确认门禁对最终阶段列表统一执行：不传 phases（走 config 默认全阶段）同样受
+        # docs/preview 确认约束，堵住默认路径绕过（governance-remediation-2026-09 批 B）。
+        require_docs_confirmation(
+            project_dir_path,
+            action="workflow_run",
+            requested_phases=requested_phase_names,
+            require_context=False,
+        )
+        require_preview_confirmation(
+            project_dir_path,
+            action="workflow_run",
+            requested_phases=requested_phase_names,
+            require_context=True,
+        )
 
         # 生成运行 ID
         import uuid
@@ -1841,218 +1842,53 @@ async def doctor_hosts(
     repair: bool = False,
     force: bool = False,
 ) -> dict:
-    """诊断宿主接入状态，并返回兼容性评分。"""
+    """诊断宿主接入状态（只读）。修复属于写操作，走 POST /api/hosts/doctor/repair。"""
+    if repair:
+        raise HTTPException(
+            status_code=400,
+            detail="repair 属于写操作：请改用 POST /api/hosts/doctor/repair 并携带 X-Super-Dev-Key",
+        )
     project_dir_path = _validate_project_dir(project_dir)
-    integration_manager = IntegrationManager(project_dir_path)
-    all_targets = [item.name for item in integration_manager.list_targets()]
-    available_targets = _public_host_targets(integration_manager=integration_manager)
-    detected_targets, detected_meta = _detect_host_targets(available_targets)
-
-    if host:
-        if host not in all_targets:
-            raise HTTPException(status_code=400, detail=f"不支持的 host: {host}")
-        targets = [host]
-    elif auto:
-        targets = detected_targets or available_targets
-    else:
-        targets = available_targets
-
-    check_integrate = not skip_integrate
-    check_skill = not skip_skill
-    check_slash = not skip_slash
-
-    report = _collect_host_diagnostics(
-        project_dir=project_dir_path,
-        targets=targets,
-        skill_name=skill_name,
-        check_integrate=check_integrate,
-        check_skill=check_skill,
-        check_slash=check_slash,
-    )
-    compatibility = _build_host_compatibility_summary(
-        report=report,
-        targets=targets,
-        check_integrate=check_integrate,
-        check_skill=check_skill,
-        check_slash=check_slash,
-    )
-    repair_actions: dict[str, dict[str, str]] = {}
-    if repair:
-        repair_actions = _repair_host_diagnostics(
-            project_dir=project_dir_path,
-            report=report,
-            skill_name=skill_name,
-            force=force,
-            check_integrate=check_integrate,
-            check_skill=check_skill,
-            check_slash=check_slash,
-        )
-        report = _collect_host_diagnostics(
-            project_dir=project_dir_path,
-            targets=targets,
-            skill_name=skill_name,
-            check_integrate=check_integrate,
-            check_skill=check_skill,
-            check_slash=check_slash,
-        )
-        compatibility = _build_host_compatibility_summary(
-            report=report,
-            targets=targets,
-            check_integrate=check_integrate,
-            check_skill=check_skill,
-            check_slash=check_slash,
-        )
-
-    report["compatibility"] = compatibility
-    if repair:
-        report["repair_actions"] = repair_actions
-
-    usage_profiles = {
-        target: _serialize_host_usage_profile(
-            integration_manager=integration_manager,
-            target=target,
-        )
-        for target in targets
-    }
-    decision_card = _build_detected_host_decision_card(
-        project_dir=project_dir_path,
-        integration_manager=integration_manager,
-        detected_targets=detected_targets,
-        detected_meta=detected_meta,
-        preferred_targets=targets if host else None,
-    )
-    workflow_context = build_host_workflow_context(
+    return run_host_doctor(
         project_dir_path,
-        entry_mode=str(decision_card.get("workflow_mode", "")).strip(),
-        target=str(decision_card.get("selected_host", "")).strip(),
+        host=host,
+        auto=auto,
+        skill_name=skill_name,
+        skip_integrate=skip_integrate,
+        skip_skill=skip_skill,
+        skip_slash=skip_slash,
+        repair=False,
+        force=False,
     )
-    decision_card["workflow_context"] = workflow_context
 
-    return {
-        "status": "success",
-        "project_dir": str(project_dir_path),
-        "selected_targets": targets,
-        "detected_targets": detected_targets,
-        "detection_details": detected_meta,
-        "detection_details_pretty": _explain_detection_details(detected_meta),
-        "report": report,
-        "compatibility": compatibility,
-        "usage_profiles": usage_profiles,
-        "adaptation_contracts": {
-            target: dict(usage.get("adaptation_contract", {}))
-            for target, usage in usage_profiles.items()
-            if isinstance(usage, dict) and isinstance(usage.get("adaptation_contract", {}), dict)
-        },
-        "experience_profiles": {
-            target: dict(usage.get("experience_profile", {}))
-            for target, usage in usage_profiles.items()
-            if isinstance(usage, dict) and isinstance(usage.get("experience_profile", {}), dict)
-        },
-        "workflow_context": workflow_context,
-        "decision_card": decision_card,
-        "selected_host_adaptation": (
-            dict(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()][
-                    "adaptation_contract"
-                ]
-            )
-            if str(decision_card.get("selected_host", "")).strip() in usage_profiles
-            and isinstance(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()],
-                dict,
-            )
-            and isinstance(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()].get(
-                    "adaptation_contract",
-                    {},
-                ),
-                dict,
-            )
-            else {}
-        ),
-        "selected_host_experience": (
-            dict(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()][
-                    "experience_profile"
-                ]
-            )
-            if str(decision_card.get("selected_host", "")).strip() in usage_profiles
-            and isinstance(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()],
-                dict,
-            )
-            and isinstance(
-                usage_profiles[str(decision_card.get("selected_host", "")).strip()].get(
-                    "experience_profile",
-                    {},
-                ),
-                dict,
-            )
-            else {}
-        ),
-        "selected_host_post_onboard_self_check": (
-            list(decision_card.get("selected_host_post_onboard_self_check", []))
-            if isinstance(decision_card.get("selected_host_post_onboard_self_check", []), list)
-            else []
-        ),
-        "selected_host_start_playbook": (
-            list(decision_card.get("selected_host_start_playbook", []))
-            if isinstance(decision_card.get("selected_host_start_playbook", []), list)
-            else []
-        ),
-        "selected_host_standard_flow_first_prompt": str(
-            decision_card.get("selected_host_standard_flow_first_prompt", "")
-        ).strip(),
-        "selected_host_competition_flow_first_prompt": str(
-            decision_card.get("selected_host_competition_flow_first_prompt", "")
-        ).strip(),
-        "selected_host_resume_guidance": (
-            list(decision_card.get("selected_host_resume_guidance", []))
-            if isinstance(decision_card.get("selected_host_resume_guidance", []), list)
-            else []
-        ),
-        "selected_host_injection_closure": (
-            dict(decision_card.get("selected_host_injection_closure", {}))
-            if isinstance(decision_card.get("selected_host_injection_closure", {}), dict)
-            else {}
-        ),
-        "selected_host_ready_for_standard_flow": bool(
-            decision_card.get("selected_host_ready_for_standard_flow", False)
-        ),
-        "selected_host_ready_for_competition_flow": bool(
-            decision_card.get("selected_host_ready_for_competition_flow", False)
-        ),
-        "selected_host_standard_flow_label": str(
-            decision_card.get("selected_host_standard_flow_label", "")
-        ).strip(),
-        "selected_host_competition_flow_label": str(
-            decision_card.get("selected_host_competition_flow_label", "")
-        ).strip(),
-        "selected_host_official_workflow_checks": (
-            list(decision_card.get("selected_host_official_workflow_checks", []))
-            if isinstance(decision_card.get("selected_host_official_workflow_checks", []), list)
-            else []
-        ),
-        "selected_host_repair_playbook": str(
-            decision_card.get("selected_host_repair_playbook", "")
-        ).strip(),
-        "primary_repair_action": _build_primary_repair_action(
-            report=report,
-            targets=targets,
-            integration_manager=integration_manager,
-            decision_card=decision_card,
-        ),
-        "session_resume_cards": {
-            target: _build_session_resume_card(
-                project_dir_path,
-                target,
-                usage_profiles[target],
-            )
-            for target in targets
-        },
-        "auto": auto,
-        "repair": repair,
-    }
+
+class HostDoctorRepairRequest(BaseModel):
+    """宿主修复请求体（写操作，需要 API Key）。"""
+
+    host: str | None = None
+    auto: bool = False
+    skill_name: str = "super-dev"
+    skip_integrate: bool = False
+    skip_skill: bool = False
+    skip_slash: bool = False
+    force: bool = False
+
+
+@app.post("/api/hosts/doctor/repair", dependencies=[Depends(get_api_key)])
+async def repair_hosts(request: HostDoctorRepairRequest, project_dir: str = ".") -> dict:
+    """诊断并修复宿主接入文件（含用户级写入，需要 API Key）。"""
+    project_dir_path = _validate_project_dir(project_dir)
+    return run_host_doctor(
+        project_dir_path,
+        host=request.host,
+        auto=request.auto,
+        skill_name=request.skill_name,
+        skip_integrate=request.skip_integrate,
+        skip_skill=request.skip_skill,
+        skip_slash=request.skip_slash,
+        repair=True,
+        force=request.force,
+    )
 
 
 @app.get("/api/hosts/validate")
@@ -2291,24 +2127,55 @@ async def update_hosts_runtime_validation(
     }
 
 
+class ReleaseEvaluationRequest(BaseModel):
+    """发布评估请求体（verify_tests / persist 属于重载或写操作，需要 API Key）。"""
+
+    verify_tests: bool = False
+    persist: bool = False
+
+
 @app.get("/api/release/readiness")
 async def get_release_readiness(
     project_dir: str = ".",
     verify_tests: bool = False,
     persist: bool = False,
 ) -> dict[str, Any]:
+    """只读评估发布就绪（不执行测试、不落盘）；写操作走 POST /api/release/readiness。"""
+    if verify_tests or persist:
+        raise HTTPException(
+            status_code=400,
+            detail="verify_tests/persist 属于执行或写操作：请改用 POST /api/release/readiness "
+            "并携带 X-Super-Dev-Key",
+        )
+    project_dir_path = _validate_project_dir(project_dir)
+    evaluator = ReleaseReadinessEvaluator(project_dir_path, persist_artifacts=False)
+    report = evaluator.evaluate(verify_tests=False)
+    payload = report.to_dict()
+    payload["report_file"] = ""
+    payload["json_file"] = ""
+    payload["persisted"] = False
+    payload["frontend_governance_summary"] = _extract_frontend_governance_summary(payload)
+    payload["compliance_governance_summary"] = _extract_compliance_governance_summary(payload)
+    return payload
+
+
+@app.post("/api/release/readiness", dependencies=[Depends(get_api_key)])
+async def post_release_readiness(
+    request: ReleaseEvaluationRequest, project_dir: str = "."
+) -> dict[str, Any]:
+    """评估发布就绪；可选执行测试与持久化报告（需要 API Key）。"""
     project_dir_path = _validate_project_dir(project_dir)
     evaluator = ReleaseReadinessEvaluator(project_dir_path)
-    report = evaluator.evaluate(verify_tests=verify_tests)
+    report = evaluator.evaluate(verify_tests=request.verify_tests)
     payload = report.to_dict()
-    if persist:
+    if request.persist:
         files = evaluator.write(report)
         payload["report_file"] = str(files["markdown"])
         payload["json_file"] = str(files["json"])
     else:
         payload["report_file"] = ""
         payload["json_file"] = ""
-    payload["persisted"] = persist
+    payload["persisted"] = request.persist
     payload["frontend_governance_summary"] = _extract_frontend_governance_summary(payload)
     payload["compliance_governance_summary"] = _extract_compliance_governance_summary(payload)
     return payload
@@ -2320,11 +2187,36 @@ async def get_release_proof_pack(
     verify_tests: bool = False,
     persist: bool = False,
 ) -> dict[str, Any]:
+    """只读组装发布证据包（不执行测试、不落盘）；写操作走 POST /api/release/proof-pack。"""
+    if verify_tests or persist:
+        raise HTTPException(
+            status_code=400,
+            detail="verify_tests/persist 属于执行或写操作：请改用 POST /api/release/proof-pack "
+            "并携带 X-Super-Dev-Key",
+        )
+    project_dir_path = _validate_project_dir(project_dir)
+    builder = ProofPackBuilder(project_dir_path, persist_artifacts=False)
+    report = builder.build(verify_tests=False)
+    payload = report.to_dict()
+    payload["report_file"] = ""
+    payload["json_file"] = ""
+    payload["summary_file"] = ""
+    payload["persisted"] = False
+    payload["frontend_governance_summary"] = _extract_frontend_governance_summary(payload)
+    payload["compliance_governance_summary"] = _extract_compliance_governance_summary(payload)
+    return payload
+
+
+@app.post("/api/release/proof-pack", dependencies=[Depends(get_api_key)])
+async def post_release_proof_pack(
+    request: ReleaseEvaluationRequest, project_dir: str = "."
+) -> dict[str, Any]:
+    """组装发布证据包；可选执行测试与持久化（需要 API Key）。"""
     project_dir_path = _validate_project_dir(project_dir)
     builder = ProofPackBuilder(project_dir_path)
-    report = builder.build(verify_tests=verify_tests)
+    report = builder.build(verify_tests=request.verify_tests)
     payload = report.to_dict()
-    if persist:
+    if request.persist:
         files = builder.write(report)
         payload["report_file"] = str(files["markdown"])
         payload["json_file"] = str(files["json"])
@@ -2333,7 +2225,7 @@ async def get_release_proof_pack(
         payload["report_file"] = ""
         payload["json_file"] = ""
         payload["summary_file"] = ""
-    payload["persisted"] = persist
+    payload["persisted"] = request.persist
     payload["frontend_governance_summary"] = _extract_frontend_governance_summary(payload)
     payload["compliance_governance_summary"] = _extract_compliance_governance_summary(payload)
     return payload

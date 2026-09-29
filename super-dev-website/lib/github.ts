@@ -1,5 +1,5 @@
-export const GITHUB_REPO_URL = 'https://github.com/shangyankeji/super-dev';
-export const GITHUB_API_REPO_URL = 'https://api.github.com/repos/shangyankeji/super-dev';
+export const GITHUB_REPO_URL = 'https://github.com/mixyoung/super-dev';
+export const GITHUB_API_REPO_URL = 'https://api.github.com/repos/mixyoung/super-dev';
 export const DEFAULT_STAR_COUNT = 108;
 
 const STAR_CACHE_KEY = 'super-dev:github-stars';

@@ -1,12 +1,12 @@
 # Super Dev 详细使用指南（2.6.0）
 
 > 宿主详细试用方式、是否支持 `/super-dev`、各宿主正确入口，请优先查看：
-> [HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
+> [HOST_USAGE_GUIDE.md](HOST_USAGE_GUIDE.md)
 
 > 普通用户优先看：
-> - [README.md](/Users/weiyou/Documents/kaifa/super-dev/README.md)
-> - [QUICKSTART.md](/Users/weiyou/Documents/kaifa/super-dev/docs/QUICKSTART.md)
-> - [HOST_USAGE_GUIDE.md](/Users/weiyou/Documents/kaifa/super-dev/docs/HOST_USAGE_GUIDE.md)
+> - [README.md](../README.md)
+> - [QUICKSTART.md](QUICKSTART.md)
+> - [HOST_USAGE_GUIDE.md](HOST_USAGE_GUIDE.md)
 >
 > 本文包含维护者工作流、Spec/Task 闭环和发布边界，不是普通用户的第一份入口文档。
 
@@ -203,15 +203,13 @@ super-dev review quality --status confirmed --comment "质量返工已通过"
 
 ### 2.1 安装
 
-```bash
-uv tool install super-dev
-```
-
-指定版本：
+本分支只在 GitHub 发布，未上传 PyPI，统一使用固定 Tag 安装（不要 `pip install super-dev==<版本>`）：
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
 ```
+
+安装其他版本时替换上面的 Tag（例如 `@v2.5.0`）；完整安装方式见 [INSTALL_OPTIONS.md](INSTALL_OPTIONS.md)。
 
 ### 2.2 Bootstrap（推荐）
 
@@ -675,8 +673,8 @@ super-dev run --resume
 
 正式发版入口统一看：
 
-- [`docs/PUBLISHING.md`](/Users/weiyou/Documents/kaifa/super-dev/docs/PUBLISHING.md)
-- [`docs/RELEASE_RUNBOOK.md`](/Users/weiyou/Documents/kaifa/super-dev/docs/RELEASE_RUNBOOK.md)
+- [`docs/PUBLISHING.md`](PUBLISHING.md)
+- [`docs/RELEASE_RUNBOOK.md`](RELEASE_RUNBOOK.md)
 
 最短判断标准：
 

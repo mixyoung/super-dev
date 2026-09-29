@@ -551,12 +551,15 @@ def _check_purple_gradient(
 def run_uiux_compliance(
     project_dir: Path,
     output_dir: Path | None = None,
+    *,
+    persist: bool = True,
 ) -> UIUXComplianceReport:
     """Run UIUX compliance check: spec vs. frontend implementation.
 
     Args:
         project_dir: Root of the project to scan.
         output_dir: Directory to write reports. Defaults to project_dir/output/.
+        persist: Write report artifacts. Set False for read-only evaluation.
 
     Returns:
         UIUXComplianceReport with violations.
@@ -592,7 +595,8 @@ def run_uiux_compliance(
 
     if not frontend_required:
         report.score = 100
-        _persist_report(project_dir, output_dir, report)
+        if persist:
+            _persist_report(project_dir, output_dir, report)
         return report
 
     # Scan frontend
@@ -601,7 +605,8 @@ def run_uiux_compliance(
 
     if not frontend_files:
         report.score = 100
-        _persist_report(project_dir, output_dir, report)
+        if persist:
+            _persist_report(project_dir, output_dir, report)
         return report
 
     # Run all checks
@@ -626,6 +631,7 @@ def run_uiux_compliance(
             penalty += 1
     report.score = max(0, 100 - penalty)
 
-    _persist_report(project_dir, output_dir, report)
+    if persist:
+        _persist_report(project_dir, output_dir, report)
 
     return report

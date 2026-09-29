@@ -32,6 +32,10 @@ from super_dev.workflow_guard import (
     save_bound_docs_confirmation,
     save_bound_preview_confirmation,
 )
+from tests.support.release_ready_inputs import (
+    record_release_ready_acceptance,
+    write_release_ready_docs,
+)
 
 
 def _confirm_docs(temp_project_dir: Path) -> None:
@@ -298,6 +302,9 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
     (output_dir / "frontend").mkdir(parents=True, exist_ok=True)
+    # 批 D2 语义：真实就绪输入须先于 ui-contract 等身份敏感产物写入（保证新鲜度比较一致）。
+    write_release_ready_docs(project_dir)
+    record_release_ready_acceptance(project_dir)
     (output_dir / f"{project_dir.name}-ui-contract.json").write_text(
         json.dumps(
             {

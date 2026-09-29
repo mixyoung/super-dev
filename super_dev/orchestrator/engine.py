@@ -101,6 +101,22 @@ except ImportError:
     OVERSEER_AVAILABLE = False
 
 
+def _record_governance_gap(project_dir: Path, component: str, reason: str) -> None:
+    """可选治理组件降级继续时留下可审计记录；降级不等于确认门放行。"""
+    try:
+        gap_path = project_dir / ".super-dev" / "governance-gaps.jsonl"
+        gap_path.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "component": component,
+            "reason": reason,
+        }
+        with gap_path.open("a", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 class Phase(Enum):
     """工作流阶段"""
 
@@ -166,6 +182,7 @@ class WorkflowEngine:
                 self.governance = PipelineGovernance(self.project_dir)
             except Exception as e:
                 self.logger.warning(f"治理层初始化失败，pipeline 将在无治理模式下运行: {e}")
+                _record_governance_gap(self.project_dir, "pipeline_governance_init", str(e))
 
         # 初始化知识推送引擎（可选，不影响 pipeline 正常运行）
         self.knowledge_pusher = None
@@ -561,20 +578,21 @@ class WorkflowEngine:
             context = WorkflowContext(project_dir=self.project_dir, config=self.config_manager)
         self._seed_context_user_input(context)
 
-        explicit_phase_selection = phases is not None
         if phases is None:
             phases = self._get_phases_from_config()
-        elif explicit_phase_selection:
+        # 确认门禁对最终阶段列表统一执行：显式与默认（config）路径在同一位置真阻断。
+        requested_phase_names = [phase.value for phase in phases]
+        if requested_phase_names:
             require_docs_confirmation(
                 self.project_dir,
                 action="workflow_engine_run",
-                requested_phases=[phase.value for phase in phases],
+                requested_phases=requested_phase_names,
                 require_context=False,
             )
             require_preview_confirmation(
                 self.project_dir,
                 action="workflow_engine_run",
-                requested_phases=[phase.value for phase in phases],
+                requested_phases=requested_phase_names,
                 require_context=True,
             )
 
@@ -585,6 +603,7 @@ class WorkflowEngine:
                 self.governance.start_governance(project_name)
             except Exception as e:
                 self.logger.warning(f"治理层启动失败，继续无治理模式: {e}")
+                _record_governance_gap(self.project_dir, "pipeline_governance_start", str(e))
 
         results = {}
         if not resume:

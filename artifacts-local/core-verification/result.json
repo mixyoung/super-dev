@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "mode": "core-verification",
+  "mode_label": "完成前验证与更新核心检查",
+  "safety_result": "safe",
+  "test_result": "fail",
+  "evidence_result": "complete",
+  "repeatable": null,
+  "runner_error": null,
+  "planned_modes": [
+    "isolation-smoke",
+    "user-surfaces",
+    "core-verification"
+  ],
+  "executed_modes": [
+    "isolation-smoke",
+    "user-surfaces",
+    "core-verification"
+  ],
+  "surface_diff": {
+    "added": [],
+    "removed": [],
+    "changed": []
+  },
+  "runs": [
+    {
+      "index": 1,
+      "mode": "isolation-smoke",
+      "command": [
+        "E:\\33_dev_env\\super-dev\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/unit/test_user_directories.py",
+        "tests/unit/test_user_surface_snapshot.py",
+        "-q",
+        "--junitxml=E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-1.xml",
+        "--basetemp=C:\\Users\\admin\\AppData\\Local\\Temp\\super-dev-baseline-ok0kjywl\\pytest-1"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "junit_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-1.xml",
+      "output_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-output-1.txt",
+      "passed": 14,
+      "failed": 0,
+      "skipped": 1,
+      "errors": 0,
+      "failures": []
+    },
+    {
+      "index": 2,
+      "mode": "user-surfaces",
+      "command": [
+        "E:\\33_dev_env\\super-dev\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/unit/test_skill_manager.py",
+        "tests/unit/test_integration_manager.py",
+        "-q",
+        "--junitxml=E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-2.xml",
+        "--basetemp=C:\\Users\\admin\\AppData\\Local\\Temp\\super-dev-baseline-ok0kjywl\\pytest-2"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "junit_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-2.xml",
+      "output_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-output-2.txt",
+      "passed": 240,
+      "failed": 0,
+      "skipped": 2,
+      "errors": 0,
+      "failures": []
+    },
+    {
+      "index": 3,
+      "mode": "core-verification",
+      "command": [
+        "E:\\33_dev_env\\super-dev\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/extensions",
+        "tests/unit/test_fork_update.py",
+        "-q",
+        "--junitxml=E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-3.xml",
+        "--basetemp=C:\\Users\\admin\\AppData\\Local\\Temp\\super-dev-baseline-ok0kjywl\\pytest-3"
+      ],
+      "returncode": 1,
+      "timed_out": false,
+      "junit_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-3.xml",
+      "output_file": "E:\\33_dev_env\\super-dev\\artifacts-local\\core-verification\\pytest-output-3.txt",
+      "passed": 208,
+      "failed": 1,
+      "skipped": 2,
+      "errors": 0,
+      "failures": [
+        "tests.extensions.test_cli::test_proof_pack_and_web_api_do_not_trigger_fresh_verification"
+      ]
+    }
+  ]
+}

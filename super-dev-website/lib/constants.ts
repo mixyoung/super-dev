@@ -80,7 +80,7 @@ export const STATS = {
 
 export const TERMINAL_LINES = {
   zh: [
-    { type: 'input', text: 'uv tool install super-dev' },
+    { type: 'input', text: 'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev' },
     { type: 'output', text: 'Collecting super-dev' },
     { type: 'output', text: 'Installing collected packages: super-dev' },
     { type: 'success', text: 'Successfully installed super-dev-2.4.0' },
@@ -102,7 +102,7 @@ export const TERMINAL_LINES = {
     { type: 'success', text: 'Upgrade complete. Reopen your host and continue there.' },
   ],
   en: [
-    { type: 'input', text: 'uv tool install super-dev' },
+    { type: 'input', text: 'uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev' },
     { type: 'output', text: 'Collecting super-dev' },
     { type: 'output', text: 'Installing collected packages: super-dev' },
     { type: 'success', text: 'Successfully installed super-dev-2.4.0' },

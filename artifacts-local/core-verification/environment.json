@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-09-29T18:19:52.491426+00:00",
+  "commit": "eaa09161e851ab7337950dfcea90f3f501f9d37c",
+  "branch": "main",
+  "worktree_status": "?? artifacts-local/",
+  "python": "3.13.12 (main, Feb 12 2026, 00:38:53) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "E:\\33_dev_env\\super-dev\\.venv\\Scripts\\python.exe",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "mode": "core-verification",
+  "selectors": [
+    "tests/extensions",
+    "tests/unit/test_fork_update.py"
+  ]
+}

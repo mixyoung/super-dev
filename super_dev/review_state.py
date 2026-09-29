@@ -600,11 +600,37 @@ def save_host_runtime_validation(project_dir: Path, payload: dict[str, Any]) -> 
     return file_path
 
 
-def save_workflow_state(project_dir: Path, payload: dict[str, Any]) -> Path:
+def save_workflow_state(
+    project_dir: Path,
+    payload: dict[str, Any],
+    *,
+    expected_revision: int | None = None,
+    allow_unconditional: bool = False,
+) -> Path:
+    """保存工作流状态。
+
+    修订协议：payload 携带旧 revision 或调用方显式传 expected_revision 时按 CAS 冲突检测；
+    两者都缺省时为兼容存量调用方，自动按当前 revision 自 CAS（全新状态免检）。
+    授权的整体重置（如新工作项起点）必须显式传 allow_unconditional=True。
+    """
     normalized = _normalize_work_item_fields(
         _normalize_controlled_payload(payload, effect=ContentEffect.PHASE)
     )
-    result = StateStore(Path(project_dir)).commit_workflow(normalized)
+    store = StateStore(Path(project_dir))
+    effective_expected = expected_revision
+    if (
+        effective_expected is None
+        and not allow_unconditional
+        and not isinstance(normalized.get("revision"), int)
+    ):
+        current = store.load_workflow() or {}
+        if current:
+            effective_expected = int(current.get("revision", 0) or 0)
+    result = store.commit_workflow(
+        normalized,
+        expected_revision=effective_expected,
+        allow_unconditional=allow_unconditional,
+    )
     try:
         from .hooks.manager import HookManager
 

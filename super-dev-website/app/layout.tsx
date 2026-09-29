@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     '商业级交付',
     'super-dev',
   ],
-  authors: [{ name: 'shangyankeji' }],
+  authors: [{ name: 'mixyoung' }],
   icons: {
     icon: [
       { url: `${SITE_URL}favicon.svg`, type: 'image/svg+xml' },

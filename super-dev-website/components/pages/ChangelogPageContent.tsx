@@ -462,7 +462,7 @@ export function ChangelogPageContent({ locale = 'zh' }: { locale?: SiteLocale })
         <section className="py-20 lg:py-24 bg-bg-primary">
           <div className="max-w-2xl mx-auto px-4 sm:px-6">
             <h1 className="text-4xl font-bold text-text-primary mb-2 tracking-tight">{copy.title}</h1>
-            <p className="text-text-muted mb-12">{copy.body}{' '}<a href="https://github.com/shangyankeji/super-dev/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" className="text-accent-blue hover:text-accent-blue-hover transition-colors">{copy.link}</a></p>
+            <p className="text-text-muted mb-12">{copy.body}{' '}<a href="https://github.com/mixyoung/super-dev/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" className="text-accent-blue hover:text-accent-blue-hover transition-colors">{copy.link}</a></p>
             <div className="space-y-10">
               {releases.map((release, index) => {
                 const visibleChanges =
