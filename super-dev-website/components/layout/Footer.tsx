@@ -32,23 +32,23 @@ const COPY = {
         title: '资源',
         links: [
           { label: '文档中心', href: '/docs' },
-          { label: 'README', href: 'https://github.com/shangyankeji/super-dev#readme', external: true },
-          { label: 'PyPI', href: 'https://pypi.org/project/super-dev/', external: true },
+          { label: 'README', href: 'https://github.com/mixyoung/super-dev#readme', external: true },
+          { label: '发布', href: 'https://github.com/mixyoung/super-dev/releases', external: true },
         ],
       },
       {
         title: '项目',
         links: [
-          { label: 'GitHub', href: 'https://github.com/shangyankeji/super-dev', external: true },
-          { label: 'Issues', href: 'https://github.com/shangyankeji/super-dev/issues', external: true },
-          { label: 'MIT 许可证', href: 'https://github.com/shangyankeji/super-dev/blob/main/LICENSE', external: true },
+          { label: 'GitHub', href: 'https://github.com/mixyoung/super-dev', external: true },
+          { label: 'Issues', href: 'https://github.com/mixyoung/super-dev/issues', external: true },
+          { label: 'MIT 许可证', href: 'https://github.com/mixyoung/super-dev/blob/main/LICENSE', external: true },
         ],
       },
       {
         title: '联系',
         links: [
-          { label: '贡献指南', href: 'https://github.com/shangyankeji/super-dev/blob/main/CONTRIBUTING.md', external: true },
-          { label: 'shangyankeji', href: 'https://github.com/shangyankeji', external: true },
+          { label: '贡献指南', href: 'https://github.com/mixyoung/super-dev/blob/main/CONTRIBUTING.md', external: true },
+          { label: 'mixyoung', href: 'https://github.com/mixyoung', external: true },
         ],
       },
     ],
@@ -70,23 +70,23 @@ const COPY = {
         title: 'Resources',
         links: [
           { label: 'Docs', href: '/docs' },
-          { label: 'README', href: 'https://github.com/shangyankeji/super-dev#readme', external: true },
-          { label: 'PyPI', href: 'https://pypi.org/project/super-dev/', external: true },
+          { label: 'README', href: 'https://github.com/mixyoung/super-dev#readme', external: true },
+          { label: 'Releases', href: 'https://github.com/mixyoung/super-dev/releases', external: true },
         ],
       },
       {
         title: 'Project',
         links: [
-          { label: 'GitHub', href: 'https://github.com/shangyankeji/super-dev', external: true },
-          { label: 'Issues', href: 'https://github.com/shangyankeji/super-dev/issues', external: true },
-          { label: 'MIT License', href: 'https://github.com/shangyankeji/super-dev/blob/main/LICENSE', external: true },
+          { label: 'GitHub', href: 'https://github.com/mixyoung/super-dev', external: true },
+          { label: 'Issues', href: 'https://github.com/mixyoung/super-dev/issues', external: true },
+          { label: 'MIT License', href: 'https://github.com/mixyoung/super-dev/blob/main/LICENSE', external: true },
         ],
       },
       {
         title: 'Contact',
         links: [
-          { label: 'Contributing', href: 'https://github.com/shangyankeji/super-dev/blob/main/CONTRIBUTING.md', external: true },
-          { label: 'shangyankeji', href: 'https://github.com/shangyankeji', external: true },
+          { label: 'Contributing', href: 'https://github.com/mixyoung/super-dev/blob/main/CONTRIBUTING.md', external: true },
+          { label: 'mixyoung', href: 'https://github.com/mixyoung', external: true },
         ],
       },
     ],
@@ -122,7 +122,7 @@ export function Footer({ locale = 'zh' }: FooterProps) {
             </Link>
             <p className="text-sm text-text-muted leading-relaxed max-w-[220px]">{copy.brand}</p>
             <a
-              href="https://github.com/shangyankeji/super-dev"
+              href="https://github.com/mixyoung/super-dev"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-4 text-sm text-text-muted hover:text-text-secondary transition-colors"
@@ -166,11 +166,11 @@ export function Footer({ locale = 'zh' }: FooterProps) {
         </div>
 
         <div className="mt-12 pt-6 border-t border-border-muted flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-text-muted">&copy; {currentYear} shangyankeji. MIT License.</p>
+          <p className="text-xs text-text-muted">&copy; {currentYear} mixyoung. MIT License.</p>
           <p className="text-xs text-text-muted">
             {copy.builtWith}{' '}
             <a
-              href="https://github.com/shangyankeji/super-dev"
+              href="https://github.com/mixyoung/super-dev"
               target="_blank"
               rel="noopener noreferrer"
               className="text-accent-blue hover:text-accent-blue-hover transition-colors"

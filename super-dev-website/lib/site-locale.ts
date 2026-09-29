@@ -1,7 +1,10 @@
 export type SiteLocale = 'zh' | 'en';
 
-export const SITE_BASE_PATH = '';
-export const SITE_URL = 'https://superdev.goder.ai/';
+// 与 next.config.mjs 的 basePath 逻辑保持一致：开发环境为空，生产为 GitHub Pages
+// 项目路径 /super-dev。若未来重新启用自定义域名（CNAME/CUSTOM_DOMAIN），需同步调整此处。
+const isDevRuntime = process.env.NODE_ENV !== 'production';
+export const SITE_BASE_PATH = isDevRuntime ? '' : '/super-dev';
+export const SITE_URL = 'https://mixyoung.github.io/super-dev/';
 
 export function assetPath(path: string): string {
   if (!path) return SITE_BASE_PATH || '/';

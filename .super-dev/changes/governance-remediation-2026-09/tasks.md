@@ -9,6 +9,17 @@
 - [x] 复扫确认活跃指引零残留；相关单测 80 项通过；贡献政策检查通过（--base 75ece32）
 - [ ] 维护者复核并合并
 
+## 批 A2：官网身份切换至 GitHub Pages（已授权并执行，2026-09-29）
+
+- [x] 固定基线提交 af1d1ec，建独立分支 ocx/governance-remediation-batch-a2-website
+- [x] SITE_URL 与 SITE_BASE_PATH 切至 https://mixyoung.github.io/super-dev/（assetPath 与 basePath 对齐）
+- [x] lib/github.ts star API 与 Footer/Changelog/BottomCta/layout 全部身份链接切至 mixyoung/super-dev
+- [x] Footer PyPI 链接改 GitHub Releases；署名改 mixyoung
+- [x] 删除 public/CNAME，构建默认进入 GitHub Pages 模式（basePath /super-dev）
+- [x] 新增 .github/workflows/website-pages.yml（仅手动触发，不自动发布）
+- [ ] 维护者启用 GitHub Pages（Settings → Pages → Source: GitHub Actions）后手动触发部署验证
+- [ ] 维护者复核并合并
+
 ## 批 C：Web 权限边界（待维护者批准）
 
 - [ ] /api/hosts/doctor 的 repair/force 写动作拆为鉴权 POST，GET 只读

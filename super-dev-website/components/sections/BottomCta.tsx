@@ -54,7 +54,7 @@ export function BottomCta({ locale = 'zh' }: { locale?: SiteLocale }) {
         <p className="mt-4 text-sm text-text-muted">{copy.installNote}</p>
 
         <a
-          href="https://github.com/shangyankeji/super-dev"
+          href="https://github.com/mixyoung/super-dev"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-8 inline-flex items-center gap-2 text-text-secondary transition-colors duration-150 hover:text-text-primary"

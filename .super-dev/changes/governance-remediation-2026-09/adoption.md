@@ -27,6 +27,7 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 - super-dev-website/components/pages/ShowcasePageContent.tsx
 - super-dev-website/components/pages/DocsPageContent.tsx
 - super-dev-website/lib/constants.ts
+- .github/workflows/website-pages.yml
 
 ## 验证与未验证
 
@@ -38,3 +39,15 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 ## 决定与回退
 
 采用。授权：维护者 2026-09-29 会话（批 A 范围）。回退：`git revert` 本批提交即可；无数据迁移、无工作流状态变更、无产品行为影响。
+
+## 2026-09-29 批 A2：官网身份切换至 GitHub Pages
+
+问题与范围：官网（super-dev-website）身份全部指向原维护者——lib/site-locale.ts 的 SITE_URL 为原域名 superdev.goder.ai，public/CNAME（同域名）使 next.config.mjs 强制走自定义域模式（basePath 为空），lib/github.ts 的 star API 与 Footer（13 处）/ChangelogPageContent/BottomCta/app/layout.tsx 链接指向 shangyankeji/super-dev，Footer 另有 2 处 PyPI 链接与本 fork "未上 PyPI" 事实矛盾。维护者明确原维护者官网无法修改、官网改建 GitHub Pages（2026-09-29 会话授权）。
+
+改动（分支 ocx/governance-remediation-batch-a2-website，基线 af1d1ec）：super-dev-website/lib/site-locale.ts（SITE_URL → https://mixyoung.github.io/super-dev/，SITE_BASE_PATH 改为与 next.config.mjs basePath 逻辑一致的动态值：dev 空、生产 /super-dev）、lib/github.ts（仓库与 star API 切 mixyoung）、components/layout/Footer.tsx（仓库链接切 mixyoung、PyPI 改 GitHub Releases、作者与版权署名 mixyoung）、app/layout.tsx（authors 元数据）、components/pages/ChangelogPageContent.tsx、components/sections/BottomCta.tsx、删除 public/CNAME、新增 .github/workflows/website-pages.yml（仅 workflow_dispatch 手动触发的 Pages 构建+部署，不自动发布）。
+
+取舍：star 数改为拉取 mixyoung 仓库真实数据（初期会明显低于原仓库展示值），是身份正确性的直接结果；上游署名保留在仓库 LICENSE 与 docs/SUPER_DEV_EXTENSION_PLATFORM_PLAN.md 的上游标注（该文件中 shangyankeji 为上游仓库说明，有意保留）；DEFAULT_STAR_COUNT=108 兜底值未动（仅 API 失败时使用）。
+
+验证与未验证：全库扫描确认 website 中 shangyankeji/goder.ai/pypi.org 清零（仅余上游标注文档）；check_contribution_policy.py --base af1d1ec 通过。未验证：website 无 node_modules，未运行 tsc/build 与 lint；GitHub Pages 未启用、未实际部署（部署门保留在维护者手中：Settings → Pages → Source: GitHub Actions，再手动触发 workflow）。
+
+回退：`git revert` 本批提交并恢复 CNAME 即回到自定义域模式；workflow 为手动触发，无自动发布副作用。
