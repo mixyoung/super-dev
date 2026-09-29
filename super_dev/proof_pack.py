@@ -797,10 +797,13 @@ class ProofPackReport:
 
 
 class ProofPackBuilder:
-    def __init__(self, project_dir: Path):
+    def __init__(self, project_dir: Path, *, persist_artifacts: bool = True):
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # persist_artifacts=False 用于只读组装（Web GET）：不创建目录、不落盘。
+        self.persist_artifacts = persist_artifacts
+        if self.persist_artifacts:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
         self.active_change_id = resolve_active_change_id(self.project_dir)
         self.project_name = resolve_current_artifact_prefix(
             self.project_dir,

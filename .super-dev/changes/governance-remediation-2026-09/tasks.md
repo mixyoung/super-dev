@@ -20,12 +20,14 @@
 - [ ] 维护者启用 GitHub Pages（Settings → Pages → Source: GitHub Actions）后手动触发部署验证
 - [ ] 维护者复核并合并
 
-## 批 C：Web 权限边界（待维护者批准）
+## 批 C：Web 权限边界（已批准并执行，2026-09-29，基线 1754be0）
 
-- [ ] /api/hosts/doctor 的 repair/force 写动作拆为鉴权 POST，GET 只读
-- [ ] /api/release/readiness、/api/release/proof-pack：verify_tests/persist 要求鉴权；GET 只读且评估不落盘（含 _check_scope_coverage 无条件 builder.write）
-- [ ] _validate_project_dir 增加工作区根约束（is_relative_to allowed root）
-- [ ] TestClient 测试：无 key 写操作 401/403、路径逃逸 400、只读 GET 零写入
+- [x] /api/hosts/doctor 的 repair/force 写动作拆为鉴权 POST /api/hosts/doctor/repair，GET 拒绝 repair（400）；逻辑收敛为 api_host_support.run_host_doctor
+- [x] /api/release/readiness、/api/release/proof-pack：verify_tests/persist 拆入鉴权 POST；GET 只读拒绝写参数并以 persist_artifacts=False 评估（功能清单、spec/drift/uiux 产物、output 目录均不写）
+- [x] _validate_project_dir 获准工作区约束（服务器启动目录 + SUPER_DEV_API_PROJECT_ROOTS，越界 400）
+- [x] 前端 dist：修复按钮改走 POST + API Key 输入（localStorage）
+- [x] 新增 tests/integration/test_web_api_write_boundaries.py（17 项：401/400/只读零写入/根约束正反例）；既有 web_api 107 项、readiness+proof-pack 76 项回归通过；ruff/black 清洁；政策检查通过
+- [ ] 维护者复核并合并
 
 ## 批 B：状态/确认协议 + 门禁统一（待维护者批准）
 

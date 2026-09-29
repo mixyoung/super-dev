@@ -547,10 +547,13 @@ class ReleaseReadinessEvaluator:
     ]
     VERSIONED_HOST_SURFACE_RULES = frozenset({"/.claude/", "/.cursor/"})
 
-    def __init__(self, project_dir: Path):
+    def __init__(self, project_dir: Path, *, persist_artifacts: bool = True):
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # persist_artifacts=False 用于只读评估（Web GET）：不创建目录、不落盘任何报告。
+        self.persist_artifacts = persist_artifacts
+        if self.persist_artifacts:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
         self.active_change_id = resolve_active_change_id(self.project_dir)
         self.project_name = resolve_current_artifact_prefix(
             self.project_dir,
@@ -1067,7 +1070,8 @@ class ReleaseReadinessEvaluator:
     def _check_scope_coverage(self) -> ReleaseReadinessCheck:
         builder = FeatureChecklistBuilder(self.project_dir)
         report = builder.build()
-        builder.write(report)
+        if self.persist_artifacts:
+            builder.write(report)
 
         coverage_text = (
             f"{report.coverage_rate:.1f}%" if report.coverage_rate is not None else "unknown"
@@ -1111,7 +1115,9 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_spec_compliance_artifact(self.project_dir, self.output_dir)
-            spec_report = run_spec_compliance(self.project_dir, self.output_dir)
+            spec_report = run_spec_compliance(
+                self.project_dir, self.output_dir, persist=self.persist_artifacts
+            )
             if spec_report.total_requirements > 0:
                 details.append(
                     f"spec={inspection['status']},coverage={spec_report.coverage_percent}%/"
@@ -1133,7 +1139,9 @@ class ReleaseReadinessEvaluator:
             )
 
             inspection = inspect_architecture_drift_artifact(self.project_dir, self.output_dir)
-            architecture_report = run_architecture_drift(self.project_dir, self.output_dir)
+            architecture_report = run_architecture_drift(
+                self.project_dir, self.output_dir, persist=self.persist_artifacts
+            )
             if architecture_report.total_drifts > 0 or architecture_report.declared_tech_stack:
                 details.append(
                     f"architecture={inspection['status']},drifts:"
@@ -1160,7 +1168,9 @@ class ReleaseReadinessEvaluator:
                 )
 
                 inspection = inspect_uiux_compliance_artifact(self.project_dir, self.output_dir)
-                uiux_report = run_uiux_compliance(self.project_dir, self.output_dir)
+                uiux_report = run_uiux_compliance(
+                    self.project_dir, self.output_dir, persist=self.persist_artifacts
+                )
                 if uiux_report.files_scanned > 0:
                     details.append(
                         f"uiux={inspection['status']},violations:"

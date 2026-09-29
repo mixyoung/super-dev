@@ -28,6 +28,9 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 - super-dev-website/components/pages/DocsPageContent.tsx
 - super-dev-website/lib/constants.ts
 - .github/workflows/website-pages.yml
+- super_dev/reviewers/spec_compliance.py
+- super_dev/reviewers/architecture_drift.py
+- super_dev/reviewers/uiux_compliance.py
 
 ## 验证与未验证
 
@@ -51,3 +54,23 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：全库扫描确认 website 中 shangyankeji/goder.ai/pypi.org 清零（仅余上游标注文档）；check_contribution_policy.py --base af1d1ec 通过。未验证：website 无 node_modules，未运行 tsc/build 与 lint；GitHub Pages 未启用、未实际部署（部署门保留在维护者手中：Settings → Pages → Source: GitHub Actions，再手动触发 workflow）。
 
 回退：`git revert` 本批提交并恢复 CNAME 即回到自定义域模式；workflow 为手动触发，无自动发布副作用。
+
+## 2026-09-29 批 C：Web 接口写边界收紧（核心层：权限）
+
+核心影响（维护者已分别批准，2026-09-29"合并 批准继续"按既定顺序授权批 C）：本批改变 Web API 的对外契约——无鉴权的 GET 不再能触发任何写入或测试执行；这是权限边界的产品核心变更，不是普通缺陷修复。
+
+问题与现有覆盖：审查核实 `GET /api/hosts/doctor?repair=true` 无 API Key 即可安装项目级与用户级宿主接入文件（api_host_support.py 的 `_repair_host_diagnostics` 调 `setup_global_slash_command` 写用户目录）；`GET /api/release/readiness|proof-pack` 无鉴权可执行测试（verify_tests）与持久化报告，且 `_check_scope_coverage` 在任何评估中无条件写功能清单，`_check_compliance_closure` 会经 run_spec_compliance / run_architecture_drift / run_uiux_compliance 重算并写产物；`_validate_project_dir` 只拦 `..`，任意绝对路径放行。缓解前提（默认 127.0.0.1 监听）不变，但本机访问与对外暴露场景计入设计。
+
+改动（分支 ocx/governance-remediation-batch-c-web-boundary，基线 1754be0）：
+- super_dev/web/api_host_support.py：doctor 全量逻辑收敛为 `run_host_doctor`（repair=True 为唯一写路径）；`_validate_project_dir` 增加获准工作区约束（服务器启动目录 + `SUPER_DEV_API_PROJECT_ROOTS`，os.pathsep 分隔），越界返回 400
+- super_dev/web/api.py：GET /api/hosts/doctor 拒绝 repair 参数（400）；新增鉴权 POST /api/hosts/doctor/repair；GET /api/release/readiness、/api/release/proof-pack 拒绝 verify_tests/persist（400）并以 persist_artifacts=False 只读评估；新增两条鉴权 POST（verify_tests/persist 走请求体）
+- super_dev/release_readiness.py、super_dev/proof_pack.py：`persist_artifacts=False` 时不建目录、不写功能清单、compliance runner 以 persist=False 只算不写；CLI 默认值 True 行为不变
+- super_dev/reviewers/spec_compliance.py、architecture_drift.py、uiux_compliance.py：run_* 增加 `persist: bool = True` 关键字参数，只读评估跳过全部报告写入（默认 True 兼容 CLI 与既有调用）
+- super_dev/web/frontend/dist/index.html：修复按钮改调 POST /api/hosts/doctor/repair，新增 API Key 输入（localStorage 持久化，对应 SUPER_DEV_API_KEY）；诊断按钮仍走只读 GET
+- tests/integration/test_web_api_write_boundaries.py（新增 17 项）：无 key 写操作 401、GET 写参数 400、GET 只读（persist_artifacts=False 且零 write 调用）、根约束正反例；tests/integration/test_web_api.py：fixture 增加 SUPER_DEV_API_PROJECT_ROOTS 放行 pytest 临时目录，两个编码旧行为的测试更新为新契约（doctor patch 目标随逻辑迁移至 api_host_support；release 持久化改走 POST）
+
+取舍：GET 携带写参数返回 400 而非静默忽略（防止旧调用方以为生效）；前端修复功能在未配置 Key 时按 401 提示而非隐藏按钮（边界可见）。verify_tests 归入 POST 是因为它会运行测试套件（CPU/缓存写入）。
+
+验证与未验证：新增边界测试 17 项通过；tests/integration/test_web_api.py 107 项全部通过（含 2 项按新契约更新）；tests/unit/test_release_readiness.py + test_proof_pack_enhanced.py 76 项通过；ruff/black 全部清洁；check_contribution_policy.py --base 1754be0 通过。未验证：前端 dist 为构建产物，无独立构建管线，仅在代码层面人工核对了 axios 调用与 Vue 绑定；实际浏览器端到端未执行。
+
+回退：`git revert` 本批提交即恢复旧契约（无数据迁移；工作流状态不受影响）。

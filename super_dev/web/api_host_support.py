@@ -2,6 +2,7 @@
 
 import glob
 import logging
+import os
 import re
 import shutil
 from pathlib import Path
@@ -89,12 +90,28 @@ from super_dev.workflow_state import (
 _api_logger = logging.getLogger("super_dev.web.api")
 
 
+def _allowed_project_roots() -> list[Path]:
+    """获准工作区根目录：服务器启动目录 + SUPER_DEV_API_PROJECT_ROOTS 扩展项。"""
+    roots = [Path.cwd().resolve()]
+    extra = os.environ.get("SUPER_DEV_API_PROJECT_ROOTS", "")
+    for item in extra.split(os.pathsep):
+        item = item.strip()
+        if item:
+            roots.append(Path(item).expanduser().resolve())
+    return roots
+
+
 def _validate_project_dir(project_dir: str) -> Path:
-    """验证项目目录路径，防止路径遍历攻击"""
+    """验证项目目录路径：拒绝路径遍历，并限定在获准工作区之内。"""
     segments = project_dir.replace("\\", "/").split("/")
     if ".." in segments:
         raise HTTPException(status_code=400, detail="project_dir 不允许包含 .. 路径遍历")
     normalized = Path(project_dir).resolve()
+    if not any(normalized.is_relative_to(root) for root in _allowed_project_roots()):
+        raise HTTPException(
+            status_code=400,
+            detail="project_dir 超出获准工作区；如需扩展请设置 SUPER_DEV_API_PROJECT_ROOTS",
+        )
     return normalized
 
 
@@ -985,3 +1002,229 @@ def _repair_host_diagnostics(
             actions[target] = host_actions
 
     return actions
+
+
+def run_host_doctor(
+    project_dir_path: Path,
+    *,
+    host: str | None = None,
+    auto: bool = False,
+    skill_name: str = "super-dev",
+    skip_integrate: bool = False,
+    skip_skill: bool = False,
+    skip_slash: bool = False,
+    repair: bool = False,
+    force: bool = False,
+) -> dict[str, Any]:
+    """宿主诊断与可选修复的唯一实现；repair=True 会写项目级与用户级接入文件，
+    只能由带 API Key 鉴权的入口调用。"""
+    integration_manager = IntegrationManager(project_dir_path)
+    all_targets = [item.name for item in integration_manager.list_targets()]
+    available_targets = _public_host_targets(integration_manager=integration_manager)
+    detected_targets, detected_meta = _detect_host_targets(available_targets)
+
+    if host:
+        if host not in all_targets:
+            raise HTTPException(status_code=400, detail=f"不支持的 host: {host}")
+        targets = [host]
+    elif auto:
+        targets = detected_targets or available_targets
+    else:
+        targets = available_targets
+
+    check_integrate = not skip_integrate
+    check_skill = not skip_skill
+    check_slash = not skip_slash
+
+    report = _collect_host_diagnostics(
+        project_dir=project_dir_path,
+        targets=targets,
+        skill_name=skill_name,
+        check_integrate=check_integrate,
+        check_skill=check_skill,
+        check_slash=check_slash,
+    )
+    compatibility = _build_host_compatibility_summary(
+        report=report,
+        targets=targets,
+        check_integrate=check_integrate,
+        check_skill=check_skill,
+        check_slash=check_slash,
+    )
+    repair_actions: dict[str, dict[str, str]] = {}
+    if repair:
+        repair_actions = _repair_host_diagnostics(
+            project_dir=project_dir_path,
+            report=report,
+            skill_name=skill_name,
+            force=force,
+            check_integrate=check_integrate,
+            check_skill=check_skill,
+            check_slash=check_slash,
+        )
+        report = _collect_host_diagnostics(
+            project_dir=project_dir_path,
+            targets=targets,
+            skill_name=skill_name,
+            check_integrate=check_integrate,
+            check_skill=check_skill,
+            check_slash=check_slash,
+        )
+        compatibility = _build_host_compatibility_summary(
+            report=report,
+            targets=targets,
+            check_integrate=check_integrate,
+            check_skill=check_skill,
+            check_slash=check_slash,
+        )
+
+    report["compatibility"] = compatibility
+    if repair:
+        report["repair_actions"] = repair_actions
+
+    usage_profiles = {
+        target: _serialize_host_usage_profile(
+            integration_manager=integration_manager,
+            target=target,
+        )
+        for target in targets
+    }
+    decision_card = _build_detected_host_decision_card(
+        project_dir=project_dir_path,
+        integration_manager=integration_manager,
+        detected_targets=detected_targets,
+        detected_meta=detected_meta,
+        preferred_targets=targets if host else None,
+    )
+    workflow_context = build_host_workflow_context(
+        project_dir_path,
+        entry_mode=str(decision_card.get("workflow_mode", "")).strip(),
+        target=str(decision_card.get("selected_host", "")).strip(),
+    )
+    decision_card["workflow_context"] = workflow_context
+
+    return {
+        "status": "success",
+        "project_dir": str(project_dir_path),
+        "selected_targets": targets,
+        "detected_targets": detected_targets,
+        "detection_details": detected_meta,
+        "detection_details_pretty": _explain_detection_details(detected_meta),
+        "report": report,
+        "compatibility": compatibility,
+        "usage_profiles": usage_profiles,
+        "adaptation_contracts": {
+            target: dict(usage.get("adaptation_contract", {}))
+            for target, usage in usage_profiles.items()
+            if isinstance(usage, dict) and isinstance(usage.get("adaptation_contract", {}), dict)
+        },
+        "experience_profiles": {
+            target: dict(usage.get("experience_profile", {}))
+            for target, usage in usage_profiles.items()
+            if isinstance(usage, dict) and isinstance(usage.get("experience_profile", {}), dict)
+        },
+        "workflow_context": workflow_context,
+        "decision_card": decision_card,
+        "selected_host_adaptation": (
+            dict(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()][
+                    "adaptation_contract"
+                ]
+            )
+            if str(decision_card.get("selected_host", "")).strip() in usage_profiles
+            and isinstance(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()],
+                dict,
+            )
+            and isinstance(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()].get(
+                    "adaptation_contract",
+                    {},
+                ),
+                dict,
+            )
+            else {}
+        ),
+        "selected_host_experience": (
+            dict(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()][
+                    "experience_profile"
+                ]
+            )
+            if str(decision_card.get("selected_host", "")).strip() in usage_profiles
+            and isinstance(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()],
+                dict,
+            )
+            and isinstance(
+                usage_profiles[str(decision_card.get("selected_host", "")).strip()].get(
+                    "experience_profile",
+                    {},
+                ),
+                dict,
+            )
+            else {}
+        ),
+        "selected_host_post_onboard_self_check": (
+            list(decision_card.get("selected_host_post_onboard_self_check", []))
+            if isinstance(decision_card.get("selected_host_post_onboard_self_check", []), list)
+            else []
+        ),
+        "selected_host_start_playbook": (
+            list(decision_card.get("selected_host_start_playbook", []))
+            if isinstance(decision_card.get("selected_host_start_playbook", []), list)
+            else []
+        ),
+        "selected_host_standard_flow_first_prompt": str(
+            decision_card.get("selected_host_standard_flow_first_prompt", "")
+        ).strip(),
+        "selected_host_competition_flow_first_prompt": str(
+            decision_card.get("selected_host_competition_flow_first_prompt", "")
+        ).strip(),
+        "selected_host_resume_guidance": (
+            list(decision_card.get("selected_host_resume_guidance", []))
+            if isinstance(decision_card.get("selected_host_resume_guidance", []), list)
+            else []
+        ),
+        "selected_host_injection_closure": (
+            dict(decision_card.get("selected_host_injection_closure", {}))
+            if isinstance(decision_card.get("selected_host_injection_closure", {}), dict)
+            else {}
+        ),
+        "selected_host_ready_for_standard_flow": bool(
+            decision_card.get("selected_host_ready_for_standard_flow", False)
+        ),
+        "selected_host_ready_for_competition_flow": bool(
+            decision_card.get("selected_host_ready_for_competition_flow", False)
+        ),
+        "selected_host_standard_flow_label": str(
+            decision_card.get("selected_host_standard_flow_label", "")
+        ).strip(),
+        "selected_host_competition_flow_label": str(
+            decision_card.get("selected_host_competition_flow_label", "")
+        ).strip(),
+        "selected_host_official_workflow_checks": (
+            list(decision_card.get("selected_host_official_workflow_checks", []))
+            if isinstance(decision_card.get("selected_host_official_workflow_checks", []), list)
+            else []
+        ),
+        "selected_host_repair_playbook": str(
+            decision_card.get("selected_host_repair_playbook", "")
+        ).strip(),
+        "primary_repair_action": _build_primary_repair_action(
+            report=report,
+            targets=targets,
+            integration_manager=integration_manager,
+            decision_card=decision_card,
+        ),
+        "session_resume_cards": {
+            target: _build_session_resume_card(
+                project_dir_path,
+                target,
+                usage_profiles[target],
+            )
+            for target in targets
+        },
+        "auto": auto,
+        "repair": repair,
+    }

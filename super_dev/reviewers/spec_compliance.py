@@ -538,12 +538,15 @@ def _match_requirement(
 def run_spec_compliance(
     project_dir: Path,
     output_dir: Path | None = None,
+    *,
+    persist: bool = True,
 ) -> ComplianceReport:
     """Run spec compliance check: PRD requirements vs. implementation code.
 
     Args:
         project_dir: Root of the project to scan.
         output_dir: Directory to write reports. Defaults to project_dir/output/.
+        persist: Write report artifacts. Set False for read-only evaluation.
 
     Returns:
         ComplianceReport with traceability matrix.
@@ -618,15 +621,16 @@ def run_spec_compliance(
     # Calculate score
     report.score = int(report.coverage_percent)
 
-    # Persist reports
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prefixed_json = output_dir / f"{report.project_name}-spec-compliance.json"
-    prefixed_md = output_dir / f"{report.project_name}-spec-compliance.md"
-    payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-    prefixed_json.write_text(payload, encoding="utf-8")
-    prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
-    if not resolve_active_change_id(project_dir):
-        (output_dir / "spec-compliance.json").write_text(payload, encoding="utf-8")
-        (output_dir / "spec-compliance.md").write_text(report.to_markdown(), encoding="utf-8")
+    if persist:
+        # Persist reports
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefixed_json = output_dir / f"{report.project_name}-spec-compliance.json"
+        prefixed_md = output_dir / f"{report.project_name}-spec-compliance.md"
+        payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
+        prefixed_json.write_text(payload, encoding="utf-8")
+        prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+        if not resolve_active_change_id(project_dir):
+            (output_dir / "spec-compliance.json").write_text(payload, encoding="utf-8")
+            (output_dir / "spec-compliance.md").write_text(report.to_markdown(), encoding="utf-8")
 
     return report

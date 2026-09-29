@@ -1850,6 +1850,9 @@
                         <input type="checkbox" v-model="hostDoctorAuto" />
                         自动检测宿主（无检测结果时回退全部）
                     </label>
+                    <input v-model="hostDoctorApiKey" @input="persistHostDoctorApiKey"
+                        type="password" placeholder="API Key（修复操作需要，对应 SUPER_DEV_API_KEY）"
+                        style="padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; min-width:220px;" />
                     <button class="btn btn-secondary" :disabled="loading" @click="runHostDoctor(false)">
                         {{ loading ? '诊断中...' : '诊断接入状态' }}
                     </button>
@@ -2252,6 +2255,7 @@
                     selectedHostId: '',
                     hostTools: [],
                     hostDoctorAuto: false,
+                    hostDoctorApiKey: localStorage.getItem('superDevApiKey') || '',
                     hostDoctorResult: null,
                     hostValidationResult: null,
                     phases: [],
@@ -3126,6 +3130,9 @@
                     return `${audit.invalidCount}/${audit.totalSurfaces} 个 surface 失效`;
                 },
 
+                persistHostDoctorApiKey() {
+                    localStorage.setItem('superDevApiKey', this.hostDoctorApiKey || '');
+                },
                 async runHostDoctor(repair) {
                     this.loading = true;
                     try {
@@ -3133,10 +3140,19 @@
                             project_dir: this.projectDir || '.',
                             auto: this.hostDoctorAuto,
                             host: this.hostDoctorAuto ? undefined : (this.selectedHostId || undefined),
-                            repair: Boolean(repair),
-                            force: Boolean(repair),
                         };
-                        const response = await axios.get('/api/hosts/doctor', { params });
+                        let response;
+                        if (repair) {
+                            const apiKey = (this.hostDoctorApiKey || '').trim();
+                            response = await axios.post('/api/hosts/doctor/repair',
+                                { auto: this.hostDoctorAuto, host: params.host || null, force: true },
+                                {
+                                    params: { project_dir: params.project_dir },
+                                    headers: apiKey ? { 'X-Super-Dev-Key': apiKey } : {},
+                                });
+                        } else {
+                            response = await axios.get('/api/hosts/doctor', { params });
+                        }
                         this.hostDoctorResult = response.data || null;
                         const validationResponse = await axios.get('/api/hosts/validate', {
                             params: {

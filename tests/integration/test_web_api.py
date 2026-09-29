@@ -4,6 +4,7 @@ Super Dev Web API 集成测试
 
 import json
 import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -51,6 +52,8 @@ def _set_api_key(monkeypatch):
     """Set a known API key and disable rate limiting for integration tests."""
     monkeypatch.setenv("SUPER_DEV_API_KEY", _TEST_API_KEY)
     monkeypatch.setenv("SUPER_DEV_RATE_LIMIT", "0")
+    # 获准工作区约束：放行 pytest 临时目录，tmp_path 项目才能通过校验。
+    monkeypatch.setenv("SUPER_DEV_API_PROJECT_ROOTS", str(Path(tempfile.gettempdir()).resolve()))
     yield
 
 
@@ -3046,7 +3049,12 @@ class TestWebAPI:
         self, temp_project_dir: Path, monkeypatch
     ):
         client = _make_client()
-        monkeypatch.setattr(web_api, "_detect_host_targets", lambda available_targets: ([], {}))
+        # doctor 逻辑已收敛到 api_host_support.run_host_doctor，patch 需落在该模块。
+        from super_dev.web import api_host_support
+
+        monkeypatch.setattr(
+            api_host_support, "_detect_host_targets", lambda available_targets: ([], {})
+        )
 
         resp = client.get(
             "/api/hosts/doctor",
@@ -3826,9 +3834,17 @@ class TestWebAPI:
         _prepare_proof_pack_project(temp_project_dir)
         client = _make_client()
 
-        readiness_resp = client.get(
+        # 持久化属于写操作：GET 拒绝 persist，必须走带 API Key 的 POST。
+        get_rejected = client.get(
             "/api/release/readiness",
             params={"project_dir": str(temp_project_dir), "persist": True},
+        )
+        assert get_rejected.status_code == 400
+
+        readiness_resp = client.post(
+            "/api/release/readiness",
+            json={"persist": True},
+            params={"project_dir": str(temp_project_dir)},
         )
         assert readiness_resp.status_code == 200
         readiness_payload = readiness_resp.json()
@@ -3836,9 +3852,10 @@ class TestWebAPI:
         assert Path(readiness_payload["report_file"]).exists()
         assert Path(readiness_payload["json_file"]).exists()
 
-        proof_resp = client.get(
+        proof_resp = client.post(
             "/api/release/proof-pack",
-            params={"project_dir": str(temp_project_dir), "persist": True},
+            json={"persist": True},
+            params={"project_dir": str(temp_project_dir)},
         )
         assert proof_resp.status_code == 200
         proof_payload = proof_resp.json()

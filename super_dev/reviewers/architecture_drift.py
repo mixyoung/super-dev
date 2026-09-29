@@ -482,12 +482,15 @@ def inspect_architecture_drift_artifact(
 def run_architecture_drift(
     project_dir: Path,
     output_dir: Path | None = None,
+    *,
+    persist: bool = True,
 ) -> DriftReport:
     """Run architecture drift detection: spec vs. implementation.
 
     Args:
         project_dir: Root of the project to scan.
         output_dir: Directory to write reports. Defaults to project_dir/output/.
+        persist: Write report artifacts. Set False for read-only evaluation.
 
     Returns:
         DriftReport with drift findings.
@@ -560,16 +563,19 @@ def run_architecture_drift(
             penalty += 2
     report.score = max(0, 100 - penalty)
 
-    # Persist reports
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prefixed_json = output_dir / f"{report.project_name}-architecture-drift.json"
-    prefixed_md = output_dir / f"{report.project_name}-architecture-drift.md"
-    payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-    prefixed_json.write_text(payload, encoding="utf-8")
-    prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
-    if not resolve_active_change_id(project_dir):
-        (output_dir / "architecture-drift.json").write_text(payload, encoding="utf-8")
-        (output_dir / "architecture-drift.md").write_text(report.to_markdown(), encoding="utf-8")
+    if persist:
+        # Persist reports
+        output_dir.mkdir(parents=True, exist_ok=True)
+        prefixed_json = output_dir / f"{report.project_name}-architecture-drift.json"
+        prefixed_md = output_dir / f"{report.project_name}-architecture-drift.md"
+        payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
+        prefixed_json.write_text(payload, encoding="utf-8")
+        prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+        if not resolve_active_change_id(project_dir):
+            (output_dir / "architecture-drift.json").write_text(payload, encoding="utf-8")
+            (output_dir / "architecture-drift.md").write_text(
+                report.to_markdown(), encoding="utf-8"
+            )
 
     return report
 
