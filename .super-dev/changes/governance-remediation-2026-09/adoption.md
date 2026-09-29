@@ -109,3 +109,20 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：3 项新测试通过；ruff/black 清洁；drift 相邻单测（compliance_evidence_identity / quality_gate）通过（见提交记录）；未验证：全库重跑 drift 报告对比（历史报告按约定不回溯重生成）。
 
 回退：`git revert` 本批提交即恢复全文抓取行为。
+
+## 2026-09-29 批 D2：发布就绪证据语义（核心层：验收标准）
+
+核心影响（维护者 2026-09-29"全部批准"授权）：readiness 的"通过"含义收窄为"流程证据就绪"。无宿主真人验收记录、范围覆盖 status=unknown 不再折算为 PASS；报告新增三维度（流程证据/范围核实/宿主验收）与 blocked_unknowns 列表；spec compliance 解析不到需求时给 0 分并标记 requirements_unparsed，不再给 100。历史报告不回溯重打分。
+
+问题与现有覆盖：审查核实 `_check_host_runtime_validation` 无记录判 PASS（release_readiness.py 原 919）、`_check_scope_coverage` status unknown 判 PASS（原 1083）、spec_compliance 解析不到需求给 100 分（spec_compliance.py 原 586），实证为 2026-09-18 报告 100/100 通过同时记载无宿主验收、coverage=12.5%、unknown=49。
+
+改动（分支 ocx/governance-remediation-batch-d2-evidence-semantics，基线 ce53a3b）：
+- super_dev/release_readiness.py：Host Runtime Validation 无记录 → passed=False（severity high，evidence.state=unknown）；Scope Coverage status unknown → passed=False（severity medium）；两项检查带结构化 evidence；ReleaseReadinessReport 新增 evidence_dimensions / blocked_unknowns（to_dict 同步），evaluate 末尾经 _evidence_dimensions 计算（process_evidence=report.passed、scope_verified∈{verified/partial_unknown/unknown/blocked/not_evaluated}、host_accepted∈{accepted/unknown/blocked/not_evaluated}，partial 场景 unknown_count>0 计入 blocked_unknowns 但不额外阻断检查）；to_markdown 新增 Evidence Dimensions 小节与"未核实验收项"列表；executive summary 通过分支改为"流程证据就绪"措辞并在存在 blocked_unknowns 时显式声明"不代表全部需求已验证"
+- super_dev/reviewers/spec_compliance.py：ComplianceReport 新增 requirements_unparsed 字段；解析不到需求时 score=0 + 标记（不再 100）
+- 测试：新增 tests/unit/test_release_readiness_evidence_dimensions.py（4 项）；tests/unit/test_release_readiness.py 的 test_release_readiness_passes_when_required_artifacts_exist 原同时依赖两个 unknown→PASS 折算口径，按新语义更新为仅有的两个预期失败项并断言三维度与 blocked_unknowns
+
+取舍：partial（有清单但存在 unknown 条目）不额外阻断检查本身，只在维度与 blocked_unknowns 中显式呈现——避免把"未核对"一律升级为硬阻断；status=unknown（连清单都没有）才阻断。绿径（三维度全 verified）需真实 product-audit 清单与宿主验收记录，留待批 E 实际验收时验证。
+
+验证与未验证：新增 4 项 + test_release_readiness + proof_pack 回归共 80 项通过；ruff/black 清洁。未验证：真实仓库重跑 readiness 的前后对比（历史报告不回溯，当前仓库的重新评估属批 E 实际验收）。
+
+回退：`git revert` 本批提交恢复原折算口径。

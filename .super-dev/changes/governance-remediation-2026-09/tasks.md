@@ -45,11 +45,13 @@
 - [x] 逐行否定语境解析（前缀否定词判定，宁少排不误排）；negated_tech_stack 字段与 "Explicitly Excluded Tech" 呈现
 - [x] SQLite 案例回归测试（3 项）+ 相邻单测回归 + lint 清洁
 
-## 批 D2：证据语义（待维护者批准）
+## 批 D2：证据语义（已批准并执行，2026-09-29，基线 ce53a3b）
 
-- [ ] 发布就绪三维度呈现（流程证据/范围核实/宿主验收）；unknown 不折算 PASS；无宿主验收记录不再判 PASS
-- [ ] spec_compliance 解析不到需求不再给 100 分
-- [ ] 报告模板与 executive summary 措辞同步；历史报告不回溯重打分
+- [x] 宿主验收缺失 → blocked（severity high）；范围 status=unknown → blocked；结构化 evidence
+- [x] 三维度 evidence_dimensions + blocked_unknowns（to_dict/to_markdown/executive summary 同步措辞）
+- [x] spec_compliance 解析不到需求 → 0 分 + requirements_unparsed
+- [x] 测试：新增 4 项证据语义测试；既有"产物齐备"测试按新语义更新（原依赖两个 unknown→PASS 折算口径）；readiness+proof-pack 回归 80 项通过
+- [ ] 维护者复核并合并
 
 ## 批 E：覆盖与验收收尾（待排期）
 

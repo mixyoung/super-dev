@@ -460,7 +460,14 @@ def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir
     files = evaluator.write(report)
 
     failed = {check.name: check for check in report.checks if not check.passed}
-    assert failed == {}
+    # 批 D2 语义：宿主真人验收缺失、范围覆盖 unknown 均不再折算为通过（未知不能算通过）。
+    # 该夹具此前同时依赖这两个折算口径，现按新语义成为仅有的两个预期失败项。
+    assert set(failed) == {"Host Runtime Validation", "Scope Coverage"}
+    assert failed["Host Runtime Validation"].passed is False
+    assert report.evidence_dimensions["host_accepted"] == "unknown"
+    assert report.evidence_dimensions["scope_verified"] in {"blocked", "unknown"}
+    assert any(item.startswith("host_runtime_validation:") for item in report.blocked_unknowns)
+    assert any(item.startswith("scope_coverage:") for item in report.blocked_unknowns)
     assert files["markdown"].exists()
     assert files["json"].exists()
     delivery_check = next(check for check in report.checks if check.name == "Delivery Closure")

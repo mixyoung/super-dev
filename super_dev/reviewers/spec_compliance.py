@@ -85,6 +85,7 @@ class ComplianceReport:
     partial: int = 0
     missing: int = 0
     score: int = 0
+    requirements_unparsed: bool = False
     matches: list[RequirementMatch] = field(default_factory=list)
     evidence_identity: dict[str, Any] = field(default_factory=dict)
 
@@ -103,6 +104,7 @@ class ComplianceReport:
             "partial": self.partial,
             "missing": self.missing,
             "score": self.score,
+            "requirements_unparsed": self.requirements_unparsed,
             "coverage_percent": self.coverage_percent,
             "matches": [asdict(m) for m in self.matches],
             "evidence_identity": dict(self.evidence_identity),
@@ -586,8 +588,10 @@ def run_spec_compliance(
             all_requirements.extend(_parse_prd_requirements(requirement_path))
 
     if not all_requirements:
-        report.score = 100
+        # 解析不到需求不是覆盖率 100%：未知不能算通过（批 D2 语义），显式标记为未解析。
+        report.score = 0
         report.total_requirements = 0
+        report.requirements_unparsed = True
         return report
 
     report.total_requirements = len(all_requirements)
