@@ -53,6 +53,9 @@
 - [x] 测试：新增 4 项证据语义测试；既有"产物齐备"测试按新语义更新（原依赖两个 unknown→PASS 折算口径）；readiness+proof-pack 回归 80 项通过
 - [ ] 维护者复核并合并
 
-## 批 E：覆盖与验收收尾（待排期）
+## 批 E：覆盖与验收收尾（已执行，2026-09-30，基线 18385f2）
 
-- [ ] 跨入口、跨宿主"未确认不得推进"覆盖测试与真人宿主验收记录
+- [x] 跨入口"未确认不得推进"覆盖清单落档：Web run（显式/空 phases）、WorkflowEngine（显式/默认）、creators 任务执行（既有 test_task_executor）均有测试；本批补齐 SpecBuilder 阻塞/放行两路径（tests/unit/test_spec_gate_unified.py，2 项）
+- [x] 本仓库真实 `super-dev release readiness` 评估：D2 三维度与 blocked_unknowns 在真实数据上的输出留档 output/（结果见 adoption 批 E 记录）
+- [ ] 真人宿主 runtime validation 录入（归维护者，命令见 adoption）后复跑 readiness 验证三维度全绿路径
+- [ ] 维护者复核并合并

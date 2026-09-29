@@ -126,3 +126,17 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：新增 4 项 + test_release_readiness + proof_pack 回归共 80 项通过；ruff/black 清洁。未验证：真实仓库重跑 readiness 的前后对比（历史报告不回溯，当前仓库的重新评估属批 E 实际验收）。
 
 回退：`git revert` 本批提交恢复原折算口径。
+
+## 2026-09-30 批 E：跨入口覆盖收尾 + 真实 readiness 评估
+
+问题与现有覆盖：批 B/D2 后，跨入口"未确认不得推进"测试覆盖了 Web run（显式/空 phases）与 WorkflowEngine（显式/默认），creators 任务执行门有既有单测；SpecBuilder 的 docs 门只有放行路径测试，阻塞路径缺失。真实 readiness 评估此前未在 D2 新语义下跑过本仓库。
+
+改动（分支 ocx/governance-remediation-batch-e-coverage，基线 18385f2）：
+- 新增 tests/unit/test_spec_gate_unified.py（2 项）：SpecBuilder.create_change 未确认 docs 抛 WorkflowGateError(gate=docs_confirmation)；确认后正常生成 change。
+- tests/unit/test_release_readiness.py 的 _prepare_release_ready_project 夹具升级为 D2 下真实就绪：PRD 带可解析功能条目（### 功能标题）、change tasks.md 勾选、经 update_host_runtime_validation_state 录入 codex-cli 验收；这些输入先于 evidence_identity 产物水化写入以保持缓存身份自洽。test_release_readiness_passes_when_required_artifacts_exist 断言从"两个旧口径折算出的全绿"（批 D2 时临时改为两项预期失败）回到"真实就绪的全绿"，并断言 host_accepted=accepted、scope_verified∈{verified, partial_unknown}。
+
+被真实评估抓到的回归（本批修复）：`super-dev release readiness` 的完成前验证在合成项目上运行 replay 测试 test_representative_scenarios_execute_real_new_and_legacy_flows，其旧流程断言"无关发布项全过"在 D2 下因合成项目缺宿主验收/范围核实而失败（旧流程因无关发布项未通过: Host Runtime Validation, Scope Coverage）。夹具升级后该测试恢复通过——修复方式是让合成项目真实就绪，不是放宽 replay 断言。tests/extensions 此前不在批 B/D2 的回归范围，这一盲区由本仓库自身的完成前验证机制暴露。
+
+验证与未验证：新增/更新测试与回归共 47 项通过（readiness 全套 + replay + 门覆盖 + D2 语义）；ruff/black 清洁；政策检查 --base 18385f2 通过。真实评估两次：第一次（2026-09-30，工作区含本批未提交改动）51/100 FAIL——完成前验证如实报告"验证期间当前代码版本发生变化"（评估运行 pytest 时正在编辑夹具）与 1 个 replay 失败，Host Runtime Validation 进入待收尾清单，D2 语义在真实数据上生效；第二次（干净树，提交后）结果见 tasks.md 与 output/super-dev-2-6-reliability-release-readiness.md。未验证：真人宿主 runtime validation 录入仍归维护者（命令：`super-dev review runtime-validation --host <目标宿主> --status passed` 或鉴权 POST /api/hosts/runtime-validation），录入后复跑 readiness 即可验证三维度全绿路径。
+
+回退：`git revert` 本批提交；夹具退回旧口径后 replay 与 readiness 全绿断言需一并回退。
