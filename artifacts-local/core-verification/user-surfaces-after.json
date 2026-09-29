@@ -1,0 +1,1114 @@
+{
+  "c:\\users\\admin\\.agents\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.agents\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707191984320900,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.agents\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.agents\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27908,
+    "mtime_ns": 1789707191984320900,
+    "digest": "61fe108fbc587ea9b4aae675ec43eefc978cc6fc4ac4cadc76c2fc4482acd75a",
+    "error": null
+  },
+  "c:\\users\\admin\\.agents\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.agents\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.agents\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.agents\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707191989748800,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.agents\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.agents\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 42348,
+    "mtime_ns": 1789707191990279300,
+    "digest": "dbcc9ddf966c8e40601d4d339be06a7cf8032d2b558ecaff33a0a4b8ccdd02f3",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.claude\\agents\\super-dev.md",
+    "kind": "file",
+    "size": 4834,
+    "mtime_ns": 1789707191899675800,
+    "digest": "84ca007c16ab03936fa43387e54d0804882d6683602e22f5be0fb420c9e52db5",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\claude.md": {
+    "path_key": "c:\\users\\admin\\.claude\\claude.md",
+    "kind": "file",
+    "size": 11312,
+    "mtime_ns": 1789707191896676300,
+    "digest": "2e4e7ab3f087077fbc3550bd4544e5b8a6916f90cb6c4f5f596b4a3dc856002a",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.claude\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6098,
+    "mtime_ns": 1787508125361453300,
+    "digest": "cef8e6d27037affdf45d3d22f5e915eff5c419e7e5fa5c3dfdb14e8af0930f37",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\settings.json": {
+    "path_key": "c:\\users\\admin\\.claude\\settings.json",
+    "kind": "file",
+    "size": 3875,
+    "mtime_ns": 1790671924842802400,
+    "digest": "aa97768fea8ed4b95dba73b0befca6bf8623f0e2900f0e80b9a87a0db26d7d68",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.claude\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707191898684600,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.claude\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707191898684600,
+    "digest": "a957146a890f203c0a590d4397d960c5c5fb024e77b6a7d6dc638e7a12c0aec3",
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.claude\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.claude\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707191920314100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.claude\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.claude\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41729,
+    "mtime_ns": 1789707191921314400,
+    "digest": "aea4ecefeff6063679aae60e789abf6723889d881d089d31fca0fe205238365c",
+    "error": null
+  },
+  "c:\\users\\admin\\.cline\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.cline\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cline\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.cline\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cline\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.cline\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cline\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.cline\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\agents\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\codebuddy.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\codebuddy.md",
+    "kind": "file",
+    "size": 7698,
+    "mtime_ns": 1787508122344885700,
+    "digest": "14ac163f7be88621ff988ce8e99284f01cf24d5ed5cd7a3d1b5c9c90648192a4",
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\commands\\super-dev-seeai.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\commands\\super-dev-seeai.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6099,
+    "mtime_ns": 1787508122357319500,
+    "digest": "4b61965e32e42986fb56dcb240f5de81ad4593d7bae5fa235eb4d7833e939576",
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\rules\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\rules\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codebuddy\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codebuddy\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codeium\\windsurf\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\agents.md": {
+    "path_key": "c:\\users\\admin\\.codex\\agents.md",
+    "kind": "file",
+    "size": 5084,
+    "mtime_ns": 1787508122813136300,
+    "digest": "26df948e888d8f7a48908fa06c481b5a6397c6a12e48d1f40a7289a501a17979",
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.codex\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.codex\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.codex\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codex\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.codex\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.codex\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\agents\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.config\\agents\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\agents\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.config\\agents\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\agents\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.config\\agents\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\agents\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.config\\agents\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\agents\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.config\\agents\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\agents.md": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\agents.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\agents\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\commands\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192147530300,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192147530300,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192148528100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.config\\opencode\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192148528100,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.copilot\\agents\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\copilot-instructions.md": {
+    "path_key": "c:\\users\\admin\\.copilot\\copilot-instructions.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.copilot\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.copilot\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.copilot\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.copilot\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.copilot\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.copilot\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cursor\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.cursor\\commands\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cursor\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.cursor\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cursor\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.cursor\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cursor\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.cursor\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.cursor\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.cursor\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\agents.md": {
+    "path_key": "c:\\users\\admin\\.factory\\agents.md",
+    "kind": "file",
+    "size": 7869,
+    "mtime_ns": 1787508122567948600,
+    "digest": "b80cac325f4af8b405fe63a1646043c6bd1f3f51408e9a554dcd9dea15217efb",
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\commands\\super-dev-seeai.md": {
+    "path_key": "c:\\users\\admin\\.factory\\commands\\super-dev-seeai.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.factory\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6096,
+    "mtime_ns": 1787508122575851200,
+    "digest": "8bf37607c2bf4cc6defdc376f7facb23a283ffb0cc68eeddf5d0b21b6726cda5",
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.factory\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.factory\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.factory\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.factory\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.factory\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.factory\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\commands\\super-dev.toml": {
+    "path_key": "c:\\users\\admin\\.gemini\\commands\\super-dev.toml",
+    "kind": "file",
+    "size": 6153,
+    "mtime_ns": 1787508123285503100,
+    "digest": "cd7727f4663b6bbc955f97e523b31c345845127bc2a1d63bfd52d3bb51583cbd",
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\gemini.md": {
+    "path_key": "c:\\users\\admin\\.gemini\\gemini.md",
+    "kind": "file",
+    "size": 7802,
+    "mtime_ns": 1787508123263953600,
+    "digest": "5afd51caa4993f7f51f55d0a339ce6f086c4bbb2e459e29d93d947ae86959d65",
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\settings.json": {
+    "path_key": "c:\\users\\admin\\.gemini\\settings.json",
+    "kind": "file",
+    "size": 6344,
+    "mtime_ns": 1789627114451367600,
+    "digest": "ac851adafe53b9cde778cde64f0d3d58d528156729b9ad77a444ca4bcbc57055",
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.gemini\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192042378100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.gemini\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192042933100,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.gemini\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.gemini\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192044036200,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.gemini\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.gemini\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192045036700,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.kilocode\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.kilocode\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kilocode\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.kilocode\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kilocode\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.kilocode\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kilocode\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.kilocode\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kimi\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.kimi\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192091726100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kimi\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.kimi\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192092286700,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.kimi\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.kimi\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kimi\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.kimi\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192092818000,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kimi\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.kimi\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192093525900,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.kiro\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.kiro\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.kiro\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.kiro\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.kiro\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\steering\\agents.md": {
+    "path_key": "c:\\users\\admin\\.kiro\\steering\\agents.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.kiro\\steering\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.kiro\\steering\\super-dev.md",
+    "kind": "file",
+    "size": 8368,
+    "mtime_ns": 1787508127459191800,
+    "digest": "4325139164640480cd6547bfba4ea56173a50c92b3595205825d615fd8361049",
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\agents.md": {
+    "path_key": "c:\\users\\admin\\.qoder\\agents.md",
+    "kind": "file",
+    "size": 7867,
+    "mtime_ns": 1787508126426057200,
+    "digest": "d72962d5d8d9f0696d89ac8bc66112b1bbba3dc196f782a63962fffc71797f11",
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.qoder\\agents\\super-dev.md",
+    "kind": "file",
+    "size": 3330,
+    "mtime_ns": 1787508126436909200,
+    "digest": "80fb8128068e67e47075b0c2d3ab86774c2a57e6b7301a78001263a0a2738f72",
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.qoder\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6092,
+    "mtime_ns": 1787508124331504400,
+    "digest": "cb78a3fc02db0c39582a5462e3b815a498103ae1f5afb30e84ccfcd45119b943",
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.qoder\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192194967400,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.qoder\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192194967400,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.qoder\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.qoder\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192196967300,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qoder\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.qoder\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192196967300,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\agents\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.qwen\\agents\\super-dev.md",
+    "kind": "file",
+    "size": 3538,
+    "mtime_ns": 1787508120207165100,
+    "digest": "ad9e794f099790f4b7424b0a52b076155bcc02cfc18b531382381cbbddad973f",
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.qwen\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6096,
+    "mtime_ns": 1787508123784118800,
+    "digest": "2b5b5970de61f4c45dd1e897495dfbb5114388f405b975f59936e5404e71f56b",
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\qwen.md": {
+    "path_key": "c:\\users\\admin\\.qwen\\qwen.md",
+    "kind": "file",
+    "size": 7695,
+    "mtime_ns": 1787508123773835100,
+    "digest": "002e5b552299df8b58b700881697e128c7c7b40087c6f4d0b374ff205efd8d1e",
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.qwen\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192248149800,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.qwen\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192249148500,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.qwen\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.qwen\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192250148300,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.qwen\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.qwen\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192251290900,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.roo\\commands\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\rules\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.roo\\rules\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.roo\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.roo\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.roo\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.roo\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.roo\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.roo\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae-cn\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.trae-cn\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192389977200,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae-cn\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.trae-cn\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 27357,
+    "mtime_ns": 1789707192390977800,
+    "digest": "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae-cn\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.trae-cn\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae-cn\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.trae-cn\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192390977800,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae-cn\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.trae-cn\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 41125,
+    "mtime_ns": 1789707192392063500,
+    "digest": "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\commands\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.trae\\commands\\super-dev.md",
+    "kind": "file",
+    "size": 6096,
+    "mtime_ns": 1787508124485778000,
+    "digest": "3824a3c5630ecde68fd78d61caa926c3acae94cc6440e05b52fc260d67ca2e48",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\rules.md": {
+    "path_key": "c:\\users\\admin\\.trae\\rules.md",
+    "kind": "file",
+    "size": 5661,
+    "mtime_ns": 1787508124420714300,
+    "digest": "b035ab7f6a73051c4c94074d29c213c00fa4a37b3196faf8977228d3d2fbe317",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.trae\\skills\\super-dev",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192384980100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.trae\\skills\\super-dev\\skill.md",
+    "kind": "file",
+    "size": 7409,
+    "mtime_ns": 1789707192384980100,
+    "digest": "12754c6098250fa94a960e004fea2365689c70f0586a2e5941af521f648218fb",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.trae\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.trae\\skills\\super-dev-seeai",
+    "kind": "directory",
+    "size": null,
+    "mtime_ns": 1789707192386062100,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.trae\\skills\\super-dev-seeai\\skill.md",
+    "kind": "file",
+    "size": 7409,
+    "mtime_ns": 1789707192386062100,
+    "digest": "12754c6098250fa94a960e004fea2365689c70f0586a2e5941af521f648218fb",
+    "error": null
+  },
+  "c:\\users\\admin\\.trae\\user_rules.md": {
+    "path_key": "c:\\users\\admin\\.trae\\user_rules.md",
+    "kind": "file",
+    "size": 5661,
+    "mtime_ns": 1787508124378003000,
+    "digest": "b035ab7f6a73051c4c94074d29c213c00fa4a37b3196faf8977228d3d2fbe317",
+    "error": null
+  },
+  "c:\\users\\admin\\.windsurf\\workflows\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\.windsurf\\workflows\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.workbuddy\\skills\\super-dev": {
+    "path_key": "c:\\users\\admin\\.workbuddy\\skills\\super-dev",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.workbuddy\\skills\\super-dev-core": {
+    "path_key": "c:\\users\\admin\\.workbuddy\\skills\\super-dev-core",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.workbuddy\\skills\\super-dev-seeai": {
+    "path_key": "c:\\users\\admin\\.workbuddy\\skills\\super-dev-seeai",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.workbuddy\\skills\\super-dev-seeai\\skill.md": {
+    "path_key": "c:\\users\\admin\\.workbuddy\\skills\\super-dev-seeai\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\.workbuddy\\skills\\super-dev\\skill.md": {
+    "path_key": "c:\\users\\admin\\.workbuddy\\skills\\super-dev\\skill.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  },
+  "c:\\users\\admin\\documents\\cline\\rules\\super-dev.md": {
+    "path_key": "c:\\users\\admin\\documents\\cline\\rules\\super-dev.md",
+    "kind": "missing",
+    "size": null,
+    "mtime_ns": null,
+    "digest": null,
+    "error": null
+  }
+}

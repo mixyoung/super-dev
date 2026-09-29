@@ -409,8 +409,8 @@ class ReleaseReadinessReport:
         if self.blocked_unknowns:
             lines.append("")
             lines.append("未核实验收项（unknown/blocked，不折算为通过）：")
-            for item in self.blocked_unknowns:
-                lines.append(f"- {item}")
+            for unknown_item in self.blocked_unknowns:
+                lines.append(f"- {unknown_item}")
         lines.append("")
         facts = self._delivery_facts_payload()
         lines.extend(

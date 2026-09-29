@@ -140,3 +140,12 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：新增/更新测试与回归共 47 项通过（readiness 全套 + replay + 门覆盖 + D2 语义）；ruff/black 清洁；政策检查 --base 18385f2 通过。真实评估两次：第一次（2026-09-30，工作区含本批未提交改动）51/100 FAIL——完成前验证如实报告"验证期间当前代码版本发生变化"（评估运行 pytest 时正在编辑夹具）与 1 个 replay 失败，Host Runtime Validation 进入待收尾清单，D2 语义在真实数据上生效；第二次（干净树，提交后）结果见 tasks.md 与 output/super-dev-2-6-reliability-release-readiness.md。未验证：真人宿主 runtime validation 录入仍归维护者（命令：`super-dev review runtime-validation --host <目标宿主> --status passed` 或鉴权 POST /api/hosts/runtime-validation），录入后复跑 readiness 即可验证三维度全绿路径。
 
 回退：`git revert` 本批提交；夹具退回旧口径后 replay 与 readiness 全绿断言需一并回退。
+
+### 2026-09-30 PR #21 CI 修复（随批 E 提交）
+
+PR #21 首轮 CI：Contribution policy/Security/Windows baseline 通过；Quality×3 与 Core verification×5 失败，两处均为本整改引入、本地回归盲区：
+
+- Quality（mypy，scripts/check_type_gates.py）：批 D2 在 to_markdown 新增的 `for item in self.blocked_unknowns`（str）与既有 recent_timeline 循环的 `item`（dict）撞名，mypy 按首个绑定推断报 4 错。改名为 unknown_item；本地全量 type gate（22 文件）与全库 ruff 通过。
+- Core verification（run_safe_baseline）：tests/extensions/test_cli.py 的 test_proof_pack_and_web_api_do_not_trigger_fresh_verification 直接调用 get_release_readiness 端点函数（不经 TestClient，此前 grep TestClient 未覆盖），tmp 项目目录被批 C 的获准工作区约束拒绝（400）。新增 tests/extensions/conftest.py autouse 夹具统一放行 pytest 临时目录（与 tests/integration/test_web_api.py 同口径）。该测试本地复现通过、CI 失败的差异源于 safe-baseline 运行器的隔离环境，夹具修复与环境无关。
+
+教训已计入：后续涉及 Web API 边界的改动，回归范围需包含 tests/extensions 与 scripts/check_type_gates.py 全量。

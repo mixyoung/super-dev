@@ -1,0 +1,102 @@
+.......F.........................s..........s........................... [ 34%]
+........................................................................ [ 68%]
+...................................................................      [100%]
+================================== FAILURES ===================================
+________ test_proof_pack_and_web_api_do_not_trigger_fresh_verification ________
+
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/super-dev-baseline-ok0kjywl/pytest-3/test_proof_pack_and_web_api_do0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000230A539F890>
+
+    def test_proof_pack_and_web_api_do_not_trigger_fresh_verification(
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        (tmp_path / "super-dev.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "name": "cli-test",
+                    "frontend": "next",
+                    "backend": "python",
+                    "extensions": {
+                        "enabled": True,
+                        "allowed_builtin_methods": ["fresh-verification"],
+                        "fresh_verification": {
+                            "profile": "pytest-current-python",
+                            "plan_id": "completion-pilot",
+                            "args": ["-q", "tests"],
+                            "timeout_seconds": 30,
+                        },
+                    },
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+    
+        def unexpected_execution(self, **kwargs):
+            raise AssertionError("非命令行发布就绪入口不得执行完成前验证")
+    
+        monkeypatch.setattr(
+            "super_dev.extensions.service.ExtensionService.run_fresh_verification",
+            unexpected_execution,
+        )
+    
+        def unexpected_ambient_pytest(self):
+            raise AssertionError("完成前验证启用时 proof-pack 不得运行环境 pytest")
+    
+        monkeypatch.setattr(
+            "super_dev.release_readiness.ReleaseReadinessEvaluator._check_test_suite",
+            unexpected_ambient_pytest,
+        )
+    
+        ReleaseReadinessEvaluator(tmp_path).evaluate()
+        ProofPackBuilder(tmp_path).build(verify_tests=False)
+        proof_report = ProofPackBuilder(tmp_path).build(verify_tests=True)
+        release_artifact = next(
+            item for item in proof_report.artifacts if item.name == "Release Readiness"
+        )
+        assert release_artifact.status == "pending"
+        assert "super-dev release readiness" in release_artifact.summary
+>       asyncio.run(
+            get_release_readiness(
+                project_dir=str(tmp_path),
+                verify_tests=False,
+                persist=False,
+            )
+        )
+
+tests\extensions\test_cli.py:432: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\admin\AppData\Roaming\uv\python\cpython-3.13.12-windows-x86_64-none\Lib\asyncio\runners.py:195: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+C:\Users\admin\AppData\Roaming\uv\python\cpython-3.13.12-windows-x86_64-none\Lib\asyncio\runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\admin\AppData\Roaming\uv\python\cpython-3.13.12-windows-x86_64-none\Lib\asyncio\base_events.py:725: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+super_dev\web\api.py:2150: in get_release_readiness
+    project_dir_path = _validate_project_dir(project_dir)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+project_dir = 'C:\\Users\\admin\\AppData\\Local\\Temp\\super-dev-baseline-ok0kjywl\\pytest-3\\test_proof_pack_and_web_api_do0'
+
+    def _validate_project_dir(project_dir: str) -> Path:
+        """验证项目目录路径：拒绝路径遍历，并限定在获准工作区之内。"""
+        segments = project_dir.replace("\\", "/").split("/")
+        if ".." in segments:
+            raise HTTPException(status_code=400, detail="project_dir 不允许包含 .. 路径遍历")
+        normalized = Path(project_dir).resolve()
+        if not any(normalized.is_relative_to(root) for root in _allowed_project_roots()):
+>           raise HTTPException(
+                status_code=400,
+                detail="project_dir 超出获准工作区；如需扩展请设置 SUPER_DEV_API_PROJECT_ROOTS",
+            )
+E           fastapi.exceptions.HTTPException: 400: project_dir 超出获准工作区；如需扩展请设置 SUPER_DEV_API_PROJECT_ROOTS
+
+super_dev\web\api_host_support.py:111: HTTPException
+=========================== short test summary info ===========================
+FAILED tests/extensions/test_cli.py::test_proof_pack_and_web_api_do_not_trigger_fresh_verification
+1 failed, 208 passed, 2 skipped in 200.16s (0:03:20)
