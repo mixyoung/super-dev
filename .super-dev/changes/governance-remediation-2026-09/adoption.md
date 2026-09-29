@@ -31,6 +31,8 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 - super_dev/reviewers/spec_compliance.py
 - super_dev/reviewers/architecture_drift.py
 - super_dev/reviewers/uiux_compliance.py
+- super_dev/orchestrator/engine.py
+- super_dev/workflow_guard.py
 
 ## 验证与未验证
 
@@ -74,3 +76,26 @@ README.md:31 已明确本 fork 只在 GitHub 发布、未上传 PyPI，且 READM
 验证与未验证：新增边界测试 17 项通过；tests/integration/test_web_api.py 107 项全部通过（含 2 项按新契约更新）；tests/unit/test_release_readiness.py + test_proof_pack_enhanced.py 76 项通过；ruff/black 全部清洁；check_contribution_policy.py --base 1754be0 通过。未验证：前端 dist 为构建产物，无独立构建管线，仅在代码层面人工核对了 axios 调用与 Vue 绑定；实际浏览器端到端未执行。
 
 回退：`git revert` 本批提交即恢复旧契约（无数据迁移；工作流状态不受影响）。
+
+## 2026-09-29 批 B：状态提交协议 + 确认统一提交 + 门禁统一（核心层：权威状态与确认合同）
+
+核心影响（维护者 2026-09-29"全部批准"授权）：① 提交协议升级为强制 CAS——存在状态时，不带旧 revision 的 StateStore 直连提交被拒绝（授权重置须显式 allow_unconditional=True）；② 权威 workflow-state.json 损坏时提交被阻断并给出恢复候选，不再静默回退 latest.json；③ 确认记录的账本/文件/事件写入收进同一把项目状态锁；④ 已定位的 Web 空 phases 绕过被真阻断——未确认状态下发起默认全阶段 run 将收到 409，这是行为变更。
+
+问题与现有覆盖：审查核实 expected_revision 可省略（state_store.py 原 187 行默认 None、不校验）、运行路径 preserved keys 不含 revision（cli_workflow_runtime_mixin.py:1499）、损坏静默回退（load_workflow）、确认记录三步独立写入无共享锁（review_state.save_docs_confirmation + workflow_guard._update_stage_ledger）、api.py:1094 else 分支与 engine.py 默认分支均不执行确认门禁（静态链条：config 默认 7 阶段含 delivery ∈ _DOCS/_PREVIEW_CONFIRM_LATE_STAGES）。
+
+改动（分支 ocx/governance-remediation-batch-b-state-protocol，基线 2fa1099）：
+- super_dev/state_store.py：commit_workflow 损坏阻断（StateStoreError + 候选列表）+ 严格 CAS（expected/payload revision/allow_unconditional/全新状态免检）；新增 exclusive_commit() 共享锁、workflow_health()、prepare_recovery()、apply_recovery()（state_recovered 审计事件）
+- super_dev/review_state.py：save_workflow_state 增加 expected_revision/allow_unconditional；两者缺省且 payload 无 revision 时按当前 revision 自 CAS（兼容存量调用方；全新状态免检）
+- super_dev/work_item_identity.py：start_standard_work_item 显式 allow_unconditional=True（授权重置语义）；bind_standard_work_item 经 payload 携带 revision 自 CAS
+- super_dev/workflow_guard.py：save_bound_docs_confirmation / save_bound_preview_confirmation 的账本+确认文件+事件写入收进 StateStore.exclusive_commit()，顺序为账本先行、确认文件最后落盘（中途失败时 docs_gate_status 以确认文件为准，安全阻断而非半开）
+- super_dev/cli_workflow_runtime_mixin.py：preserved keys 补 "revision"；提交显式携带构造时 revision（并发写入时提交被拒而非覆盖）
+- super_dev/orchestrator/engine.py：run() 的两个确认门禁移出显式分支，对最终阶段列表（显式或 config 默认）统一执行；治理组件降级继续时写入 .super-dev/governance-gaps.jsonl（降级记录不等于确认门放行）
+- super_dev/web/api.py：/api/workflow/run 的门禁移出 if request.phases 分支，对最终 requested_phase_names 统一执行
+- super_dev/release_readiness.py：_governance_artifact_notes 增加 governance-gaps 降级提示（不计分，提示人工核对）
+- 测试：tests/integration/test_workflow_gate_unified.py（4 项：API 空 phases 未确认 409 / 确认后放行 / engine 默认路径阻断 / 显式路径阻断）、tests/unit/test_confirmation_atomicity.py（2 项：账本失败不留确认文件 / 正常路径文件+事件一致）、tests/unit/test_state_store.py 扩展（严格 CAS + 损坏阻断 + 恢复闭环）
+
+取舍：StateStore 直连层严格必填，但 save_workflow_state 包装层对不带 revision 的存量调用方自 CAS（否则 15+ 调用点全断）；架构文档的"类型化 WorkflowMutation/commit_confirmation 完整迁移"仍为后续增量，本批以共享锁+顺序保证先行落地。引擎崩溃在"账本后、文件前"的窗口仍存在，docs_gate_status 的摘要绑定核对继续作为兜底（文件最后落盘使失败方向为安全阻断）。
+
+验证与未验证：新增 14 项测试通过（4 门禁统一 + 2 原子性 + 8 状态存储含 2 项扩展）；tests/unit 状态/守卫相关 7 个文件 47 项通过；tests/integration/test_web_api.py 107 项通过；ruff/black 清洁。批内曾以 git stash 演示修复前红态，因当时测试文件导入笔误未取得有效红态记录，绕过结论仍以静态链条（前次汇报）+ 修复后绿测为准。未验证：tests/integration/test_cli.py 全量回归于本批提交前在后台执行，结果补记于提交信息；跨进程并发锁竞争仅靠单元级验证，未做真实多进程压测。
+
+回退：`git revert` 本批提交；旧状态文件读取兼容不受影响，写入协议退回可选项。

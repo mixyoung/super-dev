@@ -65,7 +65,8 @@ def start_standard_work_item(project_dir: Path, work_item_id: str) -> dict[str, 
             "skipped_gates": [],
         },
     }
-    save_workflow_state(project_path, payload)
+    # 新工作项起点是授权的整体状态重置：显式 allow_unconditional，绕开旧读冲突保护。
+    save_workflow_state(project_path, payload, allow_unconditional=True)
     return load_workflow_state(project_path) or payload
 
 

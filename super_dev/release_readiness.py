@@ -1839,11 +1839,18 @@ class ReleaseReadinessEvaluator:
                 *self.output_dir.glob("*-validation-results*.md"),
             ],
         }
-        return [
+        notes = [
             f"{label}：发现 {len({path for path in paths if path.is_file()})} 份资料；"
             "仅目录发现，未核验本次适用性与内容，不计分。仅按当前需求补充或审查。"
             for label, paths in groups.items()
         ]
+        gaps_file = self.project_dir / ".super-dev" / "governance-gaps.jsonl"
+        if gaps_file.is_file():
+            notes.append(
+                "治理降级：检测到 governance-gaps.jsonl 记录（可选治理组件曾以降级模式继续运行）。"
+                "降级只说明该组件缺席，不改变确认门要求；发布决策前应人工核对这些记录。"
+            )
+        return notes
 
     def _extract_regex(self, file_path: Path, pattern: str) -> str:
         if not file_path.exists():

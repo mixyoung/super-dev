@@ -10,6 +10,8 @@ import importlib
 import json
 import os
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -138,6 +140,95 @@ class StateStore:
     def load_workflow(self) -> dict[str, Any]:
         return _read_json(self.workflow_path) or _read_json(self.latest_path) or {}
 
+    @contextmanager
+    def exclusive_commit(self) -> Iterator[StateStore]:
+        """共享项目状态锁：确认记录的账本/文件/事件写入必须在同一把锁内完成。"""
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        with _ProjectStateLock(self.lock_path, timeout_seconds=self.lock_timeout_seconds):
+            yield self
+
+    def _recovery_candidates(self, *, limit: int = 5) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        if not self.history_dir.is_dir():
+            return candidates
+        snapshots = sorted(
+            self.history_dir.glob("workflow-state-r*.json"),
+            reverse=True,
+        )
+        for snapshot in snapshots:
+            payload = _read_json(snapshot)
+            if payload is not None and isinstance(payload.get("revision"), int):
+                candidates.append(
+                    {
+                        "path": str(snapshot),
+                        "revision": int(payload["revision"]),
+                        "updated_at": str(payload.get("updated_at", "")),
+                    }
+                )
+            if len(candidates) >= limit:
+                break
+        return candidates
+
+    def workflow_health(self) -> dict[str, Any]:
+        """权威状态健康；损坏时给出可解析的历史快照恢复候选，不静默降级。"""
+        if self.workflow_path.is_file():
+            payload = _read_json(self.workflow_path)
+            if payload is not None:
+                return {
+                    "status": "ok",
+                    "current_revision": int(payload.get("revision", 0) or 0),
+                    "candidates": [],
+                }
+            return {
+                "status": "corrupt",
+                "current_revision": None,
+                "candidates": self._recovery_candidates(),
+            }
+        if self.latest_path.is_file():
+            return {
+                "status": "missing_current",
+                "current_revision": None,
+                "candidates": self._recovery_candidates(limit=1),
+            }
+        return {"status": "missing", "current_revision": 0, "candidates": []}
+
+    def prepare_recovery(self) -> dict[str, Any] | None:
+        """选择最新可解析的历史快照作为恢复候选（不写回，需授权后 apply_recovery）。"""
+        candidates = self._recovery_candidates(limit=1)
+        if not candidates:
+            return None
+        snapshot_path = Path(candidates[0]["path"])
+        payload = _read_json(snapshot_path)
+        if payload is None:
+            return None
+        return {
+            "path": str(snapshot_path),
+            "revision": int(payload.get("revision", 0) or 0),
+            "updated_at": str(payload.get("updated_at", "")),
+            "payload": payload,
+        }
+
+    def apply_recovery(self, candidate: dict[str, Any]) -> dict[str, Any]:
+        """经授权把恢复候选写回权威状态并追加 state_recovered 审计事件。"""
+        snapshot_path = Path(str(candidate.get("path", "")))
+        payload = _read_json(snapshot_path) if snapshot_path.is_file() else None
+        if payload is None:
+            raise StateStoreError(f"recovery candidate unreadable: {snapshot_path}")
+        serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        with self.exclusive_commit():
+            atomic_write_text(self.workflow_path, serialized)
+            atomic_write_text(self.latest_path, serialized)
+            self._append_event(
+                event="state_recovered",
+                payload=payload,
+                source_path=self.workflow_path,
+            )
+        return {
+            "path": str(self.workflow_path),
+            "revision": int(payload.get("revision", 0) or 0),
+            "restored_from": str(snapshot_path),
+        }
+
     def session_brief_health(self, *, repair: bool = False) -> dict[str, Any]:
         state = self.load_workflow()
         if not self.session_brief_path.is_file():
@@ -186,15 +277,33 @@ class StateStore:
         *,
         expected_revision: int | None = None,
         event: str = "workflow_state_saved",
+        allow_unconditional: bool = False,
     ) -> CommitResult:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         with _ProjectStateLock(self.lock_path, timeout_seconds=self.lock_timeout_seconds):
+            if self.workflow_path.is_file():
+                try:
+                    json.loads(self.workflow_path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                    candidates = self._recovery_candidates()
+                    raise StateStoreError(
+                        "workflow-state.json 损坏，提交被阻断（不静默回退 latest.json）。"
+                        "先用 workflow_health()/prepare_recovery() 核对恢复候选，"
+                        "经授权 apply_recovery() 后再提交。"
+                        f" 解析错误: {exc}; candidates={[item['path'] for item in candidates]}"
+                    ) from exc
             current = _read_json(self.workflow_path) or _read_json(self.latest_path) or {}
             current_revision = int(current.get("revision", 0) or 0)
             supplied_revision = payload.get("revision")
             expected = expected_revision
             if expected is None and isinstance(supplied_revision, int):
                 expected = supplied_revision
+            if expected is None and current_revision > 0 and not allow_unconditional:
+                raise StateConflictError(
+                    f"workflow state exists (revision {current_revision}); "
+                    "stale-write protection requires expected_revision or payload['revision'] "
+                    "(or explicit allow_unconditional=True for an authorized reset)"
+                )
             if expected is not None and int(expected) != current_revision:
                 raise StateConflictError(
                     f"expected revision {int(expected)}, current revision {current_revision}"

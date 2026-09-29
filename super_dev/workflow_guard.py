@@ -19,6 +19,7 @@ from .review_state import (
     save_docs_confirmation,
     save_preview_confirmation,
 )
+from .state_store import StateStore
 from .workflow_contract import ContentEffect, ControlSource, ensure_control_effect_allowed
 from .workflow_stage_truth import (
     active_experts_for_stage,
@@ -376,18 +377,21 @@ def save_bound_docs_confirmation(
     if not identity.legacy and identity.work_item_id:
         normalized["work_item_id"] = identity.work_item_id
     normalized["artifact_binding"] = binding
-    file_path = save_docs_confirmation(project_dir, normalized)
-    ledger_entry = _update_stage_ledger(
-        project_dir,
-        stage="docs_confirm",
-        status=str(normalized.get("status", "")).strip() or "pending_review",
-        run_id=str(normalized.get("run_id", "")).strip(),
-        actor=str(normalized.get("actor", "")).strip(),
-        artifact_binding=binding,
-        active_experts=active_experts_for_stage("docs_confirm"),
-        source="docs_confirmation",
-        comment=str(normalized.get("comment", "")).strip(),
-    )
+    # 账本/确认文件/事件必须在同一把项目状态锁内写入；账本先行，确认文件最后落盘，
+    # 中途失败时 docs_gate_status 以确认文件为准，宁可安全阻断也不留下半开状态。
+    with StateStore(project_dir).exclusive_commit():
+        ledger_entry = _update_stage_ledger(
+            project_dir,
+            stage="docs_confirm",
+            status=str(normalized.get("status", "")).strip() or "pending_review",
+            run_id=str(normalized.get("run_id", "")).strip(),
+            actor=str(normalized.get("actor", "")).strip(),
+            artifact_binding=binding,
+            active_experts=active_experts_for_stage("docs_confirm"),
+            source="docs_confirmation",
+            comment=str(normalized.get("comment", "")).strip(),
+        )
+        file_path = save_docs_confirmation(project_dir, normalized)
     return file_path, ledger_entry
 
 
@@ -400,18 +404,20 @@ def save_bound_preview_confirmation(
     if not identity.legacy and identity.work_item_id:
         normalized["work_item_id"] = identity.work_item_id
     normalized["artifact_binding"] = binding
-    file_path = save_preview_confirmation(project_dir, normalized)
-    ledger_entry = _update_stage_ledger(
-        project_dir,
-        stage="preview_confirm",
-        status=str(normalized.get("status", "")).strip() or "pending_review",
-        run_id=str(normalized.get("run_id", "")).strip(),
-        actor=str(normalized.get("actor", "")).strip(),
-        artifact_binding=binding,
-        active_experts=active_experts_for_stage("preview_confirm"),
-        source="preview_confirmation",
-        comment=str(normalized.get("comment", "")).strip(),
-    )
+    # 与文档确认相同的统一锁与顺序：账本先行，确认文件最后落盘。
+    with StateStore(project_dir).exclusive_commit():
+        ledger_entry = _update_stage_ledger(
+            project_dir,
+            stage="preview_confirm",
+            status=str(normalized.get("status", "")).strip() or "pending_review",
+            run_id=str(normalized.get("run_id", "")).strip(),
+            actor=str(normalized.get("actor", "")).strip(),
+            artifact_binding=binding,
+            active_experts=active_experts_for_stage("preview_confirm"),
+            source="preview_confirmation",
+            comment=str(normalized.get("comment", "")).strip(),
+        )
+        file_path = save_preview_confirmation(project_dir, normalized)
     return file_path, ledger_entry
 
 

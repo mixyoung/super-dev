@@ -29,14 +29,16 @@
 - [x] 新增 tests/integration/test_web_api_write_boundaries.py（17 项：401/400/只读零写入/根约束正反例）；既有 web_api 107 项、readiness+proof-pack 76 项回归通过；ruff/black 清洁；政策检查通过
 - [ ] 维护者复核并合并
 
-## 批 B：状态/确认协议 + 门禁统一（待维护者批准）
+## 批 B：状态/确认协议 + 门禁统一（已批准并执行，2026-09-29，基线 2fa1099）
 
-- [ ] 先写各入口"未确认不得推进"运行时回归测试，锁定 Web 空 phases 绕过（api.py:1094 + engine.py:565）
-- [ ] StateStore.commit_workflow 的 expected_revision 必填；运行路径 preserved keys 补 revision
-- [ ] 权威状态损坏显式报阻 + 恢复候选展示 + state_recovered 审计事件
-- [ ] 确认记录统一经 StateStore 提交（review-state 文件 + 阶段账本 + 事件同锁）
-- [ ] api.py/engine.py 门禁移出显式分支，对最终阶段列表统一执行；workflow_guard.py:522/552 同步
-- [ ] 治理降级与确认门分离：governance_gap 仅记录降级事实；可选治理组件继续运行的条件与就绪检查处理方式单独写明
+- [x] 各入口"未确认不得推进"回归测试（tests/integration/test_workflow_gate_unified.py，4 项，锁定 Web 空 phases 绕过）
+- [x] StateStore 严格 CAS：存在状态时缺 revision 的直连提交被拒；授权重置须 allow_unconditional；运行路径 preserved keys 补 revision 并显式携带 expected_revision
+- [x] 权威状态损坏显式报阻（StateStoreError + 候选）+ workflow_health/prepare_recovery/apply_recovery + state_recovered 事件
+- [x] 确认记录统一锁提交：StateStore.exclusive_commit 下账本先行、确认文件最后落盘；原子性测试 2 项
+- [x] api.py / engine.py 门禁对最终阶段列表统一执行（显式与 config 默认同路径真阻断）
+- [x] 治理降级落 .super-dev/governance-gaps.jsonl；readiness 治理注记提示人工核对（不计分、不替代确认门）
+- [x] 回归：状态/守卫单测 47 项、web 集成 107 项通过；ruff/black 清洁；CLI 全量回归见提交记录
+- [ ] 维护者复核并合并
 
 ## 批 D1：架构漂移否定句误报（有界缺陷，待执行）
 

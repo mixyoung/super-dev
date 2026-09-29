@@ -1077,20 +1077,23 @@ async def run_workflow(
                     status_code=400, detail=f"无效阶段: {', '.join(invalid_phases)}"
                 )
             phases = [phase_map[p] for p in resolved_phase_names]
-            require_docs_confirmation(
-                project_dir_path,
-                action="workflow_run",
-                requested_phases=requested_phase_names,
-                require_context=False,
-            )
-            require_preview_confirmation(
-                project_dir_path,
-                action="workflow_run",
-                requested_phases=requested_phase_names,
-                require_context=True,
-            )
         else:
             requested_phase_names = list(manager.config.phases)
+
+        # 确认门禁对最终阶段列表统一执行：不传 phases（走 config 默认全阶段）同样受
+        # docs/preview 确认约束，堵住默认路径绕过（governance-remediation-2026-09 批 B）。
+        require_docs_confirmation(
+            project_dir_path,
+            action="workflow_run",
+            requested_phases=requested_phase_names,
+            require_context=False,
+        )
+        require_preview_confirmation(
+            project_dir_path,
+            action="workflow_run",
+            requested_phases=requested_phase_names,
+            require_context=True,
+        )
 
         # 生成运行 ID
         import uuid

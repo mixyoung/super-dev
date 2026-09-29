@@ -1502,6 +1502,7 @@ class CliWorkflowRuntimeMixin:
             "delivery_facts",
             "candidate_digest",
             "state_store_schema_version",
+            "revision",
         ):
             if preserved_key in current_state:
                 workflow_payload[preserved_key] = current_state[preserved_key]
@@ -1534,7 +1535,13 @@ class CliWorkflowRuntimeMixin:
                     ).strip(),
                 }
             )
-        return save_workflow_state(project_dir, workflow_payload)
+        # 显式携带构建时的 revision 做 CAS：构造状态期间若有并发写入，提交会被拒绝而非覆盖。
+        expected_revision = int(current_state.get("revision", 0) or 0) if current_state else None
+        return save_workflow_state(
+            project_dir,
+            workflow_payload,
+            expected_revision=expected_revision,
+        )
 
     def _build_session_continuity_rules(self, *, status: str) -> list[str]:
         return workflow_continuity_rules(status)
