@@ -47,6 +47,11 @@
 - WHEN 应检文件新增、删除或重命名
 - THEN 拒绝以过期清单给出可通过结论，下次调用重新发现
 
+#### Scenario: Equivalent path representations
+- GIVEN 相对路径、Windows 短路径和完整路径指向同一项目内对象
+- WHEN 枚举文档、读取文件、跟踪依赖或查询本次待发布报告
+- THEN 使用同一规范化绝对路径，不误报越界；实际越界、链接和检查期间大小写重命名仍受原保护
+
 ### Requirement: SCAN-006 Existing gates remain
 
 系统 SHALL 保留原阶段、质量评分与阈值、时限和清理机制，不把本批定向验证说成整仓发布就绪。

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import glob
+import json
 import os
 import subprocess
 import weakref
@@ -14,6 +15,8 @@ from super_dev.reviewers.source_inventory import (
     SourceInventory,
     SourceScanError,
     inventory_for,
+    load_scan_report,
+    scan_report_exists,
     source_scan_scope,
     write_scan_report,
 )
@@ -298,6 +301,243 @@ def test_windows_junction_is_not_followed(tmp_path):
         # Remove this test's junction, never the target tree.
         junction.rmdir()
     assert target.is_dir()
+
+
+def native_short_path(path: Path) -> Path:
+    import ctypes
+    from ctypes import wintypes
+
+    function = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
+    function.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    function.restype = wintypes.DWORD
+    required = function(str(path), None, 0)
+    if not required:
+        raise ctypes.WinError(ctypes.get_last_error())
+    buffer = ctypes.create_unicode_buffer(required)
+    written = function(str(path), buffer, required)
+    assert 0 < written < required
+    return Path(buffer.value)
+
+
+@pytest.fixture
+def native_path_pair(tmp_path):
+    if os.name != "nt":
+        pytest.skip("Windows 原生短路径专用测试")
+    root = tmp_path / "project with a long directory name"
+    root.mkdir()
+    root = root.resolve()
+    short = native_short_path(root)
+    if short == root:
+        pytest.skip("当前文件系统未提供 8.3 短路径别名")
+    assert short.samefile(root)
+    return root, short
+
+
+@pytest.mark.parametrize("root_form", ["long", "short"])
+def test_native_path_forms_share_canonical_inputs_and_reports(native_path_pair, root_form):
+    root, short = native_path_pair
+    source = put(root, "source-file-name.py")
+    document = put(root, "output/current-prd.md", "# Requirements")
+    selected_root = root if root_form == "long" else short
+    with source_scan_scope(selected_root) as inventory:
+        assert inventory_for(short) is inventory
+        assert inventory.document_paths(short / "output", "*-prd.md") == [document]
+        assert inventory.document_paths(short / "not-created/specs", "spec.md") == []
+        assert inventory.glob(str(short / "*.py")) == [source]
+        assert inventory.glob("*.py") == [source]
+        assert len(inventory._glob_results) == 1
+        assert inventory.read_text(native_short_path(source)) == "value = 1\n"
+        inventory.track([source])
+        assert list(inventory._digests) == [source]
+        inventory.watch_selection("source", [native_short_path(source)], lambda: [source])
+        inventory.watch_selection("source", [source], lambda: [native_short_path(source)])
+        report = root / "output/report.json"
+        write_scan_report(short / "output/report.json", '{"score": 100}')
+        assert list(inventory._writes) == [report]
+        assert scan_report_exists(report)
+        assert load_scan_report(report) == {"score": 100}
+        assert not report.exists()
+    assert json.loads(report.read_text(encoding="utf-8")) == {"score": 100}
+
+
+@pytest.mark.parametrize("module", [spec_compliance, architecture_drift, uiux_compliance])
+@pytest.mark.parametrize("with_specs", [False, True])
+def test_dependency_consumers_accept_native_short_roots(native_path_pair, module, with_specs):
+    root, short = native_path_pair
+    put(root, "super-dev.yaml", "name: demo\nplatform: cli\nfrontend: none\nbackend: python\n")
+    put(root, ".super-dev/workflow-state.json", '{"active_change_id": "current-change"}')
+    (root / ".super-dev/changes/current-change").mkdir(parents=True)
+    for suffix in ("prd", "architecture", "uiux"):
+        put(root, f"output/current-change-{suffix}.md", "# Current document\n")
+    if with_specs:
+        put(root, ".super-dev/changes/current-change/specs/core/spec.md", "# Current spec\n")
+    put(root, "app.py")
+    expected = module._report_dependencies(root, root / "output")
+    with source_scan_scope(root):
+        actual = module._report_dependencies(short, short / "output")
+    assert [str(path) for path in actual] == [str(path) for path in expected]
+
+
+def test_relative_inputs_are_canonical_before_cwd_changes(tmp_path, monkeypatch):
+    root = tmp_path / "project"
+    source = put(root, "app.py")
+    other = tmp_path / "other"
+    other.mkdir()
+    monkeypatch.chdir(root)
+    report = root / "output/report.json"
+    with source_scan_scope(root) as inventory:
+        assert inventory.read_text(Path("app.py")) == "value = 1\n"
+        inventory.track([source])
+        assert list(inventory._digests) == [source]
+        write_scan_report(Path("output/report.json"), '{"score": 100}')
+        assert scan_report_exists(report)
+        assert load_scan_report(report) == {"score": 100}
+        assert list(inventory._writes) == [report]
+        monkeypatch.chdir(other)
+    assert json.loads(report.read_text(encoding="utf-8")) == {"score": 100}
+    assert not (other / "output").exists()
+
+
+@pytest.mark.parametrize("outside", [False, True])
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "documents",
+        "read",
+        "pattern",
+        "report",
+        "missing-documents",
+        "report-read",
+        "report-exists",
+        "parent-hop",
+    ],
+)
+def test_path_normalization_preserves_link_checks(tmp_path, outside, operation):
+    root = tmp_path / "project"
+    put(root, "input.py")
+    put(tmp_path, "input.py")
+    target = tmp_path / "outside" if outside else root / "inside"
+    put(target, "input.py")
+    link = root / "link"
+    if os.name == "nt":
+        created = subprocess.run(
+            ["cmd.exe", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        assert created.returncode == 0
+    else:
+        link.symlink_to(target, target_is_directory=True)
+    try:
+        with pytest.raises(SourceScanError, match="链接|连接点"):
+            with source_scan_scope(root) as inventory:
+                if operation == "documents":
+                    inventory.document_paths(link, "*.py")
+                elif operation == "read":
+                    inventory.read_text(link / "input.py")
+                elif operation == "pattern":
+                    inventory.glob("link/*.py")
+                elif operation == "report":
+                    write_scan_report(link / "report.json", "{}")
+                elif operation == "missing-documents":
+                    inventory.document_paths(link / "missing/child", "*.md")
+                elif operation == "report-read":
+                    load_scan_report(link / "missing/report.json")
+                elif operation == "report-exists":
+                    scan_report_exists(link / "missing/report.json")
+                else:
+                    inventory.read_text(link / ".." / "input.py")
+        assert not (target / "report.json").exists()
+    finally:
+        if os.name == "nt":
+            link.rmdir()
+        else:
+            link.unlink()
+    assert target.is_dir()
+
+
+def test_existing_report_alias_uses_the_same_pending_slot(native_path_pair):
+    root, short = native_path_pair
+    report = put(root, "output/existing-report-with-long-name.json", '{"score": 10}')
+    alias = native_short_path(report)
+    with source_scan_scope(root) as inventory:
+        assert load_scan_report(alias) == {"score": 10}
+        write_scan_report(alias, '{"score": 20}')
+        write_scan_report(report, '{"score": 30}')
+        assert list(inventory._writes) == [report]
+        assert load_scan_report(alias) == {"score": 30}
+        assert load_scan_report(short / "output" / report.name) == {"score": 30}
+        assert json.loads(report.read_text(encoding="utf-8")) == {"score": 10}
+    assert json.loads(report.read_text(encoding="utf-8")) == {"score": 30}
+
+
+def test_glob_treats_the_project_root_as_literal(tmp_path):
+    root = tmp_path / "project[1]"
+    source = put(root, "src/app.py")
+    inventory = SourceInventory(root)
+    assert inventory.glob("src/*.py") == [source]
+    assert inventory.glob(str(root / "src/*.py")) == [source]
+    assert len(inventory._glob_results) == 1
+    inventory.verify()
+
+
+def test_document_read_accepts_safe_parent_components(tmp_path):
+    source = put(tmp_path, "src/app.py")
+    (tmp_path / "src/child").mkdir()
+    inventory = SourceInventory(tmp_path)
+    assert inventory.read_text(tmp_path / "src/child/../app.py") == "value = 1\n"
+    assert list(inventory._digests) == [source]
+
+
+def test_report_parent_becoming_a_link_blocks_all_publication(tmp_path):
+    root = tmp_path / "project"
+    root.mkdir()
+    target = tmp_path / "outside"
+    target.mkdir()
+    link = root / "output"
+    try:
+        with pytest.raises(SourceScanError, match="链接|连接点"):
+            with source_scan_scope(root):
+                write_scan_report(root / "safe/report.json", "{}")
+                write_scan_report(link / "report.json", "{}")
+                if os.name == "nt":
+                    created = subprocess.run(
+                        ["cmd.exe", "/c", "mklink", "/J", str(link), str(target)],
+                        capture_output=True,
+                        timeout=10,
+                        check=False,
+                    )
+                    assert created.returncode == 0
+                else:
+                    link.symlink_to(target, target_is_directory=True)
+        assert not (root / "safe").exists()
+        assert list(target.iterdir()) == []
+    finally:
+        if os.name == "nt":
+            if link.exists():
+                link.rmdir()
+        elif link.is_symlink():
+            link.unlink()
+
+
+def test_tracked_input_case_rename_blocks_even_without_discovery(tmp_path):
+    source = put(tmp_path, "input.py")
+    with pytest.raises(SourceScanError, match="发生变化|无法读取"):
+        with source_scan_scope(tmp_path) as inventory:
+            inventory.track([source])
+            source.rename(tmp_path / "INPUT.py")
+            write_scan_report(tmp_path / "output/report.json", "{}")
+    assert not (tmp_path / "output/report.json").exists()
+
+
+def test_normalized_parent_segments_cannot_escape_project(tmp_path):
+    root = tmp_path / "project"
+    (root / "child").mkdir(parents=True)
+    put(tmp_path, "outside.py")
+    inventory = SourceInventory(root)
+    with pytest.raises(SourceScanError, match="超出当前项目"):
+        inventory.read_text(root / "child/../../outside.py")
 
 
 def test_directory_link_is_not_followed(tmp_path):
