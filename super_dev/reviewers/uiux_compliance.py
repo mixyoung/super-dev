@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Any
 
 from ..artifact_utils import (
-    latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
     sanitize_artifact_name,
@@ -25,7 +24,13 @@ from ..config import ConfigManager
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
-    load_json_payload,
+)
+from .source_inventory import (
+    inventory_for,
+    load_scan_report,
+    scan_report_exists,
+    source_scan,
+    write_scan_report,
 )
 
 _IGNORE_DIRS: frozenset[str] = frozenset(
@@ -187,9 +192,10 @@ class UIUXComplianceReport:
         return "\n".join(lines)
 
 
-def _parse_uiux_doc(uiux_path: Path) -> dict[str, Any]:
+def _parse_uiux_doc(uiux_path: Path, *, content: str | None = None) -> dict[str, Any]:
     """Extract design declarations from UIUX doc."""
-    content = uiux_path.read_text(encoding="utf-8", errors="ignore")
+    if content is None:
+        content = uiux_path.read_text(encoding="utf-8", errors="ignore")
     result: dict[str, Any] = {
         "icon_library": "",
         "typography": [],
@@ -226,33 +232,19 @@ def _parse_uiux_doc(uiux_path: Path) -> dict[str, Any]:
 
 def _scan_frontend_files(project_dir: Path) -> list[tuple[str, str, list[str]]]:
     """Scan frontend source files. Returns [(rel_path, content, lines)]."""
+    project_dir = project_dir.resolve()
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
     files: list[tuple[str, str, list[str]]] = []
-    for path in project_dir.rglob("*"):
-        if not path.is_file() or path.suffix not in _FRONTEND_EXTENSIONS:
-            continue
-        parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-            continue
-        try:
-            rel = str(path.relative_to(project_dir))
-            content = path.read_text(encoding="utf-8", errors="ignore")
-            lines = content.split("\n")
-            files.append((rel, content, lines))
-        except (OSError, ValueError):
-            continue
+    for path in inventory.select(_FRONTEND_EXTENSIONS, _IGNORE_DIRS):
+        content = inventory.read_text(path)
+        files.append((str(path.relative_to(project_dir)), content, content.split("\n")))
     return files
 
 
 def _scan_frontend_file_paths(project_dir: Path) -> list[Path]:
-    paths: list[Path] = []
-    for path in project_dir.rglob("*"):
-        if not path.is_file() or path.suffix not in _FRONTEND_EXTENSIONS:
-            continue
-        parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-            continue
-        paths.append(path.resolve())
-    return sorted(paths)
+    return sorted(
+        inventory_for(project_dir, _IGNORE_DIRS).select(_FRONTEND_EXTENSIONS, _IGNORE_DIRS)
+    )
 
 
 def _artifact_context(project_dir: Path) -> tuple[str, str]:
@@ -271,15 +263,16 @@ def _frontend_required(project_dir: Path) -> bool:
 
 def _uiux_files(project_dir: Path, output_dir: Path) -> list[Path]:
     active_change_id, project_name = _artifact_context(project_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
     if active_change_id:
-        current = latest_artifact(
-            output_dir,
-            f"{project_name}-uiux.md",
-            preferred_prefix=project_name,
-            strict_prefix=True,
-        )
-        return [current] if current is not None else []
-    return list(output_dir.glob("*-uiux.md")) + list(output_dir.glob("*uiux*.md"))
+        return [
+            path
+            for path in inventory.document_paths(output_dir, f"{project_name}-uiux.md")
+            if path.is_file()
+        ]
+    return inventory.document_paths(output_dir, "*-uiux.md") + inventory.document_paths(
+        output_dir, "*uiux*.md"
+    )
 
 
 def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, ...]:
@@ -299,11 +292,18 @@ def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
 
 def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
     _active_change_id, project_name = _artifact_context(project_dir)
+    dependencies = _report_dependencies(project_dir, output_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    inventory.track(dependencies)
+    inventory.watch_selection(
+        f"uiux:{output_dir}", dependencies, lambda: _report_dependencies(project_dir, output_dir)
+    )
     identity: dict[str, Any] = build_evidence_identity(
         project_dir,
         artifact_name="uiux-compliance",
-        dependencies=_report_dependencies(project_dir, output_dir),
+        dependencies=dependencies,
     )
+    inventory.watch_candidate(str(identity["candidate_digest"]))
     identity["project_name"] = project_name
     return identity
 
@@ -316,7 +316,7 @@ def _load_existing_report(
 ) -> UIUXComplianceReport | None:
     active_change_id, project_name = _artifact_context(project_dir)
     for path in _report_paths(project_dir, output_dir):
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             continue
         if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
@@ -347,6 +347,7 @@ def _load_existing_report(
     return None
 
 
+@source_scan(_IGNORE_DIRS)
 def inspect_uiux_compliance_artifact(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -359,9 +360,9 @@ def inspect_uiux_compliance_artifact(
     active_change_id, project_name = _artifact_context(project_dir)
     report_paths = _report_paths(project_dir, output_dir)
     for path in report_paths:
-        if not path.exists():
+        if not scan_report_exists(path):
             continue
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             return {
                 "status": "unreadable",
@@ -408,17 +409,11 @@ def _persist_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
     markdown = report.to_markdown()
-    (output_dir / f"{report.project_name}-uiux-compliance.json").write_text(
-        payload,
-        encoding="utf-8",
-    )
-    (output_dir / f"{report.project_name}-uiux-compliance.md").write_text(
-        markdown,
-        encoding="utf-8",
-    )
+    write_scan_report(output_dir / f"{report.project_name}-uiux-compliance.json", payload)
+    write_scan_report(output_dir / f"{report.project_name}-uiux-compliance.md", markdown)
     if not resolve_active_change_id(project_dir):
-        (output_dir / "uiux-compliance.json").write_text(payload, encoding="utf-8")
-        (output_dir / "uiux-compliance.md").write_text(markdown, encoding="utf-8")
+        write_scan_report(output_dir / "uiux-compliance.json", payload)
+        write_scan_report(output_dir / "uiux-compliance.md", markdown)
 
 
 def _check_emoji_usage(
@@ -548,6 +543,7 @@ def _check_purple_gradient(
     return violations
 
 
+@source_scan(_IGNORE_DIRS)
 def run_uiux_compliance(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -588,7 +584,9 @@ def run_uiux_compliance(
 
     declared: dict[str, Any] = {}
     if uiux_files:
-        declared = _parse_uiux_doc(uiux_files[0])
+        declared = _parse_uiux_doc(
+            uiux_files[0], content=inventory_for(project_dir, _IGNORE_DIRS).read_text(uiux_files[0])
+        )
         report.declared_icon_library = declared.get("icon_library", "")
         report.declared_typography = declared.get("typography", [])
         report.declared_tokens = declared.get("tokens", [])

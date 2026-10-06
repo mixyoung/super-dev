@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from ..artifact_utils import (
-    latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
     sanitize_artifact_name,
@@ -23,7 +22,13 @@ from ..artifact_utils import (
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
-    load_json_payload,
+)
+from .source_inventory import (
+    inventory_for,
+    load_scan_report,
+    scan_report_exists,
+    source_scan,
+    write_scan_report,
 )
 
 _LANGUAGE_MAP: dict[str, tuple[str, ...]] = {
@@ -143,14 +148,15 @@ class ComplianceReport:
         return "\n".join(lines)
 
 
-def _parse_prd_requirements(prd_path: Path) -> list[tuple[str, str]]:
+def _parse_prd_requirements(prd_path: Path, *, content: str | None = None) -> list[tuple[str, str]]:
     """Extract requirements from PRD markdown.
 
     Looks for numbered items and heading-structured sections.
     Returns list of (requirement_id, requirement_text).
     """
     requirements: list[tuple[str, str]] = []
-    content = prd_path.read_text(encoding="utf-8", errors="ignore")
+    if content is None:
+        content = prd_path.read_text(encoding="utf-8", errors="ignore")
     lines = content.split("\n")
 
     current_section = ""
@@ -174,7 +180,9 @@ def _parse_prd_requirements(prd_path: Path) -> list[tuple[str, str]]:
     return requirements
 
 
-def _parse_change_spec_requirements(spec_path: Path) -> list[tuple[str, str]]:
+def _parse_change_spec_requirements(
+    spec_path: Path, *, content: str | None = None
+) -> list[tuple[str, str]]:
     """Extract one auditable requirement per ``### Requirement`` block."""
     requirements: list[tuple[str, str]] = []
     scope = sanitize_artifact_name(spec_path.parent.name) or "spec"
@@ -190,7 +198,9 @@ def _parse_change_spec_requirements(spec_path: Path) -> list[tuple[str, str]]:
         requirement_text = " ".join([current_heading, *current_body]).strip()
         requirements.append((f"{scope}-{req_counter:03d}", requirement_text))
 
-    for raw_line in spec_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+    if content is None:
+        content = spec_path.read_text(encoding="utf-8", errors="ignore")
+    for raw_line in content.splitlines():
         line = raw_line.strip()
         heading_match = re.match(r"^###\s+Requirement:\s*(.+)$", line)
         if heading_match:
@@ -297,31 +307,18 @@ def _extract_keywords(text: str) -> list[str]:
 
 def _scan_code_files(project_dir: Path) -> dict[str, str]:
     """Scan project for code files, return {relative_path: content}."""
-    files: dict[str, str] = {}
-    for path in project_dir.rglob("*"):
-        if path.is_file() and path.suffix in _ALL_CODE_EXTENSIONS:
-            # Skip ignored directories
-            parts = path.relative_to(project_dir).parts
-            if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-                continue
-            try:
-                rel = str(path.relative_to(project_dir))
-                files[rel] = path.read_text(encoding="utf-8", errors="ignore")
-            except (OSError, ValueError):
-                continue
-    return files
+    project_dir = project_dir.resolve()
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    return {
+        str(path.relative_to(project_dir)): inventory.read_text(path)
+        for path in inventory.select(_ALL_CODE_EXTENSIONS, _IGNORE_DIRS)
+    }
 
 
 def _scan_code_file_paths(project_dir: Path) -> list[Path]:
-    paths: list[Path] = []
-    for path in project_dir.rglob("*"):
-        if not path.is_file() or path.suffix not in _ALL_CODE_EXTENSIONS:
-            continue
-        parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-            continue
-        paths.append(path.resolve())
-    return sorted(paths)
+    return sorted(
+        inventory_for(project_dir, _IGNORE_DIRS).select(_ALL_CODE_EXTENSIONS, _IGNORE_DIRS)
+    )
 
 
 def _artifact_context(project_dir: Path) -> tuple[str, str]:
@@ -335,15 +332,16 @@ def _artifact_context(project_dir: Path) -> tuple[str, str]:
 
 def _prd_files(project_dir: Path, output_dir: Path) -> list[Path]:
     active_change_id, project_name = _artifact_context(project_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
     if active_change_id:
-        current = latest_artifact(
-            output_dir,
-            f"{project_name}-prd.md",
-            preferred_prefix=project_name,
-            strict_prefix=True,
-        )
-        return [current] if current is not None else []
-    return list(output_dir.glob("*-prd.md")) + list(output_dir.glob("*prd*.md"))
+        return [
+            path
+            for path in inventory.document_paths(output_dir, f"{project_name}-prd.md")
+            if path.is_file()
+        ]
+    return inventory.document_paths(output_dir, "*-prd.md") + inventory.document_paths(
+        output_dir, "*prd*.md"
+    )
 
 
 def _active_change_spec_files(project_dir: Path) -> list[Path]:
@@ -351,9 +349,12 @@ def _active_change_spec_files(project_dir: Path) -> list[Path]:
     if not active_change_id:
         return []
     specs_dir = project_dir / ".super-dev" / "changes" / active_change_id / "specs"
-    if not specs_dir.is_dir():
-        return []
-    return sorted(path.resolve() for path in specs_dir.rglob("spec.md") if path.is_file())
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    return sorted(
+        path.resolve()
+        for path in inventory.document_paths(specs_dir, "spec.md", recursive=True)
+        if path.is_file()
+    )
 
 
 def _requirement_files(project_dir: Path, output_dir: Path) -> list[Path]:
@@ -375,11 +376,18 @@ def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
 
 def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
     _active_change_id, project_name = _artifact_context(project_dir)
+    dependencies = _report_dependencies(project_dir, output_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    inventory.track(dependencies)
+    inventory.watch_selection(
+        f"spec:{output_dir}", dependencies, lambda: _report_dependencies(project_dir, output_dir)
+    )
     identity: dict[str, Any] = build_evidence_identity(
         project_dir,
         artifact_name="spec-compliance",
-        dependencies=_report_dependencies(project_dir, output_dir),
+        dependencies=dependencies,
     )
+    inventory.watch_candidate(str(identity["candidate_digest"]))
     identity["project_name"] = project_name
     return identity
 
@@ -392,7 +400,7 @@ def _load_existing_report(
 ) -> ComplianceReport | None:
     active_change_id, project_name = _artifact_context(project_dir)
     for path in _report_paths(project_dir, output_dir):
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             continue
         if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
@@ -421,6 +429,7 @@ def _load_existing_report(
     return None
 
 
+@source_scan(_IGNORE_DIRS)
 def inspect_spec_compliance_artifact(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -433,9 +442,9 @@ def inspect_spec_compliance_artifact(
     active_change_id, project_name = _artifact_context(project_dir)
     report_paths = _report_paths(project_dir, output_dir)
     for path in report_paths:
-        if not path.exists():
+        if not scan_report_exists(path):
             continue
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             return {
                 "status": "unreadable",
@@ -537,6 +546,7 @@ def _match_requirement(
     )
 
 
+@source_scan(_IGNORE_DIRS)
 def run_spec_compliance(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -581,11 +591,15 @@ def run_spec_compliance(
     # Collect all requirements
     all_requirements: list[tuple[str, str]] = []
     active_specs = set(_active_change_spec_files(project_dir))
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
     for requirement_path in requirement_files:
+        content = inventory.read_text(requirement_path)
         if requirement_path.resolve() in active_specs:
-            all_requirements.extend(_parse_change_spec_requirements(requirement_path))
+            all_requirements.extend(
+                _parse_change_spec_requirements(requirement_path, content=content)
+            )
         else:
-            all_requirements.extend(_parse_prd_requirements(requirement_path))
+            all_requirements.extend(_parse_prd_requirements(requirement_path, content=content))
 
     if not all_requirements:
         # 解析不到需求不是覆盖率 100%：未知不能算通过（批 D2 语义），显式标记为未解析。
@@ -631,10 +645,10 @@ def run_spec_compliance(
         prefixed_json = output_dir / f"{report.project_name}-spec-compliance.json"
         prefixed_md = output_dir / f"{report.project_name}-spec-compliance.md"
         payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-        prefixed_json.write_text(payload, encoding="utf-8")
-        prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+        write_scan_report(prefixed_json, payload)
+        write_scan_report(prefixed_md, report.to_markdown())
         if not resolve_active_change_id(project_dir):
-            (output_dir / "spec-compliance.json").write_text(payload, encoding="utf-8")
-            (output_dir / "spec-compliance.md").write_text(report.to_markdown(), encoding="utf-8")
+            write_scan_report(output_dir / "spec-compliance.json", payload)
+            write_scan_report(output_dir / "spec-compliance.md", report.to_markdown())
 
     return report
