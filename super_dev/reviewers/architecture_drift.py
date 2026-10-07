@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 from ..artifact_utils import (
-    latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
     sanitize_artifact_name,
@@ -23,7 +22,13 @@ from ..artifact_utils import (
 from ..evidence_identity import (
     build_evidence_identity,
     evidence_identity_matches,
-    load_json_payload,
+)
+from .source_inventory import (
+    inventory_for,
+    load_scan_report,
+    scan_report_exists,
+    source_scan,
+    write_scan_report,
 )
 
 _IGNORE_DIRS: frozenset[str] = frozenset(
@@ -172,9 +177,10 @@ def _line_negates_match(line: str, match_start: int) -> bool:
     return any(marker in prefix for marker in _NEGATION_MARKERS)
 
 
-def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
+def _parse_architecture_doc(arch_path: Path, *, content: str | None = None) -> dict[str, Any]:
     """Extract declared modules, dependencies, tech stack from architecture doc."""
-    content = arch_path.read_text(encoding="utf-8", errors="ignore")
+    if content is None:
+        content = arch_path.read_text(encoding="utf-8", errors="ignore")
     result: dict[str, Any] = {
         "modules": [],
         "dependencies": [],
@@ -238,34 +244,28 @@ def _parse_architecture_doc(arch_path: Path) -> dict[str, Any]:
 def _scan_imports(project_dir: Path) -> dict[str, list[str]]:
     """Build import graph from codebase. Returns {file: [imported_modules]}."""
     imports: dict[str, list[str]] = {}
+    project_dir = project_dir.resolve()
 
-    for path in project_dir.rglob("*"):
-        if path.is_file():
-            rel = ""
-            try:
-                rel = str(path.relative_to(project_dir))
-            except ValueError:
-                continue
-
-            parts = path.relative_to(project_dir).parts
-            if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-                continue
-
-            if path.suffix == ".py":
-                imports[rel] = _extract_python_imports(path)
-            elif path.suffix in (".ts", ".tsx", ".js", ".jsx"):
-                imports[rel] = _extract_js_imports(path)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    for path in inventory.select({".py", ".ts", ".tsx", ".js", ".jsx"}, _IGNORE_DIRS):
+        rel = str(path.relative_to(project_dir))
+        content = inventory.read_text(path)
+        if path.suffix == ".py":
+            imports[rel] = _extract_python_imports(path, content=content)
+        else:
+            imports[rel] = _extract_js_imports(path, content=content)
 
     return imports
 
 
-def _extract_python_imports(path: Path) -> list[str]:
+def _extract_python_imports(path: Path, *, content: str | None = None) -> list[str]:
     """Extract imported module names from a Python file."""
     modules: list[str] = []
-    try:
-        content = path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return modules
+    if content is None:
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return modules
 
     for line in content.split("\n"):
         line = line.strip()
@@ -281,13 +281,14 @@ def _extract_python_imports(path: Path) -> list[str]:
     return modules
 
 
-def _extract_js_imports(path: Path) -> list[str]:
+def _extract_js_imports(path: Path, *, content: str | None = None) -> list[str]:
     """Extract imported module names from a JS/TS file."""
     modules: list[str] = []
-    try:
-        content = path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return modules
+    if content is None:
+        try:
+            content = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return modules
 
     # ES module imports and require()
     for match in re.finditer(
@@ -304,12 +305,13 @@ def _extract_js_imports(path: Path) -> list[str]:
 def _scan_tech_stack(project_dir: Path) -> list[str]:
     """Detect actual tech stack from config files."""
     tech: list[str] = []
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
 
     # package.json
     pkg_path = project_dir / "package.json"
     if pkg_path.exists():
         try:
-            pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
+            pkg = json.loads(inventory.read_text(pkg_path, errors="strict"))
             deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
             known_frameworks = {
                 "react": "React",
@@ -335,7 +337,7 @@ def _scan_tech_stack(project_dir: Path) -> list[str]:
         req_path = project_dir / req_file
         if req_path.exists():
             try:
-                for line in req_path.read_text(encoding="utf-8").split("\n"):
+                for line in inventory.read_text(req_path, errors="strict").split("\n"):
                     line = line.strip()
                     if line and not line.startswith("#"):
                         pkg_name = re.split(r"[><=!]", line)[0].strip()
@@ -348,7 +350,7 @@ def _scan_tech_stack(project_dir: Path) -> list[str]:
     pyproject_path = project_dir / "pyproject.toml"
     if pyproject_path.exists():
         try:
-            content = pyproject_path.read_text(encoding="utf-8")
+            content = inventory.read_text(pyproject_path, errors="strict")
             dep_match = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
             if dep_match:
                 for dep_line in dep_match.group(1).split("\n"):
@@ -362,16 +364,11 @@ def _scan_tech_stack(project_dir: Path) -> list[str]:
 
 
 def _scan_source_file_paths(project_dir: Path) -> list[Path]:
-    paths: list[Path] = []
-    for path in project_dir.rglob("*"):
-        if not path.is_file():
-            continue
-        parts = path.relative_to(project_dir).parts
-        if any(p in _IGNORE_DIRS or p.lower().endswith(".egg-info") for p in parts):
-            continue
-        if path.suffix in {".py", ".ts", ".tsx", ".js", ".jsx"}:
-            paths.append(path.resolve())
-    return sorted(paths)
+    return sorted(
+        inventory_for(project_dir, _IGNORE_DIRS).select(
+            {".py", ".ts", ".tsx", ".js", ".jsx"}, _IGNORE_DIRS
+        )
+    )
 
 
 def _artifact_context(project_dir: Path) -> tuple[str, str]:
@@ -385,15 +382,16 @@ def _artifact_context(project_dir: Path) -> tuple[str, str]:
 
 def _architecture_files(project_dir: Path, output_dir: Path) -> list[Path]:
     active_change_id, project_name = _artifact_context(project_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
     if active_change_id:
-        current = latest_artifact(
-            output_dir,
-            f"{project_name}-architecture.md",
-            preferred_prefix=project_name,
-            strict_prefix=True,
-        )
-        return [current] if current is not None else []
-    return list(output_dir.glob("*-architecture.md")) + list(output_dir.glob("*architecture*.md"))
+        return [
+            path
+            for path in inventory.document_paths(output_dir, f"{project_name}-architecture.md")
+            if path.is_file()
+        ]
+    return inventory.document_paths(output_dir, "*-architecture.md") + inventory.document_paths(
+        output_dir, "*architecture*.md"
+    )
 
 
 def _report_paths(project_dir: Path, output_dir: Path) -> tuple[Path, ...]:
@@ -421,11 +419,20 @@ def _report_dependencies(project_dir: Path, output_dir: Path) -> list[Path]:
 
 def _expected_identity(project_dir: Path, output_dir: Path) -> dict[str, Any]:
     _active_change_id, project_name = _artifact_context(project_dir)
+    dependencies = _report_dependencies(project_dir, output_dir)
+    inventory = inventory_for(project_dir, _IGNORE_DIRS)
+    inventory.track(dependencies)
+    inventory.watch_selection(
+        f"architecture:{output_dir}",
+        dependencies,
+        lambda: _report_dependencies(project_dir, output_dir),
+    )
     identity: dict[str, Any] = build_evidence_identity(
         project_dir,
         artifact_name="architecture-drift",
-        dependencies=_report_dependencies(project_dir, output_dir),
+        dependencies=dependencies,
     )
+    inventory.watch_candidate(str(identity["candidate_digest"]))
     identity["project_name"] = project_name
     return identity
 
@@ -438,7 +445,7 @@ def _load_existing_report(
 ) -> DriftReport | None:
     active_change_id, project_name = _artifact_context(project_dir)
     for path in _report_paths(project_dir, output_dir):
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             continue
         if active_change_id and str(payload.get("project_name", "")).strip() != project_name:
@@ -467,6 +474,7 @@ def _load_existing_report(
     return None
 
 
+@source_scan(_IGNORE_DIRS)
 def inspect_architecture_drift_artifact(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -479,9 +487,9 @@ def inspect_architecture_drift_artifact(
     active_change_id, project_name = _artifact_context(project_dir)
     report_paths = _report_paths(project_dir, output_dir)
     for path in report_paths:
-        if not path.exists():
+        if not scan_report_exists(path):
             continue
-        payload = load_json_payload(path)
+        payload = load_scan_report(path)
         if not payload:
             return {
                 "status": "unreadable",
@@ -520,6 +528,7 @@ def inspect_architecture_drift_artifact(
     }
 
 
+@source_scan(_IGNORE_DIRS)
 def run_architecture_drift(
     project_dir: Path,
     output_dir: Path | None = None,
@@ -561,7 +570,9 @@ def run_architecture_drift(
         return report
 
     # Parse declared architecture
-    declared = _parse_architecture_doc(arch_files[0])
+    declared = _parse_architecture_doc(
+        arch_files[0], content=inventory_for(project_dir, _IGNORE_DIRS).read_text(arch_files[0])
+    )
     report.declared_modules = declared["modules"]
     report.declared_tech_stack = declared["tech_stack"]
     report.negated_tech_stack = declared.get("negated_tech_stack", [])
@@ -611,13 +622,11 @@ def run_architecture_drift(
         prefixed_json = output_dir / f"{report.project_name}-architecture-drift.json"
         prefixed_md = output_dir / f"{report.project_name}-architecture-drift.md"
         payload = json.dumps(report.to_dict(), indent=2, ensure_ascii=False)
-        prefixed_json.write_text(payload, encoding="utf-8")
-        prefixed_md.write_text(report.to_markdown(), encoding="utf-8")
+        write_scan_report(prefixed_json, payload)
+        write_scan_report(prefixed_md, report.to_markdown())
         if not resolve_active_change_id(project_dir):
-            (output_dir / "architecture-drift.json").write_text(payload, encoding="utf-8")
-            (output_dir / "architecture-drift.md").write_text(
-                report.to_markdown(), encoding="utf-8"
-            )
+            write_scan_report(output_dir / "architecture-drift.json", payload)
+            write_scan_report(output_dir / "architecture-drift.md", report.to_markdown())
 
     return report
 

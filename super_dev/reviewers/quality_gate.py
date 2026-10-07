@@ -11,7 +11,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..artifact_utils import (
     resolve_active_change_id,
@@ -35,7 +35,11 @@ from .fresh_verification_evidence import (
 from .quality_gate_evidence_mixin import QualityGateEvidenceMixin
 from .quality_gate_models import CheckStatus, HostProfileMetrics, QualityCheck
 from .redteam import RedTeamReport
+from .source_inventory import SourceScanError, source_scan_scope
 from .validation_rules import ValidationRuleEngine
+
+if TYPE_CHECKING:
+    from .quality_advisor import QualityAdvisorReport
 
 __all__ = [
     "CheckStatus",
@@ -86,6 +90,23 @@ class QualityGateResult:
     scenario: str = "1-N+1"  # 场景类型: "0-1" 或 "1-N+1"
     threshold: float = 80.0
     summary_context: dict[str, str] = field(default_factory=dict)
+    _advisor_report: Optional["QualityAdvisorReport"] = field(
+        default=None, repr=False, compare=False
+    )
+    _advice_prepared: bool = field(default=False, repr=False, compare=False)
+
+    def _prepare_advice(self, project_dir: Path) -> None:
+        # Render advice from this check's inputs, not a later filesystem snapshot.
+        self._advice_prepared = True
+        self._advisor_report = None
+        try:
+            from .quality_advisor import QualityAdvisor
+
+            self._advisor_report = QualityAdvisor(project_dir).analyze(self)
+        except SourceScanError:
+            raise
+        except Exception:
+            pass
 
     @property
     def gate_score(self) -> float:
@@ -308,11 +329,10 @@ class QualityGateResult:
 
         # 质量顾问建议
         try:
-            from .quality_advisor import QualityAdvisor
-
-            advisor = QualityAdvisor(Path.cwd())
-            advisor_report = advisor.analyze(self)
-            if advisor_report.advices:
+            if not self._advice_prepared:
+                self._prepare_advice(Path.cwd())
+            advisor_report = self._advisor_report
+            if advisor_report is not None and advisor_report.advices:
                 lines.extend(
                     [
                         "## 质量顾问建议",
@@ -442,6 +462,10 @@ class QualityGateChecker(QualityGateEvidenceMixin):
 
     # 检查项配置
     CHECKS_CONFIG = {
+        "scan_integrity": {
+            "weight": 0.0,
+            "required": True,
+        },
         "documentation": {
             "weight": 1.0,
             "required": True,
@@ -546,7 +570,7 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         # 可编程验证规则引擎（加载失败不影响主流程）
         self._rule_engine: ValidationRuleEngine | None = None
         try:
-            self._rule_engine = ValidationRuleEngine(Path.cwd())
+            self._rule_engine = ValidationRuleEngine(self.project_dir)
         except Exception:
             pass
 
@@ -649,7 +673,49 @@ class QualityGateChecker(QualityGateEvidenceMixin):
         # 如果有源代码或有项目配置，说明不是 0-1 场景
         return not (has_source_code or has_project_config)
 
+    @staticmethod
+    def _scan_failure(exc: SourceScanError) -> QualityCheck:
+        return QualityCheck(
+            name="源码扫描完整性",
+            category="scan_integrity",
+            description=str(exc),
+            status=CheckStatus.FAILED,
+            score=0,
+            weight=0.0,
+        )
+
     def check(self, redteam_report: Optional["RedTeamReport"] = None) -> QualityGateResult:
+        result: QualityGateResult | None = None
+        try:
+            with source_scan_scope(self.project_dir):
+                result = self._check(redteam_report)
+                result._prepare_advice(self.project_dir)
+            return result
+        except SourceScanError as exc:
+            failure = self._scan_failure(exc)
+            if result is None:
+                result = QualityGateResult(
+                    passed=False,
+                    total_score=0,
+                    weighted_score=0.0,
+                    scenario="0-1" if self.is_zero_to_one else "1-N+1",
+                    threshold=float(
+                        self.threshold_override
+                        if self.threshold_override is not None
+                        else self.PASS_THRESHOLD
+                    ),
+                )
+            result.passed = False
+            result._advice_prepared = True
+            result._advisor_report = None
+            if not any(check.description == str(exc) for check in result.checks):
+                result.checks.append(failure)
+            if str(exc) not in result.critical_failures:
+                result.critical_failures.append(str(exc))
+            result.recommendations.append("扫描未完成；确认应检文件可读且修改已结束后重跑。")
+            return result
+
+    def _check(self, redteam_report: Optional["RedTeamReport"] = None) -> QualityGateResult:
         """执行质量门禁检查"""
         checks: list[QualityCheck] = []
         shadow_summary_error = ""
@@ -1150,6 +1216,8 @@ class QualityGateChecker(QualityGateEvidenceMixin):
                         weight=2.0,
                     )
                 )
+        except SourceScanError as exc:
+            checks.append(self._scan_failure(exc))
         except Exception:
             pass
 
@@ -1182,6 +1250,8 @@ class QualityGateChecker(QualityGateEvidenceMixin):
                         weight=2.5,
                     )
                 )
+        except SourceScanError as exc:
+            checks.append(self._scan_failure(exc))
         except Exception:
             pass
 
@@ -1215,6 +1285,8 @@ class QualityGateChecker(QualityGateEvidenceMixin):
                             weight=2.0,
                         )
                     )
+            except SourceScanError as exc:
+                checks.append(self._scan_failure(exc))
             except Exception:
                 pass
 

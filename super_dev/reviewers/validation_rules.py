@@ -21,6 +21,8 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from .source_inventory import SourceScanError, inventory_for, source_scan_scope
+
 # 合法值常量
 VALID_CATEGORIES = frozenset(
     {
@@ -601,6 +603,33 @@ class ValidationRuleEngine:
     # ── 验证执行 ──────────────────────────────────────
 
     def validate(self, phase: str, context: dict[str, Any] | None = None) -> ValidationReport:
+        context = dict(context or {})
+        project_dir = Path(context.get("project_dir", self.project_dir))
+        report: ValidationReport | None = None
+        try:
+            with source_scan_scope(project_dir, _CONTENT_SCAN_IGNORED_DIRS):
+                report = self._validate(phase, context)
+            return report
+        except SourceScanError as exc:
+            results = list(report.results) if report else []
+            results.append(
+                ValidationResult(
+                    rule_id="SCAN-INTEGRITY",
+                    passed=False,
+                    message=str(exc),
+                    severity="critical",
+                    fix_suggestion="确认应检文件可读且修改已结束后重跑。",
+                )
+            )
+            return ValidationReport(
+                phase=phase,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                results=results,
+                passed=False,
+                score=self._calculate_score(results),
+            )
+
+    def _validate(self, phase: str, context: dict[str, Any] | None = None) -> ValidationReport:
         """对指定阶段执行所有适用规则。
 
         Args:
@@ -718,6 +747,8 @@ class ValidationRuleEngine:
                     severity=rule.severity,
                 )
             return handler(rule, context)
+        except SourceScanError:
+            raise
         except Exception as exc:  # noqa: BLE001
             return ValidationResult(
                 rule_id=rule.id,
@@ -760,7 +791,7 @@ class ValidationRuleEngine:
         pattern = rule.check_config.get("file_pattern", "")
         required = rule.check_config.get("required_sections", [])
 
-        matches = glob.glob(str(project_dir / pattern), recursive=True)
+        matches = inventory_for(project_dir).glob(pattern)
         if not matches:
             return ValidationResult(
                 rule_id=rule.id,
@@ -777,10 +808,9 @@ class ValidationRuleEngine:
             if _is_path_ignored_for_scan(candidate_path, project_dir):
                 continue
             valid_matches += 1
-            try:
-                content = candidate_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            if candidate_path.is_dir():
                 continue
+            content = inventory_for(project_dir).read_text(candidate_path, errors="replace")
             missing = [s for s in required if s not in content]
             if not missing:
                 return ValidationResult(
@@ -838,21 +868,20 @@ class ValidationRuleEngine:
         bad_patterns = rule.check_config.get("patterns", [])
         exclude_patterns = rule.check_config.get("exclude_patterns", [])
 
-        matches = glob.glob(str(project_dir / pattern), recursive=True)
+        matches = inventory_for(project_dir).glob(pattern)
         violations: list[str] = []
         excluded_paths: set[Path] = set()
         for exclude_pattern in exclude_patterns:
-            for filepath in glob.glob(str(project_dir / str(exclude_pattern)), recursive=True):
+            for filepath in inventory_for(project_dir).glob(str(exclude_pattern)):
                 excluded_paths.add(Path(filepath).resolve(strict=False))
 
         for filepath in matches:
             candidate_path = Path(filepath)
             if _is_path_ignored_for_scan(candidate_path, project_dir, excluded_paths):
                 continue
-            try:
-                content = candidate_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            if candidate_path.is_dir():
                 continue
+            content = inventory_for(project_dir).read_text(candidate_path, errors="replace")
             for pat in bad_patterns:
                 if re.search(pat, content):
                     rel = str(candidate_path.resolve(strict=False).relative_to(project_dir))
@@ -922,19 +951,18 @@ class ValidationRuleEngine:
         excluded_paths: set[Path] = set()
         if isinstance(exclude_patterns, list):
             for exclude_pattern in exclude_patterns:
-                for filepath in glob.glob(str(project_dir / str(exclude_pattern)), recursive=True):
+                for filepath in inventory_for(project_dir).glob(str(exclude_pattern)):
                     excluded_paths.add(Path(filepath).resolve(strict=False))
 
         violations: list[str] = []
         parse_errors: list[str] = []
-        for filepath in glob.glob(str(project_dir / file_pattern), recursive=True):
+        for filepath in inventory_for(project_dir).glob(file_pattern):
             candidate_path = Path(filepath)
             if _is_path_ignored_for_scan(candidate_path, project_dir, excluded_paths):
                 continue
-            try:
-                content = candidate_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            if candidate_path.is_dir():
                 continue
+            content = inventory_for(project_dir).read_text(candidate_path, errors="replace")
             matches, parse_error = _find_python_sensitive_logging(
                 content,
                 sensitive_names=sensitive_names,
@@ -1015,7 +1043,13 @@ class ValidationRuleEngine:
         regex = rule.check_config.get("pattern", "")
         desc = rule.check_config.get("description", rule.description)
 
-        matches = glob.glob(str(project_dir / file_pattern), recursive=True)
+        matches = inventory_for(project_dir).glob(file_pattern)
+        if not matches and "**" in file_pattern:
+            # Preserve the legacy distinction between no matches (skip) and only
+            # excluded matches (fail). Probe existence, never materialize that tree.
+            first_match = next(glob.iglob(str(project_dir / file_pattern), recursive=True), None)
+            if first_match is not None:
+                matches = [Path(first_match)]
         if not matches:
             return ValidationResult(
                 rule_id=rule.id,
@@ -1029,10 +1063,9 @@ class ValidationRuleEngine:
             candidate_path = Path(filepath)
             if _is_path_ignored_for_scan(candidate_path, project_dir):
                 continue
-            try:
-                content = candidate_path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            if candidate_path.is_dir():
                 continue
+            content = inventory_for(project_dir).read_text(candidate_path, errors="replace")
             if re.search(regex, content):
                 found_in.append(str(candidate_path.resolve(strict=False).relative_to(project_dir)))
 
