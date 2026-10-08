@@ -7,7 +7,6 @@ import { WhoItsForSection } from '@/components/sections/WhoItsForSection';
 import { UseCasesSection } from '@/components/sections/UseCasesSection';
 import { PipelineSection } from '@/components/sections/PipelineSection';
 import { HostCompatSection } from '@/components/sections/HostCompatSection';
-import { TrustSection } from '@/components/sections/TrustSection';
 import { CodeDemoSection } from '@/components/sections/CodeDemoSection';
 import { FaqSection } from '@/components/sections/FaqSection';
 import { BottomCta } from '@/components/sections/BottomCta';
@@ -16,7 +15,7 @@ export default function HomePage() {
   return (
     <>
       <Nav locale="zh" />
-      <main id="main-content">
+      <main id="main-content" lang="zh">
         <HeroSection locale="zh" />
         <SocialProofBand locale="zh" />
         <ValuePropsSection locale="zh" />
@@ -24,7 +23,6 @@ export default function HomePage() {
         <UseCasesSection locale="zh" />
         <PipelineSection locale="zh" />
         <HostCompatSection locale="zh" />
-        <TrustSection locale="zh" />
         <CodeDemoSection locale="zh" />
         <FaqSection locale="zh" />
         <BottomCta locale="zh" />

@@ -65,14 +65,12 @@ export const HOST_MATRIX_GROUPS = [
 
 export const STATS = {
   zh: [
-    { value: '统一矩阵', label: '宿主接入' },
-    { value: '5 分钟', label: '安装到宿主首句' },
+    { value: '26', label: '接入宿主' },
     { value: '9', label: '治理阶段' },
     { value: '2', label: '强制确认门' },
   ],
   en: [
-    { value: 'Unified', label: 'Host matrix' },
-    { value: '5 min', label: 'Install to first prompt' },
+    { value: '26', label: 'Hosts onboarded' },
     { value: '9', label: 'Governed stages' },
     { value: '2', label: 'Required approval gates' },
   ],
