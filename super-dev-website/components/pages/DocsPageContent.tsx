@@ -32,9 +32,7 @@ type Content = {
   heroKicker: string;
   heroTitle: string;
   heroBody: string;
-  heroStats: { label: string; value: string }[];
-  sections: SectionLink[];
-  governanceTitle: string;
+  sections: SectionLink[];  governanceTitle: string;
   governanceBody: string;
   governanceCards: { title: string; body: string }[];
   installTitle: string;
@@ -92,12 +90,6 @@ const zhContent: Content = {
   heroTitle: '先装上，再回宿主开始真正的开发。',
   heroBody:
     '这页不是协议字典，而是把你从安装带到“宿主第一句”和“安装后 5 分钟”的公开主路径。真正重要的是：装完就回宿主，第一轮先 research，再写三文档并等待确认。',
-  heroStats: [
-    { label: '宿主矩阵', value: '统一' },
-    { label: '安装到首句', value: '5 分钟' },
-    { label: '核心阶段', value: '9 段' },
-    { label: '确认门', value: '2 个' },
-  ],
   sections: [
     { id: 'highlights', label: 'v2.6.0 强化重点', icon: Zap },
     { id: 'governance', label: '核心路径', icon: BookOpen },
@@ -343,12 +335,6 @@ const enContent: Content = {
   heroTitle: 'Install once, then go back to the host and start the real work.',
   heroBody:
     'This page is not a protocol dictionary. It exists to move you from install to the host first prompt and the first five minutes. What matters is simple: install, go back to the host, start with research, then generate the three core docs and wait for approval.',
-  heroStats: [
-    { label: 'Host matrix', value: 'Unified' },
-    { label: 'Install to first prompt', value: '5 min' },
-    { label: 'Core phases', value: '9' },
-    { label: 'Approval gates', value: '2' },
-  ],
   sections: [
     { id: 'highlights', label: 'v2.6.0 Highlights', icon: Zap },
     { id: 'governance', label: 'Core path', icon: BookOpen },
@@ -626,7 +612,7 @@ export function DocsPageContent({ locale = 'zh' }: { locale?: SiteLocale }) {
   const homeHref = localizedPath(locale, '/');
 
   return (
-    <main className="min-h-screen bg-bg-primary pt-14" id="main-content">
+    <main className="min-h-screen bg-bg-primary pt-14" id="main-content" lang={locale}>
       <section className="relative overflow-hidden border-b border-border-muted bg-bg-primary">
         <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_top_left,rgba(37,99,235,0.22),transparent_32%),radial-gradient(circle_at_80%_12%,rgba(59,130,246,0.12),transparent_24%)]" />
         <div className="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(59,130,246,0.65),transparent)]" />

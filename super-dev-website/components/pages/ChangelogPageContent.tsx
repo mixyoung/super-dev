@@ -560,7 +560,7 @@ export function ChangelogPageContent({ locale = 'zh' }: { locale?: SiteLocale })
   return (
     <>
       <Nav locale={locale} />
-      <main className="pt-14 min-h-screen" id="main-content">
+      <main className="pt-14 min-h-screen" id="main-content" lang={locale}>
         <section className="py-20 lg:py-24 bg-bg-primary">
           <div className="max-w-2xl mx-auto px-4 sm:px-6">
             <h1 className="text-4xl font-bold text-text-primary mb-2 tracking-tight">{copy.title}</h1>

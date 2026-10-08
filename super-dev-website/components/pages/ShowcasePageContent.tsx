@@ -96,7 +96,7 @@ export function ShowcasePageContent({ locale = 'zh' }: { locale?: SiteLocale }) 
   return (
     <>
       <Nav locale={locale} />
-      <main className="pt-14 min-h-screen" id="main-content">
+      <main className="pt-14 min-h-screen" id="main-content" lang={locale}>
         {/* Hero */}
         <section className="section-glow py-20 lg:py-28 bg-bg-primary" aria-labelledby="showcase-title">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">

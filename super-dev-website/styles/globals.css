@@ -16,6 +16,16 @@
     --font-jetbrains: 'JetBrains Mono', Menlo, monospace;
   }
 
+  /* 中文标题：负字距与过紧行高只适合拉丁字形，汉字放宽到常规排版 */
+  [lang='zh'] h1,
+  [lang='zh'] h2 {
+    letter-spacing: normal;
+  }
+
+  [lang='zh'] h1 {
+    line-height: 1.2;
+  }
+
   * {
     box-sizing: border-box;
   }

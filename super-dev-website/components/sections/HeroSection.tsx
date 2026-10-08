@@ -16,7 +16,6 @@ const TerminalWindow = dynamic(
 const COPY = {
   zh: {
     openSource: 'MIT 开源',
-    title: 'AI 能写代码，Super Dev 把宿主带成交付团队。',
     body: '终端只负责接入和升级，真正的 research、三文档、确认门、Spec、实现和交付都留在宿主里。Super Dev 不是另一个代码生成器，它把宿主拉回一条能研究、能审查、能交付的商业开发主路径。',
     points: ['终端只记住 super-dev / super-dev update / super-dev uninstall', '安装后复制宿主第一句，回宿主里直接开工', '第一轮先 research，再写三文档并等你确认'],
     docs: '查看文档',
@@ -25,7 +24,6 @@ const COPY = {
   },
   en: {
     openSource: 'MIT Open Source',
-    title: 'AI can write code. Super Dev turns hosts into delivery teams.',
     body: 'The terminal only handles onboarding and upgrade. The real research, the three core docs, approval gates, spec, implementation, and delivery stay inside the host. Super Dev is not another code generator. It pushes the host back onto a commercial path that can be researched, reviewed, and shipped.',
     points: ['Only remember super-dev, super-dev update, and super-dev uninstall', 'After install, copy the host first prompt and go back into the host', 'The first pass is research first, then the three core docs, then approval'],
     docs: 'Read Docs',
