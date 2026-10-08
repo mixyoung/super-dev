@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { Archive, BadgeCheck, BookCopy, PackageCheck, ShieldCheck, Users } from 'lucide-react';
 import { HOSTS, STATS } from '@/lib/constants';
-import type { SiteLocale } from '@/lib/site-locale';
+import { assetPath, type SiteLocale } from '@/lib/site-locale';
 
 const HOST_ICON_MAP: Record<string, string> = {
   'Claude': '/hosts/claude-code.ico',
@@ -62,7 +62,7 @@ function HostLogo({ name }: { name: string }) {
     <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border-muted bg-bg-primary/50 px-4 py-2 opacity-70 transition-opacity duration-200 hover:opacity-100 cursor-pointer" title={name}>
       {iconSrc ? (
         <Image
-          src={iconSrc}
+          src={assetPath(iconSrc)}
           alt={name}
           width={20}
           height={20}
@@ -76,7 +76,7 @@ function HostLogo({ name }: { name: string }) {
     </div>
   );
   if (url) {
-    return <a href={url} target="_blank" rel="noopener noreferrer">{content}</a>;
+    return <a href={url} target="_blank" rel="noopener noreferrer" tabIndex={-1}>{content}</a>;
   }
   return content;
 }
@@ -135,7 +135,7 @@ export function SocialProofBand({ locale = 'zh' }: { locale?: SiteLocale }) {
         <dl className="grid gap-6 sm:grid-cols-3">
           {copy.labels.map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border-default bg-bg-primary/60 px-5 py-4">
-              <dt className="text-sm text-text-muted">{stat.label}</dt>
+              <dt className="text-sm text-text-secondary">{stat.label}</dt>
               <dd className="mt-2 text-2xl font-bold font-mono text-text-primary">{stat.value}</dd>
             </div>
           ))}
@@ -154,7 +154,7 @@ export function SocialProofBand({ locale = 'zh' }: { locale?: SiteLocale }) {
           <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-16 bg-gradient-to-r from-bg-secondary to-transparent" aria-hidden="true" />
           <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-16 bg-gradient-to-l from-bg-secondary to-transparent" aria-hidden="true" />
           <div className="flex gap-3 group-hover:[&>div]:pause">
-            <div className="flex shrink-0 gap-3 animate-scroll">
+            <div className="flex shrink-0 gap-3 animate-scroll" aria-hidden="true">
               {HOSTS.map((host) => <HostLogo key={`a-${host.name}`} name={host.name} />)}
               {HOSTS.map((host) => <HostLogo key={`b-${host.name}`} name={host.name} />)}
             </div>

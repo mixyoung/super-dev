@@ -65,12 +65,12 @@ export const HOST_MATRIX_GROUPS = [
 
 export const STATS = {
   zh: [
-    { value: '26', label: '接入宿主' },
+    { value: '26', label: '支持宿主' },
     { value: '9', label: '治理阶段' },
     { value: '2', label: '强制确认门' },
   ],
   en: [
-    { value: '26', label: 'Hosts onboarded' },
+    { value: '26', label: 'Supported hosts' },
     { value: '9', label: 'Governed stages' },
     { value: '2', label: 'Required approval gates' },
   ],

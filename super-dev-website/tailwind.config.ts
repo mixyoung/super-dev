@@ -34,8 +34,8 @@ const config: Config = {
         'status-blue': '#388BFD',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-jetbrains)', 'Menlo', 'monospace'],
+        sans: ['var(--font-inter)', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-jetbrains)', 'PingFang SC', 'Microsoft YaHei', 'Menlo', 'monospace'],
       },
       animation: {
         'marquee': 'marquee 40s linear infinite',

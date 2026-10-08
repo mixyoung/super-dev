@@ -75,6 +75,10 @@ export function Nav({ locale = 'zh' }: NavProps) {
   }, []);
 
   useEffect(() => {
+    document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN';
+  }, [locale]);
+
+  useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
@@ -198,7 +202,8 @@ export function Nav({ locale = 'zh' }: NavProps) {
                 className="flex items-center gap-2 py-3 px-4 text-text-secondary hover:text-text-primary"
               >
                 <Github size={16} aria-hidden="true" />
-                {copy.github} (★{formatStarCount(stars)})
+                {copy.github}
+                {stars > 0 ? ` (★${formatStarCount(stars)})` : ''}
               </a>
               <Button
                 variant="primary"

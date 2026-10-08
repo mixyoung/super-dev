@@ -1,7 +1,8 @@
+import Link from 'next/link';
 import { Nav } from '@/components/layout/Nav';
 import { Footer } from '@/components/layout/Footer';
 import { Badge } from '@/components/ui/Badge';
-import type { SiteLocale } from '@/lib/site-locale';
+import { localizedPath, type SiteLocale } from '@/lib/site-locale';
 
 const CHANGELOG = {
   zh: [
@@ -574,9 +575,7 @@ export function ChangelogPageContent({ locale = 'zh' }: { locale?: SiteLocale })
                 const showExpandedMajorView = index === 0 && release.type === 'major';
                 const releaseNotesHref =
                   release.version === '2.6.0'
-                    ? locale === 'zh'
-                      ? '/docs/#highlights'
-                      : '/en/docs/#highlights'
+                    ? `${localizedPath(locale, '/docs')}/#highlights`
                     : null;
                 return (
                 <article key={release.version} className="relative pl-6 border-l border-border-default">
@@ -619,12 +618,12 @@ export function ChangelogPageContent({ locale = 'zh' }: { locale?: SiteLocale })
                   ) : null}
                   {releaseNotesHref ? (
                     <div className="mt-4">
-                      <a
+                      <Link
                         href={releaseNotesHref}
                         className="text-sm text-accent-blue hover:text-accent-blue-hover transition-colors"
                       >
                         {copy.fullNotes}
-                      </a>
+                      </Link>
                     </div>
                   ) : null}
                 </article>
