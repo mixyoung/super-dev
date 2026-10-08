@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Nav } from '@/components/layout/Nav';
 import { Footer } from '@/components/layout/Footer';
 import { HeroSection } from '@/components/sections/HeroSection';
+import { HostMarquee } from '@/components/sections/HostMarquee';
 import { SocialProofBand } from '@/components/sections/SocialProofBand';
 import { ValuePropsSection } from '@/components/sections/ValuePropsSection';
 import { WhoItsForSection } from '@/components/sections/WhoItsForSection';
@@ -23,6 +24,7 @@ export default function HomePageEn() {
       <Nav locale="en" />
       <main id="main-content" lang="en">
         <HeroSection locale="en" />
+        <HostMarquee locale="en" />
         <SocialProofBand locale="en" />
         <ValuePropsSection locale="en" />
         <WhoItsForSection locale="en" />

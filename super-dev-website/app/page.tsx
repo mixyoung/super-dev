@@ -1,6 +1,7 @@
 import { Nav } from '@/components/layout/Nav';
 import { Footer } from '@/components/layout/Footer';
 import { HeroSection } from '@/components/sections/HeroSection';
+import { HostMarquee } from '@/components/sections/HostMarquee';
 import { SocialProofBand } from '@/components/sections/SocialProofBand';
 import { ValuePropsSection } from '@/components/sections/ValuePropsSection';
 import { WhoItsForSection } from '@/components/sections/WhoItsForSection';
@@ -17,6 +18,7 @@ export default function HomePage() {
       <Nav locale="zh" />
       <main id="main-content" lang="zh">
         <HeroSection locale="zh" />
+        <HostMarquee locale="zh" />
         <SocialProofBand locale="zh" />
         <ValuePropsSection locale="zh" />
         <WhoItsForSection locale="zh" />
