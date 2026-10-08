@@ -11,10 +11,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --font-inter: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
-    --font-jetbrains: 'JetBrains Mono', Menlo, monospace;
-  }
+  /* 字体变量由 next/font 在 <html> 上注入；中文回退栈见 tailwind.config.ts 的 fontFamily */
 
   /* 中文标题：负字距与过紧行高只适合拉丁字形，汉字放宽到常规排版 */
   [lang='zh'] h1,
@@ -37,7 +34,7 @@
   body {
     background-color: #0D1117;
     color: #F0F6FC;
-    font-family: var(--font-inter);
+    font-family: var(--font-inter), 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
