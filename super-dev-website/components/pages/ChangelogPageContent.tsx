@@ -6,6 +6,57 @@ import type { SiteLocale } from '@/lib/site-locale';
 const CHANGELOG = {
   zh: [
     {
+      version: '2.6.0',
+      date: '2026-09-18',
+      type: 'major' as const,
+      summary:
+        '一次可靠性收敛版本：流程状态、会话简报、验证证据和发布事实全部收口到单一真源，正式发布改走本仓库的 GitHub Release。',
+      changes: [
+        'workflow-state.json 成为唯一当前流程状态：新增修订冲突处理、跨平台锁、原子提交、历史快照和恢复基础',
+        'SESSION_BRIEF.md 改为根据最新状态自动生成，携带工作项与状态修订',
+        'pipeline-state.json 只允许一次迁移，成功后删除；引擎和专家阶段检查统一读取当前状态',
+        '新增候选绑定的证据信封，区分代码、输入和制品摘要；代码变化后旧验证不再支持当前通过',
+        '新增正式发布观察记录，只更新 released，不推导部署或运营成功',
+        'Fresh Verification 改用受控临时文件收集输出，长时运行每分钟显示心跳，强化超时与取消时的子进程清理',
+        '可选的目标隔离模式在同一候选和总预算下分别运行各测试目标，避免跨文件资源累积',
+        '正式发布走 GitHub Release：wheel、sdist 与 SHA256SUMS.txt，不上传 PyPI',
+      ],
+      groups: [
+        {
+          title: '状态与恢复真源',
+          items: [
+            'workflow-state.json 成为唯一当前流程状态，pipeline-state.json 一次性迁移后删除。',
+            'SESSION_BRIEF.md 自动生成并携带工作项与状态修订，恢复链不再依赖旧快照。',
+            '修订冲突、跨平台锁、原子提交与历史快照一起构成恢复基础。',
+          ],
+        },
+        {
+          title: '证据与发布',
+          items: [
+            '证据信封绑定候选：代码、输入、制品摘要分开记录，代码变化后旧验证失效。',
+            '发布观察只更新 released 事实，不推导部署或运营成功。',
+            '正式版本通过 GitHub Release 发布 wheel、sdist 与 SHA256SUMS.txt。',
+          ],
+        },
+      ],
+    },
+    { version: '2.5.1', date: '2026-09-16', type: 'patch' as const, changes: [
+      '建立 L0-L4 内容权威与确定性知识信封：仓库和外部指令只作为待审数据，不能自行取得权限',
+      '阶段专家收敛为单一真源与 ExpertProfile v2：独立评审必须绑定真实会话与候选',
+      '标准流程新增 Spec 前工作项身份、文档摘要绑定和原子状态写入，旧 change 与证据不再污染新任务',
+      '解耦 delivery_ready / released / deployed / operating 四类事实',
+      '修复 Feature Checklist 把研究优先级误判为缺口的问题',
+      '修复提示生成未绑定当前变更、常规 QA 被验证变体覆盖等问题',
+    ] },
+    { version: '2.5.0', date: '2026-09-07', type: 'major' as const, changes: [
+      '本 fork 的 GitHub-only 发行版：安装与升级改用 Git 标签或 Release wheel，不再上传上游 PyPI 包',
+      '结构化范围声明、只读阶段影子台账与对照；不授予影子台账流程控制权',
+      '最小扩展机制与完成前验证：来源锁、权限、执行器、证据、所有权和路径检查',
+      '择优吸收 Forge、需求审查、Grill 与 UmaDev 的软内容，固定贡献和演进边界',
+      'Windows 测试隔离与真实必过 CI；七个依赖设下已知漏洞版本下限',
+      '修复类型与外部输入边界、UI 契约安全文件名、中文编码与跨平台路径问题',
+    ] },
+    {
       version: '2.4.0',
       date: '2026-04-22',
       type: 'major' as const,
@@ -221,6 +272,57 @@ const CHANGELOG = {
     { version: '1.0.0', date: '2025-12-29', type: 'major' as const, changes: ['首次发布', '基础流水线框架（research / documents / spec / implement）', 'Spec-Driven Development 模块', '支持 Claude Code、Cursor、Windsurf 宿主', 'PyPI 正式发布'] },
   ],
   en: [
+    {
+      version: '2.6.0',
+      date: '2026-09-18',
+      type: 'major' as const,
+      summary:
+        'A reliability-convergence release: flow state, session briefs, verification evidence, and release facts now converge on single sources of truth, and official distribution moved to GitHub Releases on this repository.',
+      changes: [
+        'workflow-state.json is now the single source of current flow state, adding revision-conflict handling, cross-platform locking, atomic commits, history snapshots, and a recovery foundation',
+        'SESSION_BRIEF.md is now auto-generated from the latest state and carries the work item and state revisions',
+        'pipeline-state.json is allowed exactly one migration and is deleted afterwards; the engine and expert stage checks read the current state uniformly',
+        'Candidate-bound evidence envelopes separate code, inputs, and artifact digests; once the code changes, old verifications no longer support the current pass',
+        'New release observation records update only the released fact and never infer deployment or operational success',
+        'Fresh Verification now collects output through controlled temporary files, shows a heartbeat every minute on long runs, and strengthens subprocess cleanup on normal exit, timeout, and cancellation',
+        'An optional target-isolation mode runs each test target separately under the same candidate and budget, avoiding cross-file resource accumulation',
+        'Official releases ship via GitHub Release: wheel, sdist, and SHA256SUMS.txt; nothing is uploaded to PyPI',
+      ],
+      groups: [
+        {
+          title: 'State and recovery truth',
+          items: [
+            'workflow-state.json is the single current-state source; pipeline-state.json migrates once and is removed.',
+            'SESSION_BRIEF.md regenerates automatically with work-item and state revisions, so recovery no longer depends on stale snapshots.',
+            'Revision conflicts, cross-platform locks, atomic commits, and history snapshots form the recovery foundation.',
+          ],
+        },
+        {
+          title: 'Evidence and release',
+          items: [
+            'Evidence envelopes bind to the candidate: code, inputs, and artifact digests are recorded separately, and stale verifications stop counting once code changes.',
+            'Release observation updates only the released fact, never inferring deployment or operational success.',
+            'Official versions publish wheel, sdist, and SHA256SUMS.txt through GitHub Releases.',
+          ],
+        },
+      ],
+    },
+    { version: '2.5.1', date: '2026-09-16', type: 'patch' as const, changes: [
+      'Established L0-L4 content authority and deterministic knowledge envelopes: repository and external instructions remain review-only data and cannot grant themselves permissions',
+      'Stage experts converged to a single source with ExpertProfile v2; independent reviews must bind to a real session and candidate',
+      'The standard flow gained pre-Spec work-item identity, document digest binding, and atomic state writes so old changes and evidence cannot pollute new tasks',
+      'Decoupled the four facts: delivery_ready / released / deployed / operating',
+      'Fixed Feature Checklist misreading research priorities as gaps',
+      'Fixed prompt generation not binding the current change and regular QA being shadowed by verification variants',
+    ] },
+    { version: '2.5.0', date: '2026-09-07', type: 'major' as const, changes: [
+      'GitHub-only distribution for this fork: install and upgrade now use Git tags or Release wheels instead of the upstream PyPI package',
+      'Structured scope declarations, read-only stage shadow ledgers with comparison; shadow ledgers never gain flow control',
+      'Minimal extension mechanism with pre-completion verification: source lock, permissions, executor, evidence, ownership, and path checks',
+      'Absorbed the best of Forge, requirement review, Grill, and UmaDev soft content with fixed contribution and evolution boundaries',
+      'Windows test isolation and a real required CI; lower bounds set for seven dependencies with known vulnerabilities',
+      'Fixed type and external-input boundaries, UI contract safe filenames, Chinese encoding, and cross-platform paths',
+    ] },
     {
       version: '2.4.0',
       date: '2026-04-22',
@@ -471,7 +573,7 @@ export function ChangelogPageContent({ locale = 'zh' }: { locale?: SiteLocale })
                     : release.changes.slice(0, 2);
                 const showExpandedMajorView = index === 0 && release.type === 'major';
                 const releaseNotesHref =
-                  release.version === '2.4.0'
+                  release.version === '2.6.0'
                     ? locale === 'zh'
                       ? '/docs/#highlights'
                       : '/en/docs/#highlights'

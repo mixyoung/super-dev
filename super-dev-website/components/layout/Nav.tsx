@@ -147,11 +147,11 @@ export function Nav({ locale = 'zh' }: NavProps) {
                 'hover:border-border-emphasis hover:text-text-primary',
                 'transition-all duration-150'
               )}
-              aria-label={`GitHub repository, ${stars} stars`}
+              aria-label="GitHub repository"
             >
               <Github size={14} aria-hidden="true" />
               <Star size={12} aria-hidden="true" />
-              <span className="font-mono">{formatStarCount(stars)}</span>
+              {stars > 0 && <span className="font-mono">{formatStarCount(stars)}</span>}
             </a>
             <Button variant="primary" size="sm" onClick={() => setQrOpen(true)}>
               <Users size={14} aria-hidden="true" className="mr-1.5" />

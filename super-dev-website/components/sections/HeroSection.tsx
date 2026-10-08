@@ -21,7 +21,7 @@ const COPY = {
     points: ['终端只记住 super-dev / super-dev update / super-dev uninstall', '安装后复制宿主第一句，回宿主里直接开工', '第一轮先 research，再写三文档并等你确认'],
     docs: '查看文档',
     installNote: '首页默认只讲 uv 安装和 super-dev 引导。安装器会直接告诉你推荐宿主、标准流第一句、比赛流第一句和接入后先验；终端到这里就该退场，日常开发回宿主里的 /super-dev、$super-dev 或 super-dev:。',
-    releaseNote: 'v2.4.0: 统一宿主矩阵、项目优先接入、宿主首句与恢复剧本、双模式准备度，以及更严格的 UI 视觉门都已经前推到安装器和交付链。',
+    releaseNote: 'v2.6.0: workflow-state 成为唯一流程状态真源，证据信封直接绑定当前代码版本，代码一变旧验证即失效；正式发布改走 GitHub Release（wheel、sdist、校验和）。',
   },
   en: {
     openSource: 'MIT Open Source',
@@ -30,7 +30,7 @@ const COPY = {
     points: ['Only remember super-dev, super-dev update, and super-dev uninstall', 'After install, copy the host first prompt and go back into the host', 'The first pass is research first, then the three core docs, then approval'],
     docs: 'Read Docs',
     installNote: 'The homepage now teaches uv install and the super-dev onboarding path. The installer prints the recommended host, the standard-flow first prompt, the competition-flow first prompt, and the post-onboard self-check. After that, the terminal should get out of the way and daily work moves back into /super-dev, $super-dev, or super-dev: inside the host.',
-    releaseNote: 'v2.4.0 brings the unified host matrix, project-first onboarding, host-specific first prompts and resume playbooks, dual-mode readiness, and a stricter screenshot-grade UI gate forward into onboarding and delivery.',
+    releaseNote: 'v2.6.0 makes workflow-state the single flow-state source, binds evidence envelopes to the current candidate so stale verifications stop counting, and ships official releases through GitHub Releases (wheel, sdist, checksums).',
   },
 } as const;
 
@@ -48,16 +48,18 @@ export function HeroSection({ locale = 'zh' }: { locale?: SiteLocale }) {
       <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-14 px-4 pb-20 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:gap-16 lg:pb-24">
         <div className="flex flex-col gap-7">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="version">v2.4.0</Badge>
+            <Badge variant="version">v2.6.0</Badge>
             <Badge variant="certified">{copy.openSource}</Badge>
-            <a
-              href={GITHUB_REPO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text-secondary"
-            >
-              {formatStarCount(stars)} Stars
-            </a>
+            {stars > 0 && (
+              <a
+                href={GITHUB_REPO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text-secondary"
+              >
+                {formatStarCount(stars)} Stars
+              </a>
+            )}
           </div>
 
           <h1 id="hero-title" className="max-w-3xl text-4xl font-bold leading-[1.06] tracking-tight text-text-primary sm:text-5xl lg:text-6xl">
