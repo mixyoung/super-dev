@@ -1,6 +1,6 @@
 export const GITHUB_REPO_URL = 'https://github.com/mixyoung/super-dev';
 export const GITHUB_API_REPO_URL = 'https://api.github.com/repos/mixyoung/super-dev';
-export const DEFAULT_STAR_COUNT = 108;
+export const DEFAULT_STAR_COUNT = 0;
 
 const STAR_CACHE_KEY = 'super-dev:github-stars';
 const STAR_CACHE_TTL_MS = 1000 * 60 * 30;

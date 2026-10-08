@@ -99,7 +99,7 @@ const zhContent: Content = {
     { label: '确认门', value: '2 个' },
   ],
   sections: [
-    { id: 'highlights', label: 'v2.4.0 强化重点', icon: Zap },
+    { id: 'highlights', label: 'v2.6.0 强化重点', icon: Zap },
     { id: 'governance', label: '核心路径', icon: BookOpen },
     { id: 'install', label: '安装方式', icon: Package },
     { id: 'first-minutes', label: '安装后 5 分钟', icon: Sparkles },
@@ -323,17 +323,15 @@ const zhContent: Content = {
     '先用 smoke 触发语句。',
     '如果宿主直接开始开发，优先判断当前会话没有重新加载规则。',
   ],
-  highlightsTitle: 'v2.4.0 当前强化重点',
-  highlightsBody: '2.4.0 继续把产品拉回“宿主内交付工具”这个核心：默认项目优先接入、统一宿主矩阵、标准流 / SEEAI 双模式准备度、宿主首句与恢复剧本、以及更清晰的安装后先验；同时把 UI 设计合同升级成更少 AI 味、更强调视觉方向和工艺审查的系统。',
+  highlightsTitle: 'v2.6.0 当前强化重点',
+  highlightsBody: '2.6.0 是一次可靠性收敛：流程状态、会话简报、验证证据与发布事实全部收口到单一真源；代码变化后旧验证不再支持当前通过，正式发布改走本仓库的 GitHub Release。',
   highlightsCards: [
-    { title: '项目优先接入默认化', body: 'onboard / setup / install / start 默认只写项目级协议面；用户级 / 系统级 surface 改成显式 opt-in，不再默认污染全局 AGENTS。' },
-    { title: '统一宿主矩阵', body: 'CLI、IDE 和桌面助手都已并入统一矩阵；Claude / Claude Code、Codex / Codex CLI、Trae 系列都拆成了独立条目。' },
-    { title: '宿主首句与恢复剧本', body: '每个宿主现在都明确给出标准流第一句、比赛流第一句、恢复方式和修复优先级，不再只有泛化触发词。' },
-    { title: '标准流 / SEEAI 双模式准备度', body: '宿主报告会明确区分“标准流可直接开工”和“SEEAI 比赛模式可直接开工”，不再把文件已写入误判成宿主已跑通。' },
-    { title: '当前项目焦点', body: '安装器和 smoke guide 会直接告诉用户当前项目更该先看哪类页面、哪类预览和哪类交付证据。' },
-    { title: '安装后先验', body: '安装器会直接显示接入后应该先确认什么，避免用户一装完就误以为已经可以稳定开工。' },
-    { title: '项目级 SEEAI 补充面', body: '标准项目接入之外，super-dev-seeai 的项目级 skill/plugin 补充面也进入正式闭环，比赛模式不再靠手工补文件。' },
-    { title: 'UI 设计反 AI 味升级', body: 'UI 契约新增视觉方向候选、主视觉哲学、反 AI 味护栏和五维设计批评标尺；截图级视觉门会把过平、过空、模板味过强的页面直接卡在质量与交付链外。' },
+    { title: '唯一流程状态真源', body: 'workflow-state.json 成为唯一当前流程状态：修订冲突、跨平台锁、原子提交、历史快照和恢复基础都挂在它上面；pipeline-state.json 只允许一次迁移后删除。' },
+    { title: '会话简报自动生成', body: 'SESSION_BRIEF.md 根据最新状态自动生成，携带工作项与状态修订，恢复链不再依赖旧快照。' },
+    { title: '候选绑定证据信封', body: '证据区分代码、输入与制品摘要；代码一变，旧验证不再支持当前通过，杜绝拿历史结果冒充当前代码版本。' },
+    { title: '发布观察记录', body: '正式发布只更新 released 事实，不推导部署或运营成功，避免把发布记录冒充部署证据。' },
+    { title: 'Fresh Verification 治理', body: '受控临时文件收集输出，长时运行每分钟心跳，正常结束、超时与取消时都清理子进程；目标隔离模式避免跨文件资源累积。' },
+    { title: '官方发布渠道', body: '正式版本通过 GitHub Release 发布 wheel、sdist 与 SHA256SUMS.txt；安装升级用 Git 标签或 Release wheel，不上传 PyPI。' },
   ],
   smokeTitle: 'Smoke 验收',
   smokeCode:
@@ -352,7 +350,7 @@ const enContent: Content = {
     { label: 'Approval gates', value: '2' },
   ],
   sections: [
-    { id: 'highlights', label: 'v2.4.0 Highlights', icon: Zap },
+    { id: 'highlights', label: 'v2.6.0 Highlights', icon: Zap },
     { id: 'governance', label: 'Core path', icon: BookOpen },
     { id: 'install', label: 'Installation', icon: Package },
     { id: 'first-minutes', label: 'First 5 Minutes', icon: Sparkles },
@@ -576,17 +574,15 @@ const enContent: Content = {
     'Use a smoke prompt before trying the real requirement.',
     'If the host starts coding immediately, assume the current session did not reload the rules.',
   ],
-  highlightsTitle: 'v2.4.0 Current Focus',
-  highlightsBody: 'Version 2.4.0 keeps pushing Super Dev back toward its core product shape: project-first onboarding, a unified host matrix, standard-flow vs. SEEAI readiness, host-specific first prompts and resume guidance, clearer post-install verification, and a stronger UI contract that pushes design quality away from generic AI-looking output.',
+  highlightsTitle: 'v2.6.0 Current Focus',
+  highlightsBody: 'Version 2.6.0 is a reliability-convergence release: flow state, session briefs, verification evidence, and release facts all converge on single sources of truth; stale verifications stop counting once code changes, and official distribution moved to GitHub Releases on this repository.',
   highlightsCards: [
-    { title: 'Project-First Onboarding', body: 'onboard / setup / install / start now write project-level protocol surfaces by default. User/global surfaces are explicit opt-ins instead of silent defaults.' },
-    { title: 'Unified 26-Host Matrix', body: 'CLI 12, IDE 9, and desktop assistants 5 now sit inside the same current host matrix. Claude / Claude Code, Codex / Codex CLI, and the Trae family are all split into separate entries.' },
-    { title: 'Host-Specific First Prompts', body: 'Each host now exposes a standard-flow first prompt, competition-flow first prompt, resume guidance, and repair priority instead of one generic trigger script.' },
-    { title: 'Standard vs. SEEAI Readiness', body: 'Host reports now explicitly distinguish "ready for standard flow" from "ready for SEEAI competition flow" rather than treating written files as equivalent to a working host runtime.' },
-    { title: 'Current project focus', body: 'The installer and smoke guide now tell users which pages, previews, and delivery signals matter first for the current project.' },
-    { title: 'Post-Onboard Self-Check', body: 'The installer now tells users what to verify first so onboarding is not mistaken for real readiness.' },
-    { title: 'Project-Level SEEAI Supplements', body: 'The super-dev-seeai project supplements now participate in formal injection closure, so competition mode is no longer a manual afterthought.' },
-    { title: 'UI Design Anti-Slop Upgrade', body: 'The UI contract now freezes art-direction candidates, visual philosophy, anti-AI-slop guardrails, and a five-dimension critique rubric; the screenshot-grade visual gate blocks flat, generic, template-looking pages from passing delivery.' },
+    { title: 'Single Flow-State Source', body: 'workflow-state.json is now the single source of current flow state, carrying revision-conflict handling, cross-platform locks, atomic commits, history snapshots, and the recovery foundation; pipeline-state.json migrates once and is removed.' },
+    { title: 'Auto-Generated Session Briefs', body: 'SESSION_BRIEF.md regenerates from the latest state with work-item and state revisions, so recovery no longer depends on stale snapshots.' },
+    { title: 'Candidate-Bound Evidence Envelopes', body: 'Evidence separates code, inputs, and artifact digests; once the code changes, old verifications no longer support the current pass, so historical results can never impersonate the current candidate.' },
+    { title: 'Release Observation Records', body: 'Official releases update only the released fact and never infer deployment or operational success, so a release record cannot masquerade as deployment evidence.' },
+    { title: 'Fresh Verification Hygiene', body: 'Controlled temporary files collect output, long runs show a per-minute heartbeat, and subprocesses are cleaned up on normal exit, timeout, and cancellation; target isolation avoids cross-file resource accumulation.' },
+    { title: 'Official Release Channel', body: 'Official versions publish wheel, sdist, and SHA256SUMS.txt through GitHub Releases; install and upgrade use Git tags or Release wheels, with nothing uploaded to PyPI.' },
   ],
   smokeTitle: 'Smoke validation',
   smokeCode:
@@ -639,7 +635,7 @@ export function DocsPageContent({ locale = 'zh' }: { locale?: SiteLocale }) {
             <div className="max-w-[860px]">
               <div className="mb-5 flex flex-wrap items-center gap-2">
                 <Badge variant="version">{content.heroKicker}</Badge>
-                <Badge variant="certified">v2.4.0</Badge>
+                <Badge variant="certified">v2.6.0</Badge>
                 <Badge variant="compatible">{locale === 'en' ? 'Bilingual' : '中英双语'}</Badge>
               </div>
               <h1 className="max-w-[900px] text-4xl font-bold leading-[1.08] tracking-tight text-text-primary sm:text-5xl lg:text-[3.5rem]">

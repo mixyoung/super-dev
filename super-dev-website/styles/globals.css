@@ -12,7 +12,7 @@
 
 @layer base {
   :root {
-    --font-inter: 'Inter', system-ui, sans-serif;
+    --font-inter: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
     --font-jetbrains: 'JetBrains Mono', Menlo, monospace;
   }
 
