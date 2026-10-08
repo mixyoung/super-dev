@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 // usePathname removed - no longer needed after handleGetStarted removal
-import { Github, Menu, X, Star, Users, Copy, Check } from 'lucide-react';
+import { Github, Menu, X, Star, Users, Copy, Check, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { LocaleSwitch } from '@/components/ui/LocaleSwitch';
@@ -243,17 +243,17 @@ export function Nav({ locale = 'zh' }: NavProps) {
             </button>
             <div className="text-center">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-blue/10 border border-accent-blue/20 mb-4">
-                <Users size={14} className="text-accent-blue" aria-hidden="true" />
+                <Mail size={14} className="text-accent-blue" aria-hidden="true" />
                 <span className="text-sm text-accent-blue font-medium">{copy.start}</span>
               </div>
               <h3 className="text-lg font-bold text-text-primary mb-2">{copy.qrTitle}</h3>
-              <div className="flex items-center justify-center gap-2 mt-3 mb-4">
+              <div className="flex items-center justify-center gap-2 mt-4 mb-5">
                 <span className="text-base text-text-primary font-mono bg-bg-secondary px-3 py-1.5 rounded-lg border border-border-default">
-                  Excellent_We
+                  mixyoung@gmail.com
                 </span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText('Excellent_We');
+                    navigator.clipboard.writeText('mixyoung@gmail.com');
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
@@ -268,16 +268,15 @@ export function Nav({ locale = 'zh' }: NavProps) {
                   {copied ? (locale === 'zh' ? '已复制' : 'Copied') : (locale === 'zh' ? '复制' : 'Copy')}
                 </button>
               </div>
-              <Image
-                src={assetPath('/wx.png')}
-                alt="Developer WeChat QR Code"
-                width={200}
-                height={200}
-                className="w-48 h-48 rounded-xl border border-border-default mx-auto object-cover"
-                unoptimized
-              />
+              <a
+                href="mailto:mixyoung@gmail.com"
+                className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-accent-blue text-white text-sm font-medium hover:bg-accent-blue-hover transition-colors"
+              >
+                <Mail size={16} aria-hidden="true" />
+                {locale === 'zh' ? '发送邮件' : 'Send email'}
+              </a>
               <p className="text-xs text-text-muted mt-4">
-                {locale === 'zh' ? '扫码或搜索微信号添加开发者' : 'Scan or search WeChat ID to contact developer'}
+                {locale === 'zh' ? '邮件是联系开发者的方式，欢迎反馈问题与需求' : 'Email is the way to reach the developer — issues and ideas welcome'}
               </p>
             </div>
           </div>

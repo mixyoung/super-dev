@@ -47,6 +47,7 @@ const COPY = {
       {
         title: '联系',
         links: [
+          { label: 'mixyoung@gmail.com', href: 'mailto:mixyoung@gmail.com' },
           { label: '贡献指南', href: 'https://github.com/mixyoung/super-dev/blob/main/CONTRIBUTING.md', external: true },
           { label: 'mixyoung', href: 'https://github.com/mixyoung', external: true },
         ],
@@ -85,6 +86,7 @@ const COPY = {
       {
         title: 'Contact',
         links: [
+          { label: 'mixyoung@gmail.com', href: 'mailto:mixyoung@gmail.com' },
           { label: 'Contributing', href: 'https://github.com/mixyoung/super-dev/blob/main/CONTRIBUTING.md', external: true },
           { label: 'mixyoung', href: 'https://github.com/mixyoung', external: true },
         ],
