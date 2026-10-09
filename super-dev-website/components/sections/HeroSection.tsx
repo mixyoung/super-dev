@@ -19,16 +19,12 @@ const COPY = {
     body: '终端只负责接入和升级，真正的 research、三文档、确认门、Spec、实现和交付都留在宿主里。Super Dev 不是另一个代码生成器，它把宿主拉回一条能研究、能审查、能交付的商业开发主路径。',
     points: ['终端只记住 super-dev / super-dev update / super-dev uninstall', '安装后复制宿主第一句，回宿主里直接开工', '第一轮先 research，再写三文档并等你确认'],
     docs: '查看文档',
-    installNote: '首页默认只讲 uv 安装和 super-dev 引导。安装器会直接告诉你推荐宿主、标准流第一句、比赛流第一句和接入后先验；终端到这里就该退场，日常开发回宿主里的 /super-dev、$super-dev 或 super-dev:。',
-    releaseNote: 'v2.6.0: workflow-state 成为唯一流程状态真源，证据信封直接绑定当前代码版本，代码一变旧验证即失效；正式发布改走 GitHub Release（wheel、sdist、校验和）。',
   },
   en: {
     openSource: 'MIT Open Source',
     body: 'The terminal only handles onboarding and upgrade. The real research, the three core docs, approval gates, spec, implementation, and delivery stay inside the host. Super Dev is not another code generator. It pushes the host back onto a commercial path that can be researched, reviewed, and shipped.',
     points: ['Only remember super-dev, super-dev update, and super-dev uninstall', 'After install, copy the host first prompt and go back into the host', 'The first pass is research first, then the three core docs, then approval'],
     docs: 'Read Docs',
-    installNote: 'The homepage now teaches uv install and the super-dev onboarding path. The installer prints the recommended host, the standard-flow first prompt, the competition-flow first prompt, and the post-onboard self-check. After that, the terminal should get out of the way and daily work moves back into /super-dev, $super-dev, or super-dev: inside the host.',
-    releaseNote: 'v2.6.0 makes workflow-state the single flow-state source, binds evidence envelopes to the current candidate so stale verifications stop counting, and ships official releases through GitHub Releases (wheel, sdist, checksums).',
   },
 } as const;
 
@@ -37,13 +33,12 @@ export function HeroSection({ locale = 'zh' }: { locale?: SiteLocale }) {
   const copy = COPY[locale];
 
   return (
-    <section className="relative overflow-hidden border-b border-border-muted bg-bg-primary pt-24 lg:pt-28" aria-labelledby="hero-title">
+    <section className="relative overflow-hidden bg-bg-primary pt-24 lg:pt-28" aria-labelledby="hero-title">
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <div className="absolute left-1/2 top-0 h-[460px] w-[780px] -translate-x-1/2 rounded-full bg-accent-blue/6 blur-3xl" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border-default to-transparent" />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-14 px-4 pb-20 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:gap-16 lg:pb-24">
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-14 px-4 pb-10 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:gap-16 lg:pb-12">
         <div className="flex flex-col gap-7">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="version">v2.6.0</Badge>
@@ -94,11 +89,6 @@ export function HeroSection({ locale = 'zh' }: { locale?: SiteLocale }) {
               {copy.docs}
               <ArrowRight size={14} aria-hidden="true" />
             </Link>
-          </div>
-
-          <div className="space-y-2 text-sm text-text-muted">
-            <p>{copy.installNote}</p>
-            <p>{copy.releaseNote}</p>
           </div>
         </div>
 

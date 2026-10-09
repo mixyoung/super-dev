@@ -90,15 +90,10 @@ export function HostMarquee({ locale = 'zh' }: { locale?: SiteLocale }) {
 
   return (
     <section
-      className="border-b border-border-muted bg-bg-primary py-8"
+      className="bg-bg-primary pb-10"
       aria-label={`${copy.hosts}: ${HOSTS.map((h) => h.name).join(', ')}`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="mb-5 flex items-center gap-4">
-          <div className="h-px flex-1 bg-border-muted" />
-          <span className="text-xs uppercase tracking-wider text-text-muted">{copy.hosts}</span>
-          <div className="h-px flex-1 bg-border-muted" />
-        </div>
         <div className="relative overflow-hidden group">
           <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-16 bg-gradient-to-r from-bg-primary to-transparent" aria-hidden="true" />
           <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-16 bg-gradient-to-l from-bg-primary to-transparent" aria-hidden="true" />
@@ -108,6 +103,11 @@ export function HostMarquee({ locale = 'zh' }: { locale?: SiteLocale }) {
               {HOSTS.map((host) => <HostLogo key={`b-${host.name}`} name={host.name} />)}
             </div>
           </div>
+        </div>
+        <div className="mt-10 flex items-center gap-4">
+          <div className="h-px flex-1 bg-border-muted" />
+          <span className="text-xs uppercase tracking-wider text-text-muted">{copy.hosts}</span>
+          <div className="h-px flex-1 bg-border-muted" />
         </div>
       </div>
     </section>
