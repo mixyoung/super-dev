@@ -101,11 +101,13 @@ class OperationalHarnessBuilder:
         self.output_dir = self.project_dir / "output"
         self.project_name = self.project_dir.name
 
-    def build(self, *, hook_limit: int = 20) -> OperationalHarnessReport:
+    def build(
+        self, *, hook_limit: int = 20, write_reports: bool = True
+    ) -> OperationalHarnessReport:
         payload = build_operational_harness_payload(
             self.project_dir,
             hook_limit=max(hook_limit, 1),
-            write_reports=True,
+            write_reports=write_reports,
         )
         harnesses = payload.get("harnesses", {}) if isinstance(payload, dict) else {}
         if not isinstance(harnesses, dict):

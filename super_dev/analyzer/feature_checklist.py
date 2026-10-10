@@ -158,7 +158,6 @@ class FeatureChecklistBuilder:
     def __init__(self, project_dir: Path):
         self.project_dir = Path(project_dir).resolve()
         self.output_dir = self.project_dir / "output"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.active_change_id = resolve_active_change_id(self.project_dir)
         self.project_name = resolve_current_artifact_prefix(
             self.project_dir,
@@ -229,6 +228,8 @@ class FeatureChecklistBuilder:
         )
 
     def write(self, report: FeatureCoverageReport) -> dict[str, Path]:
+        # 目录仅在真正落盘时创建；只读构建（如 Web GET）不得新建 output/。
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         md_path = self.output_dir / f"{self.project_name}-feature-checklist.md"
         json_path = self.output_dir / f"{self.project_name}-feature-checklist.json"
         md_path.write_text(report.to_markdown(), encoding="utf-8")

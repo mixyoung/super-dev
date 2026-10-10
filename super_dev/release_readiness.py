@@ -24,6 +24,7 @@ from .artifact_utils import (
     latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
+    resolve_work_item_identity,
 )
 from .baseline_governance import inspect_baseline_governance
 from .config import ConfigManager
@@ -1073,32 +1074,44 @@ class ReleaseReadinessEvaluator:
         )
 
     def _check_spec_quality(self) -> ReleaseReadinessCheck:
-        validator = SpecValidator(self.project_dir)
-        report = validator.assess_latest_change_quality(
-            exclude_ids={"release-hardening-finalization"}
-        )
-        if report is None:
+        if not self.active_change_id:
+            identity = resolve_work_item_identity(self.project_dir)
+            if "bound_change_missing" in identity.issues:
+                detail = "绑定的目标工作项目录不存在或不可用，无法评估规格质量。"
+            elif identity.issues:
+                detail = "目标工作项绑定无效，无法评估规格质量。"
+            else:
+                detail = "缺少有效绑定的目标工作项，无法评估规格质量。"
             return ReleaseReadinessCheck(
                 name="Spec Quality",
-                passed=True,
-                detail="no active change spec under evaluation",
-                severity="low",
-                recommendation="如当前发布包含新需求或修复变更，先检查当前 change 的 Spec 质量报告。",
+                passed=False,
+                detail=detail,
+                severity="critical",
+                recommendation="先明确并核对本次发布的目标工作项，不按目录时间或旧名称猜测。",
+                evidence={
+                    "reason": "missing_active_change",
+                    "binding_issues": list(identity.issues),
+                },
             )
 
+        report = SpecValidator(self.project_dir).assess_change_quality(self.active_change_id)
         passed = report.passed
         detail = f"change={report.change_id}, score={report.score:.1f}, level={report.level}, blockers={len(report.blockers)}"
+        if not passed and report.blockers:
+            detail += f"；{report.blockers[0]}"
         recommendation = (
             report.action_plan[0].get("command", "")
             if report.action_plan
             else f"查看 change `{report.change_id}` 的完整 Spec 整改计划。"
         )
+        required_spec_present = bool(report.checks.get("spec", {}).get("passed"))
         return ReleaseReadinessCheck(
             name="Spec Quality",
             passed=passed,
             detail=detail,
-            severity="high" if not passed else "low",
+            severity="low" if passed else ("high" if required_spec_present else "critical"),
             recommendation=recommendation,
+            evidence={"change_id": report.change_id, "blockers": list(report.blockers)},
         )
 
     def _check_scope_coverage(self) -> ReleaseReadinessCheck:
@@ -1832,7 +1845,9 @@ class ReleaseReadinessEvaluator:
         )
 
     def _check_operational_harness_trail(self) -> ReleaseReadinessCheck:
-        harness = OperationalHarnessBuilder(self.project_dir).build()
+        harness = OperationalHarnessBuilder(self.project_dir).build(
+            write_reports=self.persist_artifacts
+        )
         focus = self._operational_focus()
         if not harness.enabled:
             return ReleaseReadinessCheck(

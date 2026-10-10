@@ -61,12 +61,12 @@ class ExpertKnowledge:
             if full.exists():
                 resolved.append(str(full.resolve()))
 
-        # 2. 按 domain 扫描 01-standards / 04-antipatterns / 03-checklists
+        # 2. 按 domain 扫描标准、反模式、清单和手册，保留原有优先顺序
         for domain in self.domains:
             domain_dir = knowledge_dir / domain
             if not domain_dir.is_dir():
                 continue
-            for sub in ("01-standards", "04-antipatterns", "03-checklists"):
+            for sub in ("01-standards", "04-antipatterns", "03-checklists", "02-playbooks"):
                 sub_dir = domain_dir / sub
                 if sub_dir.is_dir():
                     for md in sorted(sub_dir.glob("*.md")):
@@ -457,7 +457,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
                     "dimension": "架构质量",
                     "checklist": [
                         "系统分层是否清晰",
-                        "技术选型是否有 ADR",
+                        "重要且难逆的技术取舍是否记录 ADR",
                         "API 设计是否 RESTful",
                         "数据流是否完整",
                         "扩展性是否考虑",
@@ -468,7 +468,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         system_prompt_injection=(
             "以架构师视角审查：\n"
             "1) 系统分层是否清晰\n"
-            "2) 技术选型是否有 ADR（架构决策记录）\n"
+            "2) 重要且难逆的技术取舍是否有 ADR（架构决策记录），已有记录可复用\n"
             "3) API 设计是否 RESTful\n"
             "4) 数据流是否完整\n"
             "5) 扩展性是否考虑"
@@ -481,25 +481,25 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         playbook=[
             "先定义系统边界与模块职责，再确定通信契约。",
             "有容量或扩展需求时估算关键链路，按瓶颈选择缓存、队列等方案。",
-            "沉淀可演进架构决策记录（ADR），降低后续返工风险。",
+            "仅对重要且难逆的取舍记录 ADR；复用已有决策，避免重复文档。",
         ],
         phase_checklists={
             "research": [
                 "关键技术方案可行性已评估",
-                "性能瓶颈和扩展策略已分析",
+                "有容量或扩展需求时，关键链路瓶颈和必要扩展方案已评估",
             ],
             "docs": [
                 "系统边界与模块职责已定义",
                 "通信契约（API/消息）已规范",
-                "架构决策记录（ADR）已沉淀",
+                "重要且难逆的取舍已有 ADR；无此类取舍不另建",
             ],
             "spec": [
                 "技术选型与架构文档一致",
                 "接口契约在 Spec 中可追溯",
             ],
             "backend": [
-                "关键链路容量估算已完成",
-                "缓存/队列/分片策略已明确",
+                "有容量或扩展需求时，关键链路容量估算与目标验证已完成",
+                "缓存/队列/分片依据已确认的架构、功能、可靠性与容量要求及瓶颈分析决定是否采用；不预设必须引入，也不跳过已确认要求",
                 "容错与降级方案已设计",
             ],
         },
@@ -515,7 +515,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         knowledge=ExpertKnowledge(
             domains=["design", "frontend"],
             key_files=[
-                "design/01-standards/design-system-complete.md",
+                "design/01-standards/ui-design-system-complete.md",
             ],
         ),
         rules=ExpertRules(
@@ -582,7 +582,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
         knowledge=ExpertKnowledge(
             domains=["design"],
             key_files=[
-                "design/01-standards/design-system-complete.md",
+                "design/01-standards/ui-design-system-complete.md",
             ],
         ),
         rules=ExpertRules(
@@ -631,8 +631,8 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
                 "空状态/错误态/加载态已定义",
             ],
             "frontend": [
-                "转化漏斗路径无断链",
-                "可观测埋点已规划",
+                "有量化使用分析需求时，转化漏斗路径无断链",
+                "有量化使用分析需求时，可观测埋点已规划",
                 "交互反馈（成功/失败/加载）已覆盖",
             ],
         },
@@ -728,6 +728,7 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
             key_files=[
                 "development/04-antipatterns/code-smell-antipatterns.md",
                 "testing/01-standards/testing-strategy-complete.md",
+                "development/02-playbooks/debugging-playbook.md",
             ],
         ),
         rules=ExpertRules(
@@ -759,7 +760,9 @@ _EXPERT_TOOLKITS: dict[str, ExpertToolkit] = {
             "2) 异常处理是否完整\n"
             "3) 命名是否清晰\n"
             "4) Linter 是否零警告\n"
-            "5) 核心逻辑是否有测试覆盖"
+            "5) 核心逻辑是否有测试覆盖\n"
+            "6) 排错或验证失败时，若本项目提供调试手册则读取；先区分环境与业务问题。"
+            "仅诊断请求不修改代码，其他任务不新增必读要求"
         ),
         phase_prompts={
             "frontend": "检查组件拆分、状态管理和边界条件处理",

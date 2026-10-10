@@ -3,9 +3,9 @@ import subprocess
 from pathlib import Path
 
 from super_dev import __version__
+from super_dev.artifact_utils import resolve_active_change_id, resolve_current_artifact_prefix
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.hooks.manager import HookManager
-from super_dev.host_runtime_validation import update_host_runtime_validation_state
 from super_dev.release_readiness import (
     ReleaseReadinessCheck,
     ReleaseReadinessEvaluator,
@@ -35,6 +35,10 @@ from super_dev.workflow_guard import (
     save_bound_docs_confirmation,
     save_bound_preview_confirmation,
 )
+from tests.support.release_ready_inputs import (
+    record_release_ready_acceptance,
+    write_release_ready_docs,
+)
 
 
 def _prepare_release_ready_project(
@@ -42,14 +46,12 @@ def _prepare_release_ready_project(
     *,
     artifact_prefix: str | None = None,
 ) -> None:
-    project_name = artifact_prefix or project_dir.name
+    project_name = artifact_prefix or resolve_current_artifact_prefix(
+        project_dir, fallback_name=project_dir.name
+    )
     (project_dir / "super_dev").mkdir(parents=True, exist_ok=True)
     (project_dir / "docs").mkdir(parents=True, exist_ok=True)
     (project_dir / "output").mkdir(parents=True, exist_ok=True)
-    (project_dir / ".super-dev" / "changes" / "release-hardening-finalization").mkdir(
-        parents=True,
-        exist_ok=True,
-    )
     (project_dir / "pyproject.toml").write_text(
         f'[project]\nversion = "{__version__}"\n[project.scripts]\nsuper-dev = "super_dev.cli:main"\n',
         encoding="utf-8",
@@ -124,29 +126,8 @@ def _prepare_release_ready_project(
         encoding="utf-8",
     )
     (project_dir / "install.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-    for name in ("change.yaml", "proposal.md", "tasks.md"):
-        (
-            project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / name
-        ).write_text(
-            "ok\n",
-            encoding="utf-8",
-        )
-    # 批 D2 语义后，"发布就绪"夹具必须真实就绪：范围可核实（PRD 功能 + 任务完成）
-    # 与宿主真人验收记录齐备，不再依赖 unknown/缺失折算为 PASS 的旧口径。
-    # 这些输入必须先于下方带 evidence_identity 的产物水化写入，保证身份摘要自洽。
-    (
-        project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / "tasks.md"
-    ).write_text(
-        "# Tasks\n\n- [x] 版本信息展示：README 与包内版本一致\n",
-        encoding="utf-8",
-    )
-    update_host_runtime_validation_state(
-        project_dir=project_dir,
-        host="codex-cli",
-        status="passed",
-        comment="release-ready fixture",
-        actor="fixture",
-    )
+    # Bind the target and prepare real specs before any evidence identities are built.
+    write_release_ready_docs(project_dir, artifact_prefix=project_name)
     (project_dir / "output" / f"{project_name}-redteam.json").write_text(
         (
             "{\n"
@@ -386,8 +367,8 @@ def _prepare_release_ready_project(
         json.dumps(
             {
                 "project_name": project_name,
-                "total_requirements": 0,
-                "found": 0,
+                "total_requirements": 1,
+                "found": 1,
                 "partial": 0,
                 "missing": 0,
                 "score": 100,
@@ -444,6 +425,7 @@ def _prepare_release_ready_project(
         ),
         encoding="utf-8",
     )
+    record_release_ready_acceptance(project_dir)
 
 
 def _prepare_spec_quality_change(project_dir: Path, change_id: str = "add-proof-ready") -> None:
@@ -501,10 +483,18 @@ def test_release_readiness_passes_when_required_artifacts_exist(temp_project_dir
 def test_release_readiness_flags_missing_expert_stage_governance(temp_project_dir: Path) -> None:
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{temp_project_dir.name}-research.md").write_text("research", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-prd.md").write_text("prd", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-architecture.md").write_text("arch", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-uiux.md").write_text("uiux", encoding="utf-8")
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-research.md").write_text(
+        "research", encoding="utf-8"
+    )
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-prd.md").write_text(
+        "prd", encoding="utf-8"
+    )
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-architecture.md"
+    ).write_text("arch", encoding="utf-8")
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-uiux.md").write_text(
+        "uiux", encoding="utf-8"
+    )
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -520,10 +510,18 @@ def test_release_readiness_passes_when_expert_stage_governance_is_recorded(
 ) -> None:
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{temp_project_dir.name}-research.md").write_text("research", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-prd.md").write_text("prd", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-architecture.md").write_text("arch", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-uiux.md").write_text("uiux", encoding="utf-8")
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-research.md").write_text(
+        "research", encoding="utf-8"
+    )
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-prd.md").write_text(
+        "prd", encoding="utf-8"
+    )
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-architecture.md"
+    ).write_text("arch", encoding="utf-8")
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-uiux.md").write_text(
+        "uiux", encoding="utf-8"
+    )
 
     record_stage_progress(temp_project_dir, stage="research", status="completed")
     record_stage_progress(temp_project_dir, stage="docs", status="completed")
@@ -537,7 +535,7 @@ def test_release_readiness_passes_when_expert_stage_governance_is_recorded(
     assert "3/3" in expert_check.detail
 
 
-def test_release_readiness_fails_when_latest_spec_quality_is_weak(temp_project_dir: Path) -> None:
+def test_release_readiness_fails_when_bound_spec_quality_is_weak(temp_project_dir: Path) -> None:
     _prepare_release_ready_project(temp_project_dir)
     generator = SpecGenerator(temp_project_dir)
     generator.init_sdd()
@@ -548,6 +546,7 @@ def test_release_readiness_fails_when_latest_spec_quality_is_weak(temp_project_d
     )
     change_dir = temp_project_dir / ".super-dev" / "changes" / change.id
     (change_dir / "tasks.md").write_text("# Tasks\n\n", encoding="utf-8")
+    save_workflow_state(temp_project_dir, {"active_change_id": change.id})
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -565,7 +564,11 @@ def test_release_readiness_fails_when_host_runtime_validation_repo_probe_breaks(
         "name: demo\nplatform: web\nfrontend: uni-app\nbackend: python\n",
         encoding="utf-8",
     )
-    (temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json").write_text(
+    (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    ).write_text(
         json.dumps(
             {
                 "analysis": {"frontend": "uni-app"},
@@ -623,8 +626,22 @@ def test_release_readiness_fails_when_compliance_closure_detects_spec_gap(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    (temp_project_dir / "output" / f"{temp_project_dir.name}-prd.md").write_text(
+    (
+        temp_project_dir / "output" / f"{resolve_current_artifact_prefix(temp_project_dir)}-prd.md"
+    ).write_text(
         "# PRD\n\n## Requirements\n\n- The system must support auditable delivery workflows.\n",
+        encoding="utf-8",
+    )
+    target = resolve_active_change_id(temp_project_dir)
+    (
+        temp_project_dir / ".super-dev" / "changes" / target / "specs" / target / "spec.md"
+    ).write_text(
+        "# Spec\n\n## ADDED Requirements\n\n"
+        "### Requirement: auditable-delivery\n"
+        "The system SHALL support auditable delivery workflows.\n\n"
+        "#### Scenario: Delivery audit\n"
+        "- GIVEN a delivery workflow\n- WHEN evidence is inspected\n"
+        "- THEN delivery actions are auditable\n",
         encoding="utf-8",
     )
 
@@ -671,7 +688,11 @@ def test_release_readiness_fails_when_delivery_closure_is_incomplete(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    (temp_project_dir / "output" / f"{temp_project_dir.name}-task-execution.md").unlink()
+    (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-task-execution.md"
+    ).unlink()
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -685,7 +706,11 @@ def test_release_readiness_fails_when_ui_contract_closure_is_incomplete(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    (temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json").unlink()
+    (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    ).unlink()
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -699,7 +724,11 @@ def test_release_readiness_fails_when_frontend_runtime_structural_ui_checks_fail
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    runtime_file = temp_project_dir / "output" / f"{temp_project_dir.name}-frontend-runtime.json"
+    runtime_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
+    )
     runtime_file.write_text(
         (
             "{\n"
@@ -734,7 +763,11 @@ def test_release_readiness_fails_when_frontend_runtime_missing_claude_design_exe
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    runtime_file = temp_project_dir / "output" / f"{temp_project_dir.name}-frontend-runtime.json"
+    runtime_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
+    )
     runtime_file.write_text(
         (
             "{\n"
@@ -776,7 +809,7 @@ def test_release_readiness_fails_when_ui_review_runtime_protocol_drift(
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-ui-review.json").write_text(
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json").write_text(
         json.dumps(
             {
                 "alignment_summary": {
@@ -810,7 +843,7 @@ def test_release_readiness_fails_when_screenshot_visual_judge_fails(
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-ui-review.json").write_text(
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json").write_text(
         json.dumps(
             {
                 "alignment_summary": {
@@ -884,7 +917,11 @@ def test_release_readiness_fails_when_cross_platform_runtime_missing_framework_e
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    contract_file = temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json"
+    contract_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    )
     payload = json.loads(contract_file.read_text(encoding="utf-8"))
     payload["analysis"] = {"frontend": "uni-app"}
     payload["framework_playbook"] = {
@@ -898,7 +935,11 @@ def test_release_readiness_fails_when_cross_platform_runtime_missing_framework_e
     }
     contract_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    runtime_file = temp_project_dir / "output" / f"{temp_project_dir.name}-frontend-runtime.json"
+    runtime_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
+    )
     runtime_file.write_text(
         (
             "{\n"
@@ -935,7 +976,11 @@ def test_release_readiness_fails_when_ui_contract_missing_emoji_policy(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    contract_file = temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json"
+    contract_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    )
     payload = json.loads(contract_file.read_text(encoding="utf-8"))
     payload.pop("emoji_policy", None)
     contract_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -952,7 +997,11 @@ def test_release_readiness_fails_when_cross_platform_ui_contract_missing_framewo
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    contract_file = temp_project_dir / "output" / f"{temp_project_dir.name}-ui-contract.json"
+    contract_file = (
+        temp_project_dir
+        / "output"
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    )
     payload = json.loads(contract_file.read_text(encoding="utf-8"))
     payload["analysis"] = {"frontend": "uni-app"}
     contract_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -971,12 +1020,17 @@ def test_release_readiness_fails_when_quality_gate_evidence_identity_mismatches(
     _prepare_release_ready_project(temp_project_dir)
     _prepare_spec_quality_change(temp_project_dir)
     output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-uiux.md").write_text("# uiux", encoding="utf-8")
-    (output_dir / f"{temp_project_dir.name}-ui-review.json").write_text(
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-uiux.md").write_text(
+        "# uiux", encoding="utf-8"
+    )
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json").write_text(
         json.dumps({"passed": True}, ensure_ascii=False),
         encoding="utf-8",
     )
-    (output_dir / f"{temp_project_dir.name}-ui-contract-alignment.json").write_text(
+    (
+        output_dir
+        / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract-alignment.json"
+    ).write_text(
         json.dumps({"aligned": True}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -984,12 +1038,15 @@ def test_release_readiness_fails_when_quality_gate_evidence_identity_mismatches(
         temp_project_dir,
         artifact_name="quality-gate",
         dependencies=[
-            output_dir / f"{temp_project_dir.name}-ui-review.json",
-            output_dir / f"{temp_project_dir.name}-ui-contract-alignment.json",
-            output_dir / f"{temp_project_dir.name}-uiux.md",
+            output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json",
+            output_dir
+            / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract-alignment.json",
+            output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-uiux.md",
         ],
     )
-    (output_dir / f"{temp_project_dir.name}-quality-gate.json").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-quality-gate.json"
+    ).write_text(
         json.dumps(
             {
                 "passed": True,
@@ -1002,7 +1059,9 @@ def test_release_readiness_fails_when_quality_gate_evidence_identity_mismatches(
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{temp_project_dir.name}-uiux.md").write_text("# uiux v2", encoding="utf-8")
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-uiux.md").write_text(
+        "# uiux v2", encoding="utf-8"
+    )
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -1017,7 +1076,9 @@ def test_release_readiness_treats_waiting_baseline_confirmation_as_blocker(
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-baseline-audit.md").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-baseline-audit.md"
+    ).write_text(
         "# baseline\n",
         encoding="utf-8",
     )
@@ -1057,7 +1118,9 @@ def test_release_readiness_exposes_baseline_confirmation_check(
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-baseline-audit.md").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-baseline-audit.md"
+    ).write_text(
         "# baseline\n",
         encoding="utf-8",
     )
@@ -1099,17 +1162,22 @@ def test_release_readiness_fails_when_frontend_runtime_evidence_identity_mismatc
         temp_project_dir,
         artifact_name="frontend-runtime",
         dependencies=[
-            output_dir / f"{temp_project_dir.name}-ui-contract.json",
-            output_dir / f"{temp_project_dir.name}-ui-contract-alignment.json",
+            output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json",
+            output_dir
+            / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract-alignment.json",
         ],
     )
-    runtime_file = output_dir / f"{temp_project_dir.name}-frontend-runtime.json"
+    runtime_file = (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
+    )
     runtime_payload = json.loads(runtime_file.read_text(encoding="utf-8"))
     runtime_payload["evidence_identity"] = identity
     runtime_file.write_text(
         json.dumps(runtime_payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    (output_dir / f"{temp_project_dir.name}-ui-contract.json").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    ).write_text(
         json.dumps(
             {
                 "style_direction": "changed",
@@ -1211,7 +1279,9 @@ def test_release_readiness_fails_when_framework_harness_has_blockers(
 
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{temp_project_dir.name}-ui-contract.json").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    ).write_text(
         json.dumps(
             {
                 "analysis": {"frontend": "uni-app"},
@@ -1246,7 +1316,9 @@ def test_release_readiness_fails_when_operational_harness_has_blockers(
 
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{temp_project_dir.name}-ui-contract.json").write_text(
+    (
+        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
+    ).write_text(
         json.dumps(
             {
                 "analysis": {"frontend": "uni-app"},
@@ -1274,7 +1346,7 @@ def test_release_readiness_fails_when_operational_harness_has_blockers(
     assert "需要先处理" in operational_check.detail
 
 
-def test_release_readiness_fails_when_latest_spec_contains_tbd_placeholders(
+def test_release_readiness_fails_when_bound_spec_contains_tbd_placeholders(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
@@ -1289,6 +1361,7 @@ def test_release_readiness_fails_when_latest_spec_contains_tbd_placeholders(
         "# Placeholder Change\n\n## Requirements\n\n### Requirement: Example\n\nSHALL keep placeholder\n\n#### Scenario 1: TBD\n- DETAIL REQUIRED\n",
         encoding="utf-8",
     )
+    save_workflow_state(temp_project_dir, {"active_change_id": "placeholder-change"})
 
     evaluator = ReleaseReadinessEvaluator(temp_project_dir)
     report = evaluator.evaluate(verify_tests=False)
@@ -1304,7 +1377,7 @@ def test_release_readiness_fails_when_scope_coverage_has_high_priority_gap(
     _prepare_release_ready_project(temp_project_dir)
     output_dir = temp_project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{temp_project_dir.name}-prd.md").write_text(
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-prd.md").write_text(
         "\n".join(
             [
                 "# PRD",
@@ -1320,11 +1393,13 @@ def test_release_readiness_fails_when_scope_coverage_has_high_priority_gap(
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{temp_project_dir.name}-research.md").write_text(
+    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-research.md").write_text(
         "| 优先级 | 事项 | 工作量 |\n|:---:|:---|:---|\n| P0 | Canvas 工作台 | 大 |\n",
         encoding="utf-8",
     )
-    change_dir = temp_project_dir / ".super-dev" / "changes" / "release-hardening-finalization"
+    change_dir = (
+        temp_project_dir / ".super-dev" / "changes" / resolve_active_change_id(temp_project_dir)
+    )
     (change_dir / "tasks.md").write_text(
         "# Tasks\n\n- [x] 用户登录\n- [ ] Canvas 工作台\n",
         encoding="utf-8",

@@ -1,18 +1,18 @@
-"""批 D2（governance-remediation-2026-09）后的"真实就绪"测试输入。
+"""Honest release-ready inputs: bind and prepare specs before evidence hydration.
 
-发布就绪夹具自批 D2 起不能再依赖 unknown/缺失折算为 PASS 的旧口径。
-使用顺序约束：
-- write_release_ready_docs 必须先于夹具内 evidence_identity 产物水化（身份自洽）；
-- record_release_ready_acceptance 必须在一切会改写 docs/preview 绑定文件的
-  产物水化之后调用（绑定摘要对最终内容成立）。
-若夹具没有后续水化，可用 hydrate_release_ready_inputs 一次完成两步。
+Write inputs before evidence_identity is built, then record fixture confirmations
+against the final documents and preview artifacts. These synthetic inputs are not
+real human acceptance or production release evidence.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from super_dev.artifact_utils import resolve_active_change_id, sanitize_artifact_name
 from super_dev.host_runtime_validation import update_host_runtime_validation_state
+from super_dev.review_state import load_workflow_state, save_workflow_state
+from super_dev.specs import SpecGenerator
 from super_dev.workflow_guard import (
     save_bound_docs_confirmation,
     save_bound_preview_confirmation,
@@ -22,10 +22,30 @@ from super_dev.workflow_guard import (
 def write_release_ready_docs(
     project_dir: Path,
     *,
-    change_id: str = "release-hardening-finalization",
+    change_id: str | None = None,
+    artifact_prefix: str | None = None,
 ) -> None:
     project_dir = Path(project_dir)
-    name = project_dir.name
+    target = (
+        change_id
+        or resolve_active_change_id(project_dir)
+        or sanitize_artifact_name(artifact_prefix or project_dir.name)
+    )
+    name = artifact_prefix or sanitize_artifact_name(target)
+    generator = SpecGenerator(project_dir)
+    generator.create_change(target, "版本信息展示", "README 与包内版本信息保持一致")
+    artifacts = generator.scaffold_change_artifacts(target)
+    current = load_workflow_state(project_dir) or {}
+    save_workflow_state(
+        project_dir,
+        {
+            **current,
+            "active_change_id": target,
+            "artifact_prefix": name,
+            "status": current.get("status", "delivery"),
+            "current_step_label": current.get("current_step_label", "交付证据已就绪"),
+        },
+    )
     output = project_dir / "output"
     output.mkdir(parents=True, exist_ok=True)
     (output / f"{name}-prd.md").write_text(
@@ -33,11 +53,20 @@ def write_release_ready_docs(
         encoding="utf-8",
     )
     for doc in ("architecture", "uiux"):
-        target = output / f"{name}-{doc}.md"
-        if not target.exists():
-            target.write_text(f"# {doc}\n", encoding="utf-8")
-    change_dir = project_dir / ".super-dev" / "changes" / change_id
-    change_dir.mkdir(parents=True, exist_ok=True)
+        path = output / f"{name}-{doc}.md"
+        if not path.exists():
+            path.write_text(f"# {doc}\n", encoding="utf-8")
+    change_dir = project_dir / ".super-dev" / "changes" / target
+    artifacts["spec.md"].write_text(
+        "# 版本信息展示\n\n## ADDED Requirements\n\n"
+        "### Requirement: package-version\n"
+        "The system SHALL expose the current package version in README and package metadata.\n\n"
+        "#### Scenario: Version agreement\n"
+        "- GIVEN the installed package version\n"
+        "- WHEN README and package metadata are inspected\n"
+        "- THEN both display the same current version\n",
+        encoding="utf-8",
+    )
     (change_dir / "tasks.md").write_text(
         "# Tasks\n\n- [x] 版本信息展示：README 与包内版本一致\n",
         encoding="utf-8",
@@ -47,25 +76,15 @@ def write_release_ready_docs(
 def record_release_ready_acceptance(
     project_dir: Path,
     *,
-    change_id: str = "release-hardening-finalization",
+    change_id: str | None = None,
 ) -> None:
-    """按当前最终文档与 preview 产物重绑 docs/preview 确认，并录入宿主真人验收。
-
-    repo 连续性探针要求 workflow-state.json 与 SESSION_BRIEF 存在；夹具若无任何
-    工作流状态，这里补一个与阶段账本一致的交付就绪状态。
-    """
+    """Bind synthetic confirmations to final inputs; never claim real acceptance."""
     project_dir = Path(project_dir)
-    if not (project_dir / ".super-dev" / "workflow-state.json").exists():
-        from super_dev.review_state import save_workflow_state
-
-        # 不设置 active_change_id：避免改变产物前缀解析（夹具产物按目录名前缀水化）。
-        save_workflow_state(
-            project_dir,
-            {
-                "status": "delivery",
-                "current_step_label": "交付证据已就绪",
-            },
-        )
+    target = resolve_active_change_id(project_dir)
+    if not target:
+        write_release_ready_docs(project_dir, change_id=change_id)
+    elif change_id and target != change_id:
+        raise ValueError("Release-ready fixture acceptance must match its bound target")
     save_bound_docs_confirmation(
         project_dir,
         {"status": "confirmed", "actor": "fixture", "comment": "release-ready fixture"},
@@ -86,7 +105,7 @@ def record_release_ready_acceptance(
 def hydrate_release_ready_inputs(
     project_dir: Path,
     *,
-    change_id: str = "release-hardening-finalization",
+    change_id: str | None = None,
 ) -> None:
     write_release_ready_docs(project_dir, change_id=change_id)
-    record_release_ready_acceptance(project_dir)
+    record_release_ready_acceptance(project_dir, change_id=change_id)
