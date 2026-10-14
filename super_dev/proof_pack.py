@@ -21,6 +21,7 @@ from .artifact_utils import (
     latest_artifact,
     resolve_active_change_id,
     resolve_current_artifact_prefix,
+    resolve_work_item_identity,
 )
 from .baseline_governance import inspect_baseline_governance
 from .config import ConfigManager
@@ -1116,16 +1117,25 @@ class ProofPackBuilder:
         )
 
     def _spec_quality_artifact(self) -> ProofPackArtifact:
-        validator = SpecValidator(self.project_dir)
-        report = validator.assess_latest_change_quality(
-            exclude_ids={"release-hardening-finalization"}
-        )
-        if report is None:
+        if not self.active_change_id:
+            identity = resolve_work_item_identity(self.project_dir)
+            if "bound_change_missing" in identity.issues:
+                summary = "绑定的目标工作项目录不存在或不可用，无法评估规格质量。"
+            elif identity.issues:
+                summary = "目标工作项绑定无效，无法评估规格质量。"
+            else:
+                summary = "缺少有效绑定的目标工作项，无法评估规格质量。"
             return ProofPackArtifact(
                 name="Spec Quality",
-                status="ready",
-                summary="no active change spec under evaluation",
+                status="pending",
+                summary=summary,
+                details={
+                    "reason": "missing_active_change",
+                    "binding_issues": list(identity.issues),
+                },
             )
+
+        report = SpecValidator(self.project_dir).assess_change_quality(self.active_change_id)
         change_dir = self.project_dir / ".super-dev" / "changes" / report.change_id
         return ProofPackArtifact(
             name="Spec Quality",
@@ -1544,7 +1554,9 @@ class ProofPackBuilder:
         report = builder.build()
         if not report.enabled:
             return None
-        report_files = builder.write(report)
+        report_files = builder.write(report) if self.persist_artifacts else {}
+        json_path = str(report_files["json"]) if report_files else ""
+        markdown_path = str(report_files["markdown"]) if report_files else ""
         summary = (
             f"{report.framework} framework harness verified across playbook, runtime execution and alignment"
             if report.passed
@@ -1554,9 +1566,9 @@ class ProofPackBuilder:
             name="Framework Harness",
             status="ready" if report.passed else "pending",
             summary=summary,
-            path=str(report_files["json"]),
+            path=json_path,
             details={
-                "markdown": str(report_files["markdown"]),
+                "markdown": markdown_path,
                 "checks": report.checks,
                 "next_actions": report.next_actions,
                 "framework": report.framework,
@@ -1565,8 +1577,10 @@ class ProofPackBuilder:
 
     def _operational_harness_artifact(self) -> ProofPackArtifact:
         builder = OperationalHarnessBuilder(self.project_dir)
-        report = builder.build()
-        report_files = builder.write(report)
+        report = builder.build(write_reports=self.persist_artifacts)
+        report_files = builder.write(report) if self.persist_artifacts else {}
+        json_path = str(report_files["json"]) if report_files else ""
+        markdown_path = str(report_files["markdown"]) if report_files else ""
         focus = derive_operational_focus(self.project_dir)
         focus_action = str(focus.get("recommended_action", "")).strip()
         if not self.frontend_required and any(
@@ -1586,9 +1600,9 @@ class ProofPackBuilder:
             name="Operational Harness",
             status="ready" if report.passed else "pending",
             summary=summary,
-            path=str(report_files["json"]),
+            path=json_path,
             details={
-                "markdown": str(report_files["markdown"]),
+                "markdown": markdown_path,
                 "operational_focus": focus,
                 "focus": focus,
                 **report.to_dict(),
@@ -1600,7 +1614,9 @@ class ProofPackBuilder:
         report = builder.build()
         if not report.enabled:
             return None
-        report_files = builder.write(report)
+        report_files = builder.write(report) if self.persist_artifacts else {}
+        json_path = str(report_files["json"]) if report_files else ""
+        markdown_path = str(report_files["markdown"]) if report_files else ""
         summary = (
             f"current hook outcomes passed; {report.total_events} historical events retained"
             if report.passed
@@ -1610,9 +1626,9 @@ class ProofPackBuilder:
             name="Hook Audit Trail",
             status="ready" if report.passed else "pending",
             summary=summary,
-            path=str(report_files["json"]),
+            path=json_path,
             details={
-                "markdown": str(report_files["markdown"]),
+                "markdown": markdown_path,
                 **report.to_dict(),
             },
         )
@@ -1772,7 +1788,9 @@ class ProofPackBuilder:
                 summary="no active workflow continuity trail recorded",
                 details=report.to_dict(),
             )
-        report_files = builder.write(report)
+        report_files = builder.write(report) if self.persist_artifacts else {}
+        json_path = str(report_files["json"]) if report_files else ""
+        markdown_path = str(report_files["markdown"]) if report_files else ""
         summary = (
             f"workflow continuity trail captured at {report.updated_at or 'unknown'} · {report.current_step_label or report.workflow_status or 'unknown'}"
             if report.passed
@@ -1782,9 +1800,9 @@ class ProofPackBuilder:
             name="Workflow Continuity",
             status="ready" if report.passed else "pending",
             summary=summary,
-            path=str(report_files["json"]),
+            path=json_path,
             details={
-                "markdown": str(report_files["markdown"]),
+                "markdown": markdown_path,
                 **report.to_dict(),
             },
         )
@@ -2130,21 +2148,23 @@ class ProofPackBuilder:
                 path=str(existing_path),
             )
 
-        evaluator = ReleaseReadinessEvaluator(self.project_dir)
+        evaluator = ReleaseReadinessEvaluator(
+            self.project_dir, persist_artifacts=self.persist_artifacts
+        )
         report = evaluator.evaluate(verify_tests=verify_tests)
-        files = evaluator.write(report)
+        files = evaluator.write(report) if self.persist_artifacts else {}
         return ProofPackArtifact(
             name="Release Readiness",
             status="ready" if report.passed else "pending",
             summary=f"score={report.score}/100, passed={report.passed}",
-            path=str(files["json"]),
+            path=str(files["json"]) if files else "",
             details=report.to_dict(),
         )
 
     def _scope_coverage_artifact(self) -> ProofPackArtifact:
         builder = FeatureChecklistBuilder(self.project_dir)
         report = builder.build()
-        paths = builder.write(report)
+        paths = builder.write(report) if self.persist_artifacts else {}
         coverage_text = (
             f"{report.coverage_rate:.1f}%" if report.coverage_rate is not None else "unknown"
         )
@@ -2156,7 +2176,7 @@ class ProofPackBuilder:
                 f"status={report.status}, coverage={coverage_text}, "
                 f"high_priority_gaps={report.high_priority_gap_count}"
             ),
-            path=str(paths["json"]),
+            path=str(paths["json"]) if paths else "",
             details=report.to_dict(),
         )
 

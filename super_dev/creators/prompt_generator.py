@@ -943,9 +943,18 @@ import {{ Save, Search, Settings }} from 'lucide-react';
                             for kf in knowledge_files[:3]:
                                 kf_path = Path(kf)
                                 if kf_path.exists():
-                                    lines.append(
-                                        f"- `{kf_path}`：读取原文及适用条件，不单独截取清单作为无条件要求。"
+                                    reading_rule = (
+                                        "读取原文及适用条件，不单独截取清单作为无条件要求。"
                                     )
+                                    if (
+                                        expert_id == "CODE"
+                                        and kf_path.name == "debugging-playbook.md"
+                                    ):
+                                        reading_rule = (
+                                            "仅在排错或验证失败时读取原文及适用条件；"
+                                            "其他任务不新增必读要求。"
+                                        )
+                                    lines.append(f"- `{kf_path}`：{reading_rule}")
                             lines.append("")
                 except Exception:
                     pass

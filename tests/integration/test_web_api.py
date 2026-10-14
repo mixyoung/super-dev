@@ -15,6 +15,7 @@ from PIL import Image
 import super_dev.web.api as web_api
 from super_dev import __version__ as _super_dev_version
 from super_dev.analyzer import BaselineAuditBuilder
+from super_dev.artifact_utils import resolve_current_artifact_prefix
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.cli import SuperDevCLI
 from super_dev.config import ConfigManager
@@ -135,7 +136,7 @@ def _write_baseline_audit(project_dir: Path, *, work_mode: str = "variant") -> N
 def _hydrate_release_governance_artifacts(project_dir: Path) -> None:
     output_dir = project_dir / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    project_name = project_dir.name
+    project_name = resolve_current_artifact_prefix(project_dir)
 
     prd_path = output_dir / f"{project_name}-prd.md"
     if not prd_path.exists():
@@ -290,14 +291,12 @@ def _hydrate_release_governance_artifacts(project_dir: Path) -> None:
     )
 
 
-def _prepare_release_ready_project(project_dir: Path) -> None:
+def _prepare_release_ready_project(project_dir: Path, *, change_id: str | None = None) -> None:
+    write_release_ready_docs(project_dir, change_id=change_id)
+    project_name = resolve_current_artifact_prefix(project_dir)
     (project_dir / "super_dev").mkdir(parents=True, exist_ok=True)
     (project_dir / "docs").mkdir(parents=True, exist_ok=True)
     (project_dir / "output").mkdir(parents=True, exist_ok=True)
-    (project_dir / ".super-dev" / "changes" / "release-hardening-finalization").mkdir(
-        parents=True,
-        exist_ok=True,
-    )
     (project_dir / "pyproject.toml").write_text(
         f'[project]\nversion = "{_super_dev_version}"\n[project.scripts]\nsuper-dev = "super_dev.cli:main"\n',
         encoding="utf-8",
@@ -365,11 +364,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         "super-dev product-audit\nproof-pack\nrelease readiness\n", encoding="utf-8"
     )
     (project_dir / "install.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-    for name in ("change.yaml", "proposal.md", "tasks.md"):
-        (
-            project_dir / ".super-dev" / "changes" / "release-hardening-finalization" / name
-        ).write_text("ok\n", encoding="utf-8")
-    (project_dir / "output" / f"{project_dir.name}-redteam.json").write_text(
+    (project_dir / "output" / f"{project_name}-redteam.json").write_text(
         json.dumps(
             {
                 "project_name": project_dir.name,
@@ -388,11 +383,11 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-quality-gate.md").write_text(
+    (project_dir / "output" / f"{project_name}-quality-gate.md").write_text(
         "# 质量门禁报告\n\n**状态**: <span style='color:green'>通过</span>\n**总分**: 90/100\n",
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-task-execution.md").write_text(
+    (project_dir / "output" / f"{project_name}-task-execution.md").write_text(
         (
             "# Spec 任务执行报告\n\n"
             "## 执行期验证摘要\n\n"
@@ -402,17 +397,17 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_dir.name}-product-audit.json").write_text(
+    (project_dir / "output" / f"{project_name}-product-audit.json").write_text(
         json.dumps({"status": "ready", "score": 90}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     output_dir = project_dir / "output"
-    (output_dir / f"governance-report-{project_dir.name}.md").write_text(
+    (output_dir / f"governance-report-{project_name}.md").write_text(
         "# Governance Report\n\nvalidation=PASSED\n命中率: 100%\n",
         encoding="utf-8",
     )
     (output_dir / "knowledge-cache").mkdir(parents=True, exist_ok=True)
-    (output_dir / "knowledge-cache" / f"{project_dir.name}-knowledge-bundle.json").write_text(
+    (output_dir / "knowledge-cache" / f"{project_name}-knowledge-bundle.json").write_text(
         json.dumps(
             {"local_knowledge": [], "web_knowledge": [], "research_summary": "fixture"},
             ensure_ascii=False,
@@ -425,13 +420,13 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
     (output_dir / "metrics-history").mkdir(parents=True, exist_ok=True)
-    (output_dir / "metrics-history" / f"{project_dir.name}-metrics.json").write_text(
+    (output_dir / "metrics-history" / f"{project_name}-metrics.json").write_text(
         json.dumps(
             {"project_name": project_dir.name, "success_rate": 100}, ensure_ascii=False, indent=2
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-validation-results.json").write_text(
+    (output_dir / f"{project_name}-validation-results.json").write_text(
         json.dumps({"passed": True, "errors": []}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -445,12 +440,12 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         "# ADR-001: Delivery Closure\n\n选择 proof-pack + release readiness 作为发布闭环。\n",
         encoding="utf-8",
     )
-    (output_dir / f"validation-report-{project_dir.name}.md").write_text(
+    (output_dir / f"validation-report-{project_name}.md").write_text(
         "# Validation Report\n\n- rules: passed\n",
         encoding="utf-8",
     )
     (output_dir / "frontend").mkdir(parents=True, exist_ok=True)
-    (output_dir / f"{project_dir.name}-ui-contract.json").write_text(
+    (output_dir / f"{project_name}-ui-contract.json").write_text(
         json.dumps(
             {
                 "style_direction": "Editorial workspace",
@@ -499,7 +494,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     (output_dir / "frontend" / "design-tokens.css").write_text(
         ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-ui-review.json").write_text(
+    (output_dir / f"{project_name}-ui-review.json").write_text(
         json.dumps(
             {
                 "score": 92,
@@ -520,7 +515,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-ui-contract-alignment.json").write_text(
+    (output_dir / f"{project_name}-ui-contract-alignment.json").write_text(
         json.dumps(
             {
                 "screen_recipes": {"passed": True, "observed": "hero/proof/cta"},
@@ -538,7 +533,7 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-frontend-runtime.json").write_text(
+    (output_dir / f"{project_name}-frontend-runtime.json").write_text(
         json.dumps(
             {
                 "passed": True,
@@ -569,20 +564,20 @@ def _prepare_release_ready_project(project_dir: Path) -> None:
     save_bound_preview_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
     record_stage_progress(project_dir, stage="quality", status="completed")
     record_stage_progress(project_dir, stage="delivery", status="completed")
-    # 批 D2 语义：文档/任务先于身份水化；确认与验收在水化后按最终产物重绑。
-    write_release_ready_docs(project_dir)
+    # Inputs were bound before identity-sensitive artifacts; rebind final acceptance after hydration.
     _hydrate_release_governance_artifacts(project_dir)
     record_release_ready_acceptance(project_dir)
 
 
 def _prepare_proof_pack_project(project_dir: Path) -> None:
-    _prepare_release_ready_project(project_dir)
+    _prepare_release_ready_project(project_dir, change_id="proof-quality")
+    project_name = resolve_current_artifact_prefix(project_dir)
     output_dir = project_dir / "output"
     (output_dir / "delivery").mkdir(parents=True, exist_ok=True)
     (output_dir / "rehearsal").mkdir(parents=True, exist_ok=True)
     for suffix in ("research", "architecture", "uiux"):
-        (output_dir / f"{project_dir.name}-{suffix}.md").write_text("# ok\n", encoding="utf-8")
-    (output_dir / f"{project_dir.name}-ui-contract.json").write_text(
+        (output_dir / f"{project_name}-{suffix}.md").write_text("# ok\n", encoding="utf-8")
+    (output_dir / f"{project_name}-ui-contract.json").write_text(
         json.dumps(
             {
                 "style_direction": "Editorial workspace",
@@ -632,7 +627,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
     (output_dir / "frontend" / "design-tokens.css").write_text(
         ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-ui-review.json").write_text(
+    (output_dir / f"{project_name}-ui-review.json").write_text(
         json.dumps(
             {
                 "score": 91,
@@ -653,7 +648,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-ui-contract-alignment.json").write_text(
+    (output_dir / f"{project_name}-ui-contract-alignment.json").write_text(
         json.dumps(
             {
                 "ui_contract": {
@@ -746,7 +741,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-frontend-runtime.json").write_text(
+    (output_dir / f"{project_name}-frontend-runtime.json").write_text(
         json.dumps(
             {
                 "passed": True,
@@ -773,26 +768,26 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-quality-gate.md").write_text(
+    (output_dir / f"{project_name}-quality-gate.md").write_text(
         "# 质量门禁报告\n\n**状态**: <span style='color:green'>通过</span>\n**总分**: 90/100\n",
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-quality-gate.md").write_text(
+    (output_dir / f"{project_name}-quality-gate.md").write_text(
         "# quality gate\npassed\n", encoding="utf-8"
     )
     # Ensure the ready fixture reflects one coherent artifact generation round.
     base_time = time.time() + 1
     for index, artifact_name in enumerate(
         (
-            f"{project_dir.name}-ui-review.json",
-            f"{project_dir.name}-ui-contract-alignment.json",
-            f"{project_dir.name}-frontend-runtime.json",
-            f"{project_dir.name}-quality-gate.md",
+            f"{project_name}-ui-review.json",
+            f"{project_name}-ui-contract-alignment.json",
+            f"{project_name}-frontend-runtime.json",
+            f"{project_name}-quality-gate.md",
         )
     ):
         ts = base_time + index
         os.utime(output_dir / artifact_name, (ts, ts))
-    (output_dir / f"{project_dir.name}-redteam.json").write_text(
+    (output_dir / f"{project_name}-redteam.json").write_text(
         json.dumps(
             {
                 "project_name": project_dir.name,
@@ -811,7 +806,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-task-execution.md").write_text(
+    (output_dir / f"{project_name}-task-execution.md").write_text(
         (
             "# Spec 任务执行报告\n\n"
             "## 执行期验证摘要\n\n"
@@ -821,11 +816,11 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-product-audit.json").write_text(
+    (output_dir / f"{project_name}-product-audit.json").write_text(
         json.dumps({"status": "ready", "score": 91}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-ui-contract.json").write_text(
+    (output_dir / f"{project_name}-ui-contract.json").write_text(
         json.dumps(
             {
                 "style_direction": "Editorial workspace",
@@ -852,7 +847,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
     (output_dir / "frontend" / "design-tokens.css").write_text(
         ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-frontend-runtime.json").write_text(
+    (output_dir / f"{project_name}-frontend-runtime.json").write_text(
         json.dumps(
             {
                 "passed": True,
@@ -875,17 +870,15 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-repo-map.md").write_text(
-        "# Repo Map\n\nok\n", encoding="utf-8"
-    )
-    (output_dir / f"{project_dir.name}-repo-map.json").write_text(
+    (output_dir / f"{project_name}-repo-map.md").write_text("# Repo Map\n\nok\n", encoding="utf-8")
+    (output_dir / f"{project_name}-repo-map.json").write_text(
         json.dumps({"project_name": project_dir.name}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-dependency-graph.md").write_text(
+    (output_dir / f"{project_name}-dependency-graph.md").write_text(
         "# Dependency Graph\n\nok\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-dependency-graph.json").write_text(
+    (output_dir / f"{project_name}-dependency-graph.json").write_text(
         json.dumps(
             {"project_name": project_dir.name, "node_count": 4, "edge_count": 3},
             ensure_ascii=False,
@@ -893,25 +886,25 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-impact-analysis.md").write_text(
+    (output_dir / f"{project_name}-impact-analysis.md").write_text(
         "# Change Impact Analysis\n\nok\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-impact-analysis.json").write_text(
+    (output_dir / f"{project_name}-impact-analysis.json").write_text(
         json.dumps(
             {"project_name": project_dir.name, "risk_level": "medium"}, ensure_ascii=False, indent=2
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-regression-guard.md").write_text(
+    (output_dir / f"{project_name}-regression-guard.md").write_text(
         "# Regression Guard\n\nok\n", encoding="utf-8"
     )
-    (output_dir / f"{project_dir.name}-regression-guard.json").write_text(
+    (output_dir / f"{project_name}-regression-guard.json").write_text(
         json.dumps(
             {"project_name": project_dir.name, "risk_level": "medium"}, ensure_ascii=False, indent=2
         ),
         encoding="utf-8",
     )
-    (output_dir / f"{project_dir.name}-prd.md").write_text(
+    (output_dir / f"{project_name}-prd.md").write_text(
         "\n".join(
             [
                 "# PRD",
@@ -928,7 +921,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         encoding="utf-8",
     )
     delivery_applicability = derive_delivery_applicability(ConfigManager(project_dir).load())
-    (output_dir / "delivery" / f"{project_dir.name}-delivery-manifest.json").write_text(
+    (output_dir / "delivery" / f"{project_name}-delivery-manifest.json").write_text(
         json.dumps(
             {
                 "status": "ready",
@@ -939,7 +932,7 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
-    (output_dir / "rehearsal" / f"{project_dir.name}-rehearsal-report.json").write_text(
+    (output_dir / "rehearsal" / f"{project_name}-rehearsal-report.json").write_text(
         json.dumps({"passed": True, "score": 94}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -969,6 +962,16 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
         description="proof pack spec quality",
     )
     generator.scaffold_change_artifacts(change.id)
+    (
+        project_dir / ".super-dev" / "changes" / change.id / "specs" / change.id / "spec.md"
+    ).write_text(
+        "# 登录和运营看板\n\n## ADDED Requirements\n\n"
+        "### Requirement: login-and-dashboard\n"
+        "The system SHALL support email password login and an operations dashboard.\n\n"
+        "#### Scenario: Login\n- GIVEN an email and password\n"
+        "- WHEN authentication succeeds\n- THEN display the operations dashboard\n",
+        encoding="utf-8",
+    )
     (project_dir / ".super-dev" / "changes" / change.id / "tasks.md").write_text(
         "# Tasks\n\n- [x] 支持邮箱密码登录\n- [x] 提供运营数据概览\n",
         encoding="utf-8",
@@ -976,11 +979,11 @@ def _prepare_proof_pack_project(project_dir: Path) -> None:
     final_base_time = time.time() + 5
     for index, artifact_name in enumerate(
         (
-            f"{project_dir.name}-ui-contract.json",
-            f"{project_dir.name}-ui-review.json",
-            f"{project_dir.name}-ui-contract-alignment.json",
-            f"{project_dir.name}-frontend-runtime.json",
-            f"{project_dir.name}-quality-gate.md",
+            f"{project_name}-ui-contract.json",
+            f"{project_name}-ui-review.json",
+            f"{project_name}-ui-contract-alignment.json",
+            f"{project_name}-frontend-runtime.json",
+            f"{project_name}-quality-gate.md",
         )
     ):
         ts = final_base_time + index
@@ -3800,6 +3803,8 @@ class TestWebAPI:
         assert payload["score"] >= 90
         checks = {check["name"]: check for check in payload["checks"]}
         assert checks["Release Change Spec"]["passed"] is True
+        assert checks["Spec Quality"]["passed"] is True
+        assert "change=release-hardening-finalization" in checks["Spec Quality"]["detail"]
         assert payload["persisted"] is False
         assert payload["report_file"] == ""
         assert payload["json_file"] == ""

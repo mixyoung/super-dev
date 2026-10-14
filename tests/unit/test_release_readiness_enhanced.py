@@ -601,7 +601,7 @@ def test_frontend_none_release_recommendations_do_not_request_frontend_work(
     )
     monkeypatch.setattr(
         "super_dev.release_readiness.OperationalHarnessBuilder.build",
-        lambda self: SimpleNamespace(
+        lambda self, **kwargs: SimpleNamespace(
             enabled=True,
             passed=False,
             passed_count=0,
