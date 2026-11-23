@@ -4,6 +4,9 @@ on:
   schedule:
     # 每周一上午 09:00 (UTC 01:00) 定时巡检
     - cron: '0 1 * * 1'
+  push:
+    branches:
+      - mixyoung/reference-updates
   workflow_dispatch:
     inputs:
       update_baseline:
