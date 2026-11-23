@@ -27,6 +27,8 @@
 - [集成指南](./INTEGRATION_GUIDE.md)
 - [发布指南（入口页）](./PUBLISHING.md)
 - [发布作战手册](./RELEASE_RUNBOOK.md)
+- [参考项目、知识库与技能来源登记](./REFERENCE_SOURCES.md)
+- [参考来源更新台账](./REFERENCE_UPDATES.md)
 
 ## 内部策略文档（internal-only）
 
