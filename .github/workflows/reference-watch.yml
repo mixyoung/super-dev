@@ -51,7 +51,14 @@ jobs:
           fi
           python scripts/check_reference_updates.py --output-report output/reference-scan-latest.md $EXTRA_ARGS
 
-      - name: Upload Scan Report as Artifact
+      - name: Publish Online Report to Job Summary
+        if: always()
+        run: |
+          if [ -f output/reference-scan-latest.md ]; then
+            cat output/reference-scan-latest.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Scan Report as Artifact (Archive)
         uses: actions/upload-artifact@v4
         with:
           name: reference-scan-report

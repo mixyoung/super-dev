@@ -347,6 +347,13 @@ def main():
         with open(gh_output, "a", encoding="utf-8") as fp:
             fp.write(f"has_actionable={'true' if has_actionable else 'false'}\n")
 
+    # GitHub Actions Step Summary (直接在线渲染，无需下载解压 zip)
+    gh_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if gh_summary and os.path.exists(gh_summary):
+        with open(gh_summary, "a", encoding="utf-8") as fp:
+            fp.write(report_md)
+            fp.write("\n")
+
     print("\n[✓] 巡检完成！")
     print(f"    - 建议跟进: {sum(1 for r in results if r['status'] == 'actionable')}")
     print(f"    - 观察暂缓: {sum(1 for r in results if r['status'] == 'watch')}")
