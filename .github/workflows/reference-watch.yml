@@ -1,0 +1,82 @@
+name: Reference Sources Watcher
+
+on:
+  schedule:
+    # 每周一上午 09:00 (UTC 01:00) 定时巡检
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: '是否将本次检测到的新提交写入基线配置文件'
+        type: boolean
+        default: false
+      source_id:
+        description: '仅检查特定来源 ID (留空表示全量检查，如 REF-014)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  inspect-upstream:
+    name: Inspect Upstream Reference Sources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mixyoung/reference-updates
+        uses: actions/checkout@v4
+        with:
+          ref: mixyoung/reference-updates
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Reference Update Checker
+        id: checker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ inputs.update_baseline }}" = "true" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --update-baseline"
+          fi
+          if [ -n "${{ inputs.source_id }}" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --source ${{ inputs.source_id }}"
+          fi
+          python scripts/check_reference_updates.py --output-report output/reference-scan-latest.md $EXTRA_ARGS
+
+      - name: Upload Scan Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-scan-report
+          path: output/reference-scan-latest.md
+
+      - name: Notify Maintainer via Issue if Actionable
+        if: env.has_actionable == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'output/reference-scan-latest.md';
+            if (fs.existsSync(reportPath)) {
+              const body = fs.readFileSync(reportPath, 'utf8');
+              const now = new Date().toISOString().slice(0, 10);
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `📢 [参考源更新提醒] 发现上游存在建议跟进项 (${now})`,
+                body: body,
+                labels: ['documentation', 'reference-update']
+              });
+            }
+
+      - name: Commit Updated Baseline if Requested
+        if: inputs.update_baseline == true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/references/.upstream_tracking.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore(references): auto-update upstream tracking baseline" && git push origin mixyoung/reference-updates)

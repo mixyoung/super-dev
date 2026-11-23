@@ -42,18 +42,18 @@ docs/references/
 
 ---
 
-## 3. 六大工程方法论与一键调用速查 (Methods & Invocation)
+## 3. 六大工程方法论与全自动流水线注入机制 (Methods & Pipeline Injection)
 
-拒绝“只停留在文档上”。以下六大方法已封装为对话框一键唤醒指令：
+拒绝“只停留在文档上”，也“绝不让用户当人肉调度员”。以下六大方法已作为底层规约深度固化在 Super Dev 的 9 阶段流水线与专家契约中，在各阶段全自动注入生效：
 
-| 方法名称与精读链接 | 贯穿作用阶段 | 🎯 一键唤醒口令（直接在对话框输入） |
+| 方法名称与精读链接 | 自动注入阶段与生效载体 | 核心工程法则与自动注入机制 |
 | :--- | :--- | :--- |
-| 📖 [全流程自然准确表达](./reader_wiki/methods/natural-precise-writing.md) | **全流程贯穿**（调研/PRD/任务/报错/文案/发布） | `按自然准确表达法审查当前文案/代码注释/报错，消除黑话与机翻腔` |
-| 📖 [系统化假设驱动调试](./reader_wiki/methods/systematic-debugging.md) | `backend` / `quality` | `进入系统化调试模式：排查此报错，先给单一假设与复现单测，严禁直接改代码` |
-| 📖 [想法验证与需求反证](./reader_wiki/methods/forge-idea.md) | `discovery` / `research` | `用 Forge Idea 反证法检验此需求，找出最致命的暗含假设并设计低成本验证` |
-| 📖 [极限需求盘问与回读](./reader_wiki/methods/grill-with-docs.md) | `docs` / `drafting` | `对当前 PRD/架构发起 Grill 盘问（或直接输入 /grill-me），逼我做单选` |
-| 📖 [专家画像契约模型](./reader_wiki/methods/expert-persona-contracts.md) | 全阶段（角色切换） | `切换到 [QA_CRITIC / ARCHITECT] 专家角色，严格按其输入输出契约执行审查` |
-| 📖 [隔离前向盲测验证](./reader_wiki/methods/blind-forward-verification.md) | 框架维护与技能测试 | `对新编写的技能启动隔离盲测，不要提前泄露答案，按多轮案例渐进测试` |
+| 📖 [全流程自然准确表达](./reader_wiki/methods/natural-precise-writing.md) | **全生命周期底色** (`knowledge_pusher.py`) | 自动向各阶段注入表达底线，杜绝 AI 腔与伪黑话，保护业务状态完整 |
+| 📖 [系统化假设驱动调试](./reader_wiki/methods/systematic-debugging.md) | `backend` / `quality` (调试 Playbook) | 单元测试或构建报错时由 `toolkit.py` 自动加载，未亲眼见红严禁改源码 |
+| 📖 [想法验证与需求反证](./reader_wiki/methods/forge-idea.md) | `research` / `docs` (PM 专家) | PM `thinking_framework` 强制反证，识别致命假设，在原编号处原地更新 |
+| 📖 [极限需求盘问与回读](./reader_wiki/methods/grill-with-docs.md) | `docs` 冻结前 (架构师专家) | 架构师强制单选裁决，在 `DOC_CONFIRM_GATE` 前将结论原地写回文档 |
+| 📖 [专家画像契约模型](./reader_wiki/methods/expert-persona-contracts.md) | 全阶段引擎调度 (`builtin/*.md`) | 物理锁定各专家的输入、输出、只读/写入权限红线与停止信号，绝不越权 |
+| 📖 [隔离前向盲测验证](./reader_wiki/methods/blind-forward-verification.md) | `quality` 门禁与 CI 发布预检 | 独立沙箱与自动化确定性断言，杜绝模型事后自评与放水作弊 |
 
 ---
 

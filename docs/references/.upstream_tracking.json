@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0",
+  "description": "Super Dev 外部参考源上游跟踪基线清单。用于周期性巡检与差异捕获。",
+  "last_check_time": "2026-11-23T22:30:00Z",
+  "sources": {
+    "REF-001": {
+      "name": "UmaDev",
+      "type": "github_repo",
+      "repo": "umacloud/umadev",
+      "track_branch": "main",
+      "last_checked_commit": "585262706174ad4a958cd054f0948509e84ad610",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["knowledge/", "docs/", "prompts/"],
+      "ignore_paths": [".github/", "*.lock", "tests/"]
+    },
+    "REF-002": {
+      "name": "Superpowers",
+      "type": "github_repo",
+      "repo": "obra/superpowers",
+      "track_branch": "main",
+      "last_checked_commit": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["skills/"],
+      "ignore_paths": [".github/", "*.md", "tests/"]
+    },
+    "REF-003": {
+      "name": "BMAD Method",
+      "type": "github_repo",
+      "repo": "bmad-code-org/BMAD-METHOD",
+      "track_branch": "main",
+      "last_checked_commit": "94b6727b00c8316557828c8a8ff2a48ff60d60cc",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["docs/", "plan/", "prompts/"],
+      "ignore_paths": [".github/", "assets/"]
+    },
+    "REF-004": {
+      "name": "Agency Agents",
+      "type": "github_repo",
+      "repo": "msitarzewski/agency-agents",
+      "track_branch": "main",
+      "last_checked_commit": "6d29a9b08785a0e49ffc9818bbdd381164c2df5f",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["agents/", "specialists/", "prompts/"],
+      "ignore_paths": [".github/", "*.png", "*.jpg"]
+    },
+    "REF-005": {
+      "name": "Matt Pocock Skills",
+      "type": "github_repo",
+      "repo": "mattpocock/skills",
+      "track_branch": "main",
+      "last_checked_commit": "3cca18b368ae95cdbdebbff572ccafa662551015",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["skills/"],
+      "ignore_paths": [".github/", "tests/"]
+    },
+    "REF-006": {
+      "name": "gyuha/forge",
+      "type": "github_repo",
+      "repo": "gyuha/forge",
+      "track_branch": "main",
+      "last_checked_commit": "28354ac0dcfa596d654631eeac5128d695503f4e",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["src/", "rules/", "prompts/"],
+      "ignore_paths": [".github/"]
+    },
+    "REF-007": {
+      "name": "Agent Skills",
+      "type": "github_repo",
+      "repo": "agentskills/agentskills",
+      "track_branch": "main",
+      "last_checked_commit": "69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["specification/", "skills/"],
+      "ignore_paths": [".github/", "website/"]
+    },
+    "REF-008": {
+      "name": "GitHub Agentic Workflows",
+      "type": "github_repo",
+      "repo": "github/gh-aw",
+      "track_branch": "main",
+      "last_checked_commit": "00ab1b7e6a3ac62629c03e5eb0ce31e10bc18fbb",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["docs/", "actions/", "workflows/"],
+      "ignore_paths": [".github/workflows/ci.yml"]
+    },
+    "REF-009": {
+      "name": "SDLC Studio",
+      "type": "github_repo",
+      "repo": "DarrenBenson/sdlc-studio",
+      "track_branch": "main",
+      "last_checked_commit": "28682ce24df2432f80f03df2f9f0d2b494cbc419",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["docs/", "prompts/", "roles/"],
+      "ignore_paths": [".github/"]
+    },
+    "REF-010": {
+      "name": "Agentic Workflow Skills",
+      "type": "github_repo",
+      "repo": "gtrabanco/agentic-workflow",
+      "track_branch": "main",
+      "last_checked_commit": "af84fe869ae6f1f79451908d0542875cbd302517",
+      "last_checked_date": "2026-09-12",
+      "watch_paths": ["skills/", "instructions/"],
+      "ignore_paths": [".github/"]
+    },
+    "REF-011": {
+      "name": "DeepSeek Harness",
+      "type": "github_repo",
+      "repo": "deepseek-ai/deepseek-harness",
+      "track_branch": "main",
+      "last_checked_commit": "b830ec950faba0a46dda564be3e2d854afed94f1",
+      "last_checked_date": "2026-11-04",
+      "watch_paths": ["harness/", "adapter/", "docs/"],
+      "ignore_paths": [".github/", "tests/"]
+    },
+    "REF-012": {
+      "name": "ZSL / Grill with Docs",
+      "type": "web_document",
+      "url": "https://superpowers.zsl.dev/skills/grill-with-docs/",
+      "last_checked_date": "2026-09-06",
+      "status_note": "文档站静态页面，需通过 HTTP ETag/Last-Modified 监听"
+    },
+    "REF-013": {
+      "name": "skill-creator",
+      "type": "unconfirmed",
+      "status_note": "上游官方仓库身份未确认，保持锁定，不自动爬取"
+    },
+    "REF-014": {
+      "name": "oil-tone",
+      "type": "github_repo",
+      "repo": "oil-oil/oil-tone",
+      "track_branch": "main",
+      "last_checked_commit": "39cbf92f76c90b7bb27a5b5d4ed88a1fc5fa31f6",
+      "last_checked_date": "2026-11-22",
+      "watch_paths": ["skills/oil-tone/SKILL.md", "README.md"],
+      "ignore_paths": [".github/"]
+    }
+  }
+}
