@@ -29,6 +29,7 @@
 - [发布作战手册](./RELEASE_RUNBOOK.md)
 - [参考项目、知识库与技能来源登记](./REFERENCE_SOURCES.md)
 - [参考来源更新台账](./REFERENCE_UPDATES.md)
+- [外部参考知识库（Ref-Wiki 看板）](./references/README.md)
 
 ## 内部策略文档（internal-only）
 
