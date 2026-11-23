@@ -2,6 +2,8 @@
 
 > **知识复利核心信条**：
 > 本知识库践行 Karpathy 的 **LLM Wiki** 与学术界《Knowledge Compounding》（arXiv:2604.11243）理念——**外部调研与参考建库的目标不是“单次检索更快”，而是让每一次对外部项目（如 BMAD、Superpowers、oil-tone）的技术调研、优缺剖析与边界取舍，永久沉淀为团队在代码仓库中可继承、可审计、随 Git 持续演进的数字资产。**
+>
+> 🔍 **自动化巡检动态**：本知识库配置了 GitHub Actions 每周自动巡检流水线，在线报告与执行状态可直接在 [GitHub Actions 巡检动态](https://github.com/mixyoung/super-dev/actions) 实时查看。
 
 ---
 

@@ -10,6 +10,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Type Checks](https://img.shields.io/badge/type%20checks-mypy-success)](https://mypy-lang.org/)
 [![Lint](https://img.shields.io/badge/lint-ruff-success)](https://docs.astral.sh/ruff/)
+[![CI / Actions](https://img.shields.io/badge/Actions-CI%20%26%20Watcher-brightgreen)](https://github.com/mixyoung/super-dev/actions)
 
 [English](README_EN.md) | 简体中文
 
@@ -25,6 +26,7 @@
 
 - 正式发布说明：[v2.6.0](docs/releases/2.6.0.md)
 - GitHub Release：[Super Dev 2.6.0](https://github.com/mixyoung/super-dev/releases/tag/v2.6.0)
+- 流水线与巡检动态：[GitHub Actions](https://github.com/mixyoung/super-dev/actions)
 
 ## 安装
 
@@ -546,6 +548,8 @@ Super Dev 按 `CLI / IDE / 桌面助手` 统一接入，默认采用项目优先
 
 - [文档总览](docs/README.md)
 - [快速开始](docs/QUICKSTART.md)
+- [外部参考知识库看板](docs/references/README.md)
+- [外部参考源巡检动态 (GitHub Actions)](https://github.com/mixyoung/super-dev/actions)
 - [安装方式](docs/INSTALL_OPTIONS.md)
 - [宿主使用指南](docs/HOST_USAGE_GUIDE.md)
 - [宿主能力审计](docs/HOST_CAPABILITY_AUDIT.md)
