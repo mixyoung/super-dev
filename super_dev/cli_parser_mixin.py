@@ -1322,4 +1322,15 @@ class CliParserMixin:
         compliance_parser.add_argument("--json", action="store_true", help="以 JSON 格式输出")
         compliance_parser.add_argument("--save", action="store_true", help="保存报告到 output/")
 
+        # web 命令 — 启动本地可视化控制台
+        web_parser = subparsers.add_parser(
+            "web",
+            help="启动本地 Web 可视化控制台与 API 服务",
+            description="启动本地 FastAPI 服务并在 127.0.0.1:7890 提供可视化控制台（遇端口冲突自动加 1）",
+        )
+        web_parser.add_argument("--host", default="127.0.0.1", help="监听主机地址 (默认: 127.0.0.1)")
+        web_parser.add_argument(
+            "-p", "--port", type=int, default=7890, help="监听端口 (默认: 7890，遇冲突自动递增)"
+        )
+
         return parser

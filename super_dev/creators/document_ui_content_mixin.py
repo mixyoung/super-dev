@@ -400,7 +400,7 @@ class DocumentUIContentMixin:
     def _render_screen_recipe_manifest(self, analysis: dict, profile: dict) -> str:
         recipes = self._build_screen_recipes(analysis=analysis, profile=profile)
         lines = [
-            "#### Screen Recipes（页面配方冻结）",
+            "#### Screen Blueprints（页面蓝图规约）",
             "",
             "在进入 UI 实现前，必须先冻结每个关键页面的目标、section order、信任模块和状态覆盖，避免页面退化成泛化模板。",
             "",

@@ -362,7 +362,7 @@ class TestGeneratedFileContent:
         builder.generate(sample_requirements, sample_phases, sample_docs)
         html_path = builder.project_dir / "output" / "frontend" / "index.html"
         content = html_path.read_text(encoding="utf-8")
-        assert "页面配方" in content
+        assert "页面蓝图" in content
         assert "上下文与 Tweaks 协议" in content
         assert "验证与交付" in content
 

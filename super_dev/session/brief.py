@@ -21,6 +21,7 @@ _logger = logging.getLogger("super_dev.session.brief")
 SECTION_NAMES: list[str] = [
     "Session Title",
     "Current State",
+    "Open Decisions",
     "Task Specification",
     "Files and Functions",
     "Workflow",
@@ -164,6 +165,17 @@ class SessionBrief:
                 lines.append("_(empty)_")
             lines.append("")
         return "\n".join(lines)
+
+    # -- sync_parking_lot ---------------------------------------------------
+
+    @staticmethod
+    def sync_parking_lot(project_dir: str | Path) -> None:
+        """从 .super-dev/parking-lot.json 自动同步未决事项到 SESSION_BRIEF.md 的 Open Decisions 段落。"""
+        from super_dev.parking_lot import ParkingLotRegister
+
+        reg = ParkingLotRegister.load(project_dir)
+        table_md = reg.render_markdown_table()
+        SessionBrief.update_section(project_dir, "Open Decisions", table_md)
 
     # -- summarize_for_context ----------------------------------------------
 

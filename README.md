@@ -140,7 +140,7 @@ super-dev
 
 ## 5 分钟上手
 
-普通用户先记住 1 条安装命令和 3 个终端命令：
+普通用户先记住 1 条安装命令和核心终端命令：
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
@@ -150,8 +150,8 @@ uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2
 # 进入宿主接入引导
 super-dev
 
-# 安装包含新更新器的版本后：更新本 fork，默认仅刷新当前项目
-super-dev update
+# 启动本地可视化控制台（默认监听 127.0.0.1:7890，遇冲突自动递增）
+super-dev web
 
 # 清理已注入的宿主接入面
 super-dev uninstall
@@ -169,9 +169,9 @@ super-dev uninstall
 如果这 6 步成立，你拿到的不是“装好了一个工具”，而是“把当前宿主训练成了这个项目的交付教练”。
 
 ### 终端只做 3 件事
-- 接入
-- 升级
-- 卸载 / 预演清理
+- 接入：`super-dev`
+- 可视化控制台：`super-dev web`
+- 卸载 / 预演清理：`super-dev uninstall`
 
 接入完成后，正常使用都回到宿主里。普通用户第一眼只需要记住：
 
@@ -210,11 +210,11 @@ SEEAI 赛事极速版：
 - 但 `spec` 之后直接进入前后端一体化快速开发，不再拆预览确认门
 - 适合 30 分钟左右的官网、小游戏、展示型工具、单页 demo
 
-只有在接入、诊断、兼容修复或治理收尾时，才需要回终端。普通用户只需要记住：
+只有在接入、启动看板、诊断、兼容修复或治理收尾时，才需要回终端。普通用户只需要记住：
 
 ```bash
 super-dev
-super-dev update
+super-dev web
 super-dev uninstall
 ```
 
@@ -245,6 +245,50 @@ super-dev uninstall
 - `review *`：维护者同步 gate 状态或修订状态
 
 普通用户仍应优先回宿主里说“继续当前流程”“现在下一步是什么”。
+
+---
+
+## 本地 Web 可视化控制台 (Dashboard)
+
+如果你希望通过可视化界面直观把控项目开发进度与交付质量，Super Dev 内置了轻量级本地 Web 控制台与 API 服务。
+
+### 启动方式
+
+在项目根目录下运行以下命令：
+
+```bash
+super-dev web
+```
+
+服务启动后，Super Dev 默认在本地监听 `http://127.0.0.1:7890`（若端口已被占用，会自动加 1 递增探测可用端口，例如 7891、7892...）。打开浏览器访问终端输出的访问地址，即可进入项目的可视化控制台。
+
+> [!NOTE]
+> **运行生命周期提示**：
+> `super-dev web` 默认在当前终端**前台持续运行**，使用期间请**保持该终端窗口开启**；当你按下 `Ctrl+C` 或直接关闭终端窗口时，Web 服务将随之停止。日常开发建议在 IDE（如 VS Code / Cursor）的独立终端标签页中保持运行。
+
+> [!TIP]
+> 如需指定主机或端口，可通过命令行参数或环境变量配置：
+> ```bash
+> # 方式一：通过命令行参数指定
+> super-dev web --host 127.0.0.1 --port 8080
+>
+> # 方式二：通过环境变量指定
+> SUPER_DEV_API_PORT=8080 super-dev web
+> ```
+
+### 可视化看板能看什么？
+
+无需在终端中反复翻找文本报告，在本地 Web 界面中你可以直观查看：
+
+1. **当前项目的流水线阶段推进进度（Pipeline Progression）**：
+   - 实时呈现项目在标准九阶段（`research` → `docs` → `spec` → `frontend` → `backend` → `quality` → `delivery`）中的当前推进环节；
+   - 实时查看文档确认门禁（`DOC_CONFIRM_GATE`）与前端预览确认门禁（`PREVIEW_CONFIRM_GATE`）的阻断、确认与通过状态。
+2. **11 位专家的审查评分与质量门禁（Quality Gate）状态**：
+   - 查看 PM、架构师、UI/UX、安全、QA、DBA、DevOps 等 11 位领域专家对当前产物的评分细项；
+   - 实时监控质量门禁对测试完整性、反作弊规则、代码规范与架构一致性的自动化校验结果。
+3. **交付证据包（Proof Pack）与追溯矩阵（Traceability Matrix）**：
+   - 查看业务需求（EARS 规范）到代码实现与测试用例的双向追溯覆盖拓扑树；
+   - 检查已落盘的交付证据清单（Proof Pack），确保所有已声明功能均具备真实的运行与测试证据。
 
 ---
 

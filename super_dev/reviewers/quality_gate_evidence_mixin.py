@@ -635,6 +635,7 @@ class QualityGateEvidenceMixin:
         checks.append(self._check_spec_task_completion())
         checks.append(self._check_spec_code_consistency())
         checks.append(self._check_task_execution_review_trace())
+        checks.append(self._check_test_integrity())
 
         coverage_percent = self._read_coverage_percent()
         if coverage_percent is None:
@@ -686,6 +687,34 @@ class QualityGateEvidenceMixin:
                     details=f"覆盖率 {coverage_percent}%（低于最低建议）",
                 )
             )
+
+    def _check_test_integrity(self) -> QualityCheck:
+        """检查测试完整性反作弊 (Anti-Gaming Probe)"""
+        from .test_integrity import TestIntegrityChecker
+
+        report = TestIntegrityChecker.scan_project(self.project_dir)
+        if report.passed:
+            return QualityCheck(
+                name="测试完整性与反作弊",
+                category="testing",
+                description="静态 AST 与测试作弊审查（注释断言/跳过标记）",
+                status=CheckStatus.PASSED,
+                score=100,
+                weight=self.CHECKS_CONFIG["testing"]["weight"],
+                details=report.summary,
+            )
+        first_violations = "; ".join(
+            f"{v.file_path}:{v.line_number} {v.message}" for v in report.violations[:3]
+        )
+        return QualityCheck(
+            name="测试完整性与反作弊",
+            category="testing",
+            description="静态 AST 与测试作弊审查（注释断言/跳过标记）",
+            status=CheckStatus.FAILED,
+            score=30,
+            weight=self.CHECKS_CONFIG["testing"]["weight"],
+            details=f"{report.summary} 示例: {first_violations}",
+        )
 
     def _check_testing(self) -> list[QualityCheck]:
         """检查测试策略"""

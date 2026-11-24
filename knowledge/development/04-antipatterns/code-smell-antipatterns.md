@@ -1,4 +1,4 @@
-# 代码坏味道反模式指南
+# 代码异味反模式指南 (Code Smell Antipatterns)
 
 > 适用范围：Python / JavaScript / TypeScript / Go / Java / Rust
 > 约束级别：SHALL（必须在 Code Review 阶段拦截）

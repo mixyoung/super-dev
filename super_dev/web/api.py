@@ -2256,10 +2256,32 @@ _mount_frontend_if_present()
 # ==================== 主函数 ====================
 
 
+def find_available_port(
+    host: str = "127.0.0.1", start_port: int = 7890, max_attempts: int = 100
+) -> int:
+    """从 start_port 开始探测可用端口，若被占用则自动 +1 直至可用。"""
+    import socket
+
+    port = start_port
+    for _ in range(max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, port))
+                return port
+            except OSError:
+                port += 1
+    return start_port
+
+
 def main():
     """启动 API 服务器"""
     host = os.getenv("SUPER_DEV_API_HOST", "127.0.0.1")
-    port = int(os.getenv("SUPER_DEV_API_PORT", "8000"))
+    raw_port = int(os.getenv("SUPER_DEV_API_PORT", "7890"))
+    port = find_available_port(host, raw_port)
+    if port != raw_port:
+        logging.getLogger("super_dev.web.api").info(
+            "端口 %d 已被占用，已自动切换到可用端口: %d", raw_port, port
+        )
     reload_enabled = os.getenv("SUPER_DEV_API_RELOAD", "true").strip().lower() in {
         "1",
         "true",

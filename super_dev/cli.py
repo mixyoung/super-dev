@@ -389,6 +389,7 @@ class SuperDevCLI(
         "feedback",
         "migrate",
         "compliance",
+        "web",
     }
 
     _SUGGESTIBLE_COMMANDS = {
@@ -842,6 +843,38 @@ class SuperDevCLI(
             self.console.print(f"  [yellow]未完成任务: {', '.join(summary.failed_tasks)}[/yellow]")
             return 1
         return 0
+
+    def _cmd_web(self, args: Any) -> int:
+        """启动本地 Web 可视化控制台与 API 服务"""
+        import os
+
+        import uvicorn
+
+        from .web.api import find_available_port
+
+        host = getattr(args, "host", None) or os.getenv("SUPER_DEV_API_HOST", "127.0.0.1")
+        target_port = int(getattr(args, "port", None) or os.getenv("SUPER_DEV_API_PORT", "7890"))
+        port = find_available_port(host, target_port)
+
+        self.console.print("[bold cyan]启动 Super Dev 本地可视化控制台与 API 服务...[/bold cyan]")
+        if port != target_port:
+            self.console.print(
+                f"[yellow]提示: 目标端口 {target_port} 已被占用，已自动递增切换到可用端口 {port}。[/yellow]"
+            )
+        self.console.print(f"本地访问地址: [bold green]http://{host}:{port}[/bold green]")
+        self.console.print(
+            "[dim]提示: 服务在当前终端前台运行，保持窗口开启即可持续查看；按 Ctrl+C 或关闭窗口将停止服务。[/dim]"
+        )
+
+        try:
+            uvicorn.run("super_dev.web.api:app", host=host, port=port, log_level="info")
+            return 0
+        except KeyboardInterrupt:
+            self.console.print("\n[yellow]已停止 Web 可视化服务[/yellow]")
+            return 0
+        except Exception as e:
+            self.console.print(f"[red]启动 Web 服务失败: {e}[/red]")
+            return 1
 
     def _normalize_pipeline_frontend(self, frontend: str) -> str:
         """将 init 的前端框架映射到 pipeline 可接受值"""

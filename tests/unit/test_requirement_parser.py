@@ -154,7 +154,7 @@ class TestDocumentGeneratorIntegration:
         assert "证明构图规则" in uiux
         assert "组件工艺要求" in uiux
         assert "布局张力纪律" in uiux
-        assert "Screen Recipes（页面配方冻结）" in uiux
+        assert "Screen Blueprints（页面蓝图规约）" in uiux
         assert "Claude-Design 风格执行协议" in uiux
 
     def test_document_generator_emits_ui_contract(self):
@@ -395,5 +395,5 @@ class TestFrontendScaffoldBuilder:
         assert '--font-heading: "IBM Plex Sans"' in css
         assert "--color-primary: #123456" in tokens
         assert "ui_library_preference" in js
-        assert "页面配方" in html
+        assert "页面蓝图" in html
         assert "verification_handoff" in js

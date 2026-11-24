@@ -1547,6 +1547,40 @@ class QualityGateChecker(QualityGateEvidenceMixin):
             )
         )
 
+        # 检查未决事项登记簿合规性（若存在）
+        parking_lot_path = self.project_dir / ".super-dev" / "parking-lot.json"
+        if parking_lot_path.exists():
+            from ..parking_lot import ParkingLotRegister
+
+            reg = ParkingLotRegister.load(self.project_dir)
+            violations = reg.validate_compliance()
+            open_count = len(reg.get_open_items())
+            if not violations:
+                checks.append(
+                    QualityCheck(
+                        name="未决事项登记簿",
+                        category="documentation",
+                        description="跨会话架构妥协与挂起决策三要素完整性",
+                        status=CheckStatus.PASSED,
+                        score=100,
+                        weight=doc_weight,
+                        details=f"未决事项登记簿合规，当前共有 {open_count} 项挂起决策已明确触发条件",
+                    )
+                )
+            else:
+                issues = "; ".join(f"{v['id']}: {v['error']}" for v in violations[:3])
+                checks.append(
+                    QualityCheck(
+                        name="未决事项登记簿",
+                        category="documentation",
+                        description="跨会话架构妥协与挂起决策三要素完整性",
+                        status=CheckStatus.WARNING,
+                        score=60,
+                        weight=doc_weight,
+                        details=f"未决事项存在推诿或要素缺失: {issues}",
+                    )
+                )
+
         return checks
 
     def _check_document_consistency(

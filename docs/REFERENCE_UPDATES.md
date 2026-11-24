@@ -109,6 +109,38 @@
 - **总表同步**：REF-014 改为“已参考·部分吸收”，A1 内容与 2026-11-22 实施日配对。22 个登记项不变（14 个 REF、8 个 DOC），当前新来源“待参考”0 项；上方原登记时的“待参考”历史保留。
 - **决定与局部回退**：择优采用，不代表最终语义批准或可发布；撤回时只撤本批知识增量、短引用和专属测试，并追加撤回记录，不抹除来源及 A1 历史。不提交、推送、安装或调整其他工作树。
 
+<a id="upstream-method-absorption-2026-11-24"></a>
+
+### 2026-11-24：REF-003 (BMAD Method A4) 与 REF-005 (Matt Pocock Skills A2) 方法论局部吸收
+
+- **授权与工作项**：用户在完成参考源周期性巡检后明确下达“正式立项开始吸收”指令；本批单独记录在 [上游前沿工程方法论吸收立项记录](<../.super-dev/changes/upstream-method-absorption-2026-11-24/adoption.md>)。
+- **关联来源与基线**：
+  - REF-003 BMAD Method：巡检基线推进至 [`e435a22`](https://github.com/bmad-code-org/BMAD-METHOD/commit/e435a22)（PR #2861）；
+  - REF-005 Matt Pocock Skills：巡检基线推进至 [`abeeaf9`](https://github.com/mattpocock/skills/commit/abeeaf9)。
+- **实际读取与差异**：
+  - REF-003：读取 PR #2861，提炼评审多视角（架构一致性、安全性、性能并发、契约兼容）与严格度分级思想，并彻底重构为地道中文工程规范。
+  - REF-005：读取 `skills/engineering/codebase-design/DESIGN-IT-TWICE.md` 与 `skills/engineering/domain-modeling/GLOSSARY-FORMAT.md`，提炼双方案比对设计法与统一领域词汇表。
+- **现有覆盖及增量**：
+  - 增量 1：在 [ADR 知识](<../knowledge/architecture/adr-template-and-examples.md#二架构决策记录adr模板与双方案比对要求-design-it-twice>) 中注入双方案比对设计法（Design It Twice），在重要架构决策中强制起草至少两套竞争设计并对比权衡，避免首个直觉方案陷阱；
+  - 增量 2：在 [产品发现知识](<../knowledge/product/product-discovery-and-prd-deep-dive.md#三领域统一词汇表规范-domain-glossary>) 中注入领域统一词汇表规范（Domain Glossary），明确标准术语、禁止别名与实体边界，防止长会话名词漂移；
+  - 增量 3：在 [代码评审知识](<../knowledge/development/code-review-quality-complete.md#10-多视角审查集-review-perspectives>) 中注入多视角审查集（Review Perspectives）与三档审查严格度（极简速审、标准评审、深度渗透）。
+- **适用与反例**：
+  - 适用于系统架构设计（`docs/architecture`）、领域需求定义（`docs/prd`）与代码审查阶段（`quality/code_review`）；
+  - 单行注释修正、纯拼写修正或常规配置微调时，严禁强行触发双方案比对或深度渗透审查，避免增加仪式化负担。
+- **取舍与成本**：
+  - 坚决不引入外部多 Agent 调度状态机，保持 Super Dev 原生单 Core 9 阶段流水线；
+  - 坚决不引入外部技能整包安装，不让外部私有格式占用宿主上下文；
+  - 彻底摒弃“透镜”、“杠杆”、“严重异味”、“坏味道”等机翻腔与欧化隐喻，全流程坚持地道自然的中文工程表达。
+- **A4 / A2 落点与日期**：
+  - REF-003 A4 批次，实施日期 2026-11-24；
+  - REF-005 A2 批次，实施日期 2026-11-24。
+- **总表同步**：
+  - [参考总表](<REFERENCE_SOURCES.md>) 已同步追加 REF-003 (A4) 与 REF-005 (A2) 记录行及方法子清单。
+- **实际验证**：
+  - 编写专属回归测试 `tests/unit/test_upstream_method_absorption.py`，验证 `knowledge_pusher.py` 调度命中正常，且在无关阶段不发生越界污染。
+- **决定与局部回退**：
+  - 正式批准并实施本轮局部吸收；回退时仅需撤回本批知识库增量段落与测试文件，恢复对应文档至原基线，不影响框架任何核心运行时逻辑。
+
 ## 6. 后续批次详情模板
 
 复制以下模板追加新条目。填写真实结果，没有执行的项目保留未验证，不以计划代替完成。

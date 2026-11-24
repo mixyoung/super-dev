@@ -141,7 +141,7 @@ In practice:
 
 ## 5-Minute Start
 
-Regular users should remember 1 install command and 3 terminal commands:
+Regular users should remember 1 install command and the core terminal commands:
 
 ```bash
 uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2.6.0" super-dev
@@ -151,8 +151,8 @@ uv tool install --force --from "git+https://github.com/mixyoung/super-dev.git@v2
 # Enter the host onboarding flow
 super-dev
 
-# Upgrade to the latest version and migrate onboarded hosts
-super-dev update
+# Launch local visual Web dashboard (default 127.0.0.1:7890, auto-increments on conflict)
+super-dev web
 
 # Remove injected Super Dev surfaces from onboarded hosts
 super-dev uninstall
@@ -170,9 +170,9 @@ super-dev uninstall
 If those six steps hold, you did not just “install a tool.” You turned the current host into a coached delivery system for this repository.
 
 ### The terminal only does 3 things
-- onboarding
-- upgrade
-- uninstall / cleanup preview
+- onboarding: `super-dev`
+- visual dashboard: `super-dev web`
+- uninstall / cleanup preview: `super-dev uninstall`
 
 After onboarding, regular use moves back into the host. Regular users should only need to remember:
 
@@ -224,7 +224,7 @@ Everything else (`detect / doctor / review / quality / release / spec / task`) r
 
 ```bash
 super-dev
-super-dev update
+super-dev web
 super-dev uninstall
 ```
 
@@ -237,6 +237,50 @@ Maintainer additions:
 - After upgrade, reopen the terminal and run `super-dev --version`; if the host no longer enters `research -> three core docs -> wait for confirmation`, then return to the terminal and run `doctor`
 - If the first UI pass still looks flat, empty, or template-like, do not defer polish to the end. A screenshot-level UI gate now keeps blocking that state across UI review, quality gate, proof-pack, and release readiness.
 - `docs/PUBLISHING.md` and `docs/RELEASE_RUNBOOK.md` are maintainer-only release docs, not part of the normal end-user path.
+
+---
+
+## Local Web Dashboard
+
+If you want a visual overview of pipeline progress and delivery quality, Super Dev comes with a built-in lightweight local Web dashboard and API service.
+
+### Launching the Dashboard
+
+Run the following command in your project directory:
+
+```bash
+super-dev web
+```
+
+Once started, Super Dev listens locally at `http://127.0.0.1:7890` by default (if the port is in use, it will automatically increment by 1 and try 7891, 7892, etc.). Open your browser and navigate to the address output in the terminal to enter the project's visual dashboard.
+
+> [!NOTE]
+> **Lifecycle Note**:
+> `super-dev web` runs in the foreground of your current terminal session. Please **keep this terminal window open** while using the dashboard. Pressing `Ctrl+C` or closing the terminal window will immediately stop the Web service. We recommend keeping it running in a dedicated terminal tab or inside your IDE's integrated terminal.
+
+> [!TIP]
+> To customize the host or port, pass command-line arguments or environment variables:
+> ```bash
+> # Via command-line flags
+> super-dev web --host 127.0.0.1 --port 8080
+>
+> # Via environment variables
+> SUPER_DEV_API_PORT=8080 super-dev web
+> ```
+
+### What can you view on the Dashboard?
+
+Without having to inspect terminal reports manually, you can view in real time:
+
+1. **Pipeline Progression**:
+   - Visual tracking of the current stage across the 9-phase chain (`research` → `docs` → `spec` → `frontend` → `backend` → `quality` → `delivery`);
+   - Blocking, pending, and confirmed statuses of the Document Confirmation Gate (`DOC_CONFIRM_GATE`) and Preview Confirmation Gate (`PREVIEW_CONFIRM_GATE`).
+2. **11-Expert Agent Reviews & Quality Gate Status**:
+   - Detailed scores and feedback from PM, Architect, UI/UX, Security, QA, DBA, DevOps, and other domain experts;
+   - Real-time audit results on test integrity, anti-gaming rules, code quality, and architectural consistency.
+3. **Delivery Evidence (Proof Pack) & Traceability Matrix**:
+   - Bi-directional requirement-to-code-and-test coverage topology (EARS specification);
+   - Auditable delivery proof pack to ensure all declared capabilities are backed by actual runtime and test evidence.
 
 ---
 

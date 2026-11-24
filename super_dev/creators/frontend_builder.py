@@ -279,7 +279,7 @@ class FrontendScaffoldBuilder(FrontendFrameworkProjectsMixin, FrontendQualityCon
         hero_panel_title = primary_recipe.get("label") or "Design Execution Blueprint"
         hero_panel_copy = (
             primary_recipe.get("objective")
-            or "把页面配方、设计上下文、Tweaks 和交付证据锁进同一条 UI 闭环。"
+            or "把页面蓝图、设计上下文、Tweaks 和交付证据锁进同一条 UI 闭环。"
         )
         trust_module_count = len(primary_recipe.get("trust_modules", []))
         verification_count = len(verification_handoff.get("verification_order", []))
@@ -314,7 +314,7 @@ class FrontendScaffoldBuilder(FrontendFrameworkProjectsMixin, FrontendQualityCon
         </div>
         <div class="top-actions">
           <a href="#trust">客户证明</a>
-          <a href="#recipe-map">页面配方</a>
+          <a href="#recipe-map">页面蓝图</a>
           <a href="#design-directions">视觉方向</a>
           <a href="#workspace">交付路径</a>
           <a class="primary-link" href="#doc-links">查看文档</a>
@@ -337,12 +337,12 @@ class FrontendScaffoldBuilder(FrontendFrameworkProjectsMixin, FrontendQualityCon
           </div>
           <div class="hero-actions">
             <a class="button button-primary" href="#doc-links">打开核心文档</a>
-            <a class="button button-secondary" href="#recipe-map">查看页面配方</a>
+            <a class="button button-secondary" href="#recipe-map">查看页面蓝图</a>
           </div>
           <ul class="trust-strip">
             <li>商业级流程治理</li>
             <li>研究报告与 UI/UX 规范先行</li>
-            <li>Screen recipes / Tweaks / Runtime evidence 全链闭环</li>
+            <li>Screen blueprints / Tweaks / Runtime evidence 全链闭环</li>
           </ul>
         </div>
         <div class="hero-panel" aria-label="产品演示摘要">
@@ -351,7 +351,7 @@ class FrontendScaffoldBuilder(FrontendFrameworkProjectsMixin, FrontendQualityCon
             <h2>{html.escape(hero_panel_title)}</h2>
             <p>{html.escape(hero_panel_copy)}</p>
             <div class="metric-grid">
-              <div><strong>{len(screen_recipes) or 1}</strong><span>页面配方</span></div>
+              <div><strong>{len(screen_recipes) or 1}</strong><span>页面蓝图</span></div>
               <div><strong>{trust_module_count or 3}</strong><span>信任模块</span></div>
               <div><strong>{verification_count or 4}</strong><span>验证节点</span></div>
             </div>
@@ -437,7 +437,7 @@ class FrontendScaffoldBuilder(FrontendFrameworkProjectsMixin, FrontendQualityCon
 
       <section id="recipe-map" class="card">
         <div class="section-head">
-          <h2>页面配方</h2>
+          <h2>页面蓝图</h2>
           <p>先冻结关键页面的结构顺序、组件重点、信任模块和状态要求，再开始写页面。</p>
         </div>
         <div id="recipe-grid" class="recipe-grid"></div>

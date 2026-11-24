@@ -267,7 +267,7 @@ class UIReviewExecutionMixin:
         has_validation_surfaces = bool(framework_playbook.get("validation_surfaces"))
         has_delivery_evidence = bool(framework_playbook.get("delivery_evidence"))
         alignment_summary["screen_recipes"] = {
-            "label": "页面配方冻结",
+            "label": "页面蓝图规约",
             "passed": screen_recipe_passed,
             "expected": "关键页面需冻结 section order / trust modules / required states",
             "observed": ", ".join(
@@ -607,7 +607,7 @@ class UIReviewExecutionMixin:
                     UIReviewFinding(
                         level="medium",
                         title="Claude-Design 风格执行协议未冻结",
-                        description="UI 契约还没有完整冻结页面配方、上下文导入协议、Tweaks 变体策略或验证交付协议，宿主容易再次退回到泛化页面生成。",
+                        description="UI 契约还没有完整冻结页面蓝图、上下文导入协议、Tweaks 变体策略或验证交付协议，宿主容易再次退回到泛化页面生成。",
                         recommendation="补齐 output/*-ui-contract.json 中的 screen_recipes、design_context_protocol、tweak_strategy、verification_handoff，并让前端实现围绕这些冻结字段组织页面。",
                         evidence=protocol_gaps,
                     )
@@ -618,7 +618,7 @@ class UIReviewExecutionMixin:
                     UIReviewFinding(
                         level="medium",
                         title="frontend runtime 缺少 Claude-Design 协议证据",
-                        description="UI 契约已经冻结 Claude-Design 风格执行协议，但还没有 frontend runtime 报告来证明页面配方、上下文协议、Tweaks 和验证交付链已真实进入运行产物。",
+                        description="UI 契约已经冻结 Claude-Design 风格执行协议，但还没有 frontend runtime 报告来证明页面蓝图、上下文协议、Tweaks 和验证交付链已真实进入运行产物。",
                         recommendation="先重新执行 frontend runtime，确保 runtime 报告写出 ui_screen_recipes / ui_design_context_protocol / ui_tweak_strategy / ui_verification_handoff 四项结果。",
                         evidence=[
                             "frontend-runtime missing",
@@ -646,7 +646,7 @@ class UIReviewExecutionMixin:
                     UIReviewFinding(
                         level="medium",
                         title="frontend runtime 未证明 Claude-Design 执行协议",
-                        description="虽然 UI 契约已经冻结 Claude-Design 风格执行协议，但 frontend runtime 仍未证明页面配方、上下文协议、Tweaks 或验证交付链已经真实进入运行态。",
+                        description="虽然 UI 契约已经冻结 Claude-Design 风格执行协议，但 frontend runtime 仍未证明页面蓝图、上下文协议、Tweaks 或验证交付链已经真实进入运行态。",
                         recommendation="按当前 UI 契约修正前端并重新执行 frontend runtime，重点补齐运行时对 screen_recipes / design_context_protocol / tweak_strategy / verification_handoff 的证据。",
                         evidence=[
                             *[
@@ -731,7 +731,7 @@ class UIReviewExecutionMixin:
                 "图标系统",
                 "Design Token 冻结输出",
                 "备选实现路径",
-                "Screen Recipes（页面配方冻结）",
+                "Screen Blueprints（页面蓝图规约）",
                 "Claude-Design 风格执行协议",
             ]
             missing_decision_markers = [
