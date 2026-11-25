@@ -109,6 +109,10 @@ super-dev release proof-pack         # 交付证据包
 ### 质量返工
 1. 修复问题 → `super-dev quality` → `super-dev review quality --status confirmed`
 
+### 未决事项与核心文档纯净
+1. 挂起决策或临时妥协统一记入 `.super-dev/parking-lot.json`（`super-dev parking add`），禁止向核心 PRD/架构文档写入 `TBD`/待定补丁
+2. 条件成熟需要解除时，必须先将最终定论写回对应核心文档，再引用真实 `#anchor` 执行 `super-dev parking resolve`
+
 ## 高频快捷 Tool
 
 | Tool | 用途 | 示例 |

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .baseline_governance import inspect_baseline_governance
+from .parking_lot import summarize_parking_lot
 from .workflow_state import build_host_action_prompt, detect_pipeline_summary
 
 
@@ -48,6 +49,7 @@ def build_host_workflow_context(
             "waiting_baseline_confirmation",
             "waiting_resume_gate",
             "waiting_docs_confirmation",
+            "waiting_parking_lot_closure",
             "waiting_preview_confirmation",
             "waiting_ui_revision",
             "waiting_architecture_revision",
@@ -59,6 +61,35 @@ def build_host_workflow_context(
         str(resolved_summary.get("blocker", "")).strip()
         or str(baseline.get("blocking_reason", "")).strip()
     )
+    parking_lot_raw = resolved_summary.get("parking_lot")
+    parking_lot: dict[str, Any] = (
+        parking_lot_raw
+        if isinstance(parking_lot_raw, dict)
+        else summarize_parking_lot(
+            project_dir,
+            artifact_prefix=str(resolved_summary.get("artifact_prefix", "")).strip(),
+        )
+    )
+    parking_lot_blocked = not bool(parking_lot.get("passed", True))
+    if parking_lot_blocked and blocking_gate in {"", "waiting_docs_confirmation"}:
+        blocking_gate = "waiting_parking_lot_closure"
+        if parking_lot.get("integrity_error"):
+            blocking_reason = str(parking_lot["integrity_error"])
+        elif parking_lot.get("core_doc_leaks"):
+            first_leak = parking_lot["core_doc_leaks"][0]
+            blocking_reason = (
+                f"核心文档存在未入账未决项 ({first_leak['file']}:{first_leak['line']}: "
+                f"{first_leak['reason']})"
+            )
+        elif parking_lot.get("violations"):
+            first_v = parking_lot["violations"][0]
+            blocking_reason = f"未决事项账本校验失败 ({first_v['id']}: {first_v['error']})"
+        if not str(recommended_host_action).strip():
+            recommended_host_action = "super-dev parking check"
+        if not str(recommended_host_sentence).strip():
+            recommended_host_sentence = (
+                "super-dev: 先清理核心文档未入账占位或修复未决事项账本后再继续"
+            )
     next_action = (
         str(recommended_host_action).strip()
         or str(baseline.get("next_host_action", "")).strip()
@@ -103,6 +134,7 @@ def build_host_workflow_context(
         ).strip(),
         "recommended_host_action": next_action,
         "recommended_host_sentence": next_sentence,
+        "parking_lot": parking_lot,
         "can_resume": effective_entry_mode == "continue" or blocking_gate == "waiting_resume_gate",
         "can_progress": not blocking_gate and bool(baseline.get("can_enter_delta_flow", True)),
     }

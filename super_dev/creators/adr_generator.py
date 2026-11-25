@@ -467,18 +467,29 @@ class ADRGenerator:
         if chosen_option:
             pros = chosen_option.get("pros", [])
             pros_text = "、".join(str(p) for p in pros) if pros else "符合项目需求"
+            alternatives = [
+                opt
+                for opt in options
+                if str(opt.get("name", "")) != str(chosen_option.get("name", ""))
+            ]
+            alt_summary = "；".join(
+                f"放弃 {opt.get('name', '备选方案')}（短板: {'、'.join(str(c) for c in opt.get('cons', [])[:2]) or '综合适配较低'}）"
+                for opt in alternatives[:2]
+            )
             decision = f"选择 {chosen_tech} 作为项目的{category_cn}。"
-            rationale = f"{chosen_tech} 的主要优势包括: {pros_text}。综合适配评分最高。"
+            rationale = f"{chosen_tech} 的主要优势包括: {pros_text}。综合实现复杂度、故障恢复与演进弹性最优。" + (
+                f"\n放弃其他备选方案的原因: {alt_summary}。" if alt_summary else ""
+            )
             cons = chosen_option.get("cons", [])
             cons_text = "、".join(str(c) for c in cons) if cons else "无明显劣势"
             consequences = (
                 f"正面: {pros_text}。\n"
                 f"负面/风险: {cons_text}。\n"
-                f"需要团队熟悉 {chosen_tech} 的最佳实践。"
+                f"适用边界: 仅对关键且难逆的技术选型启用多方案对比，常规局部改动不机械套用。"
             )
         else:
             decision = f"选择 {chosen_tech} 作为项目的{category_cn}。"
-            rationale = f"基于项目需求和团队情况，{chosen_tech} 是最合适的选择。"
+            rationale = f"基于项目需求和团队情况，{chosen_tech} 是最合适的选择；常规局部改动豁免额外方案比对。"
             consequences = f"团队需要确保对 {chosen_tech} 有足够的掌握。"
 
         adr_id = self._allocate_id()

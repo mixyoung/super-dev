@@ -12,6 +12,7 @@ from .artifact_utils import (
     sanitize_artifact_name,
 )
 from .atomic_io import atomic_write_text
+from .parking_lot import summarize_parking_lot
 from .review_state import (
     load_docs_confirmation,
     load_preview_confirmation,
@@ -187,6 +188,24 @@ def collect_preview_artifact_binding(project_dir: Path) -> dict[str, Any]:
     )
 
 
+def _raise_if_parking_lot_blocked(gate_state: dict[str, Any], *, action: str) -> None:
+    """Raise a dedicated parking_lot gate error when the ledger or core docs violate Option 2."""
+
+    parking_lot = gate_state.get("parking_lot", {})
+    if isinstance(parking_lot, dict) and not parking_lot.get("passed", True):
+        if (
+            gate_state.get("has_context")
+            or parking_lot.get("exists")
+            or parking_lot.get("core_doc_leaks")
+        ):
+            raise WorkflowGateError(
+                "未决事项账本或核心文档存在未收敛问题，不能进入后续阶段。",
+                gate="parking_lot",
+                action=action,
+                details=parking_lot,
+            )
+
+
 def require_spec_work_item_binding(project_dir: Path, change_id: str) -> dict[str, Any]:
     """Require the formal Spec id to match the explicit pre-Spec identity and docs."""
 
@@ -216,6 +235,7 @@ def require_spec_work_item_binding(project_dir: Path, change_id: str) -> dict[st
         )
 
     gate_state = docs_gate_status(project_dir)
+    _raise_if_parking_lot_blocked(gate_state, action="spec_work_item_binding")
     confirmed_binding = gate_state.get("confirmed_artifact_binding", {})
     confirmed_work_item = (
         str(confirmed_binding.get("work_item_id", "")).strip()
@@ -361,6 +381,29 @@ def record_stage_progress(
     )
 
 
+def require_parking_lot_clean(
+    project_dir: Path,
+    *,
+    action: str,
+    artifact_prefix: str = "",
+    require_no_blocking_open: bool = False,
+) -> dict[str, Any]:
+    """确保第二套账本健康且核心文档无未入账暂缓/占位泄漏。"""
+    summary = summarize_parking_lot(
+        project_dir,
+        artifact_prefix=artifact_prefix,
+        require_no_blocking_open=require_no_blocking_open,
+    )
+    if summary["passed"]:
+        return summary
+    raise WorkflowGateError(
+        "未决事项账本或核心文档存在未收敛问题，不能跳过第二账本硬门禁。",
+        gate="parking_lot",
+        action=action,
+        details=summary,
+    )
+
+
 def save_bound_docs_confirmation(
     project_dir: Path, payload: dict[str, Any]
 ) -> tuple[Path, dict[str, Any]]:
@@ -374,6 +417,13 @@ def save_bound_docs_confirmation(
         )
     binding = collect_docs_artifact_binding(project_dir)
     normalized = dict(payload)
+    normalized_status = str(normalized.get("status", "")).strip() or "pending_review"
+    if normalized_status == "confirmed":
+        require_parking_lot_clean(
+            project_dir,
+            action="save_docs_confirmation",
+            artifact_prefix=str(binding.get("artifact_prefix", "")),
+        )
     if not identity.legacy and identity.work_item_id:
         normalized["work_item_id"] = identity.work_item_id
     normalized["artifact_binding"] = binding
@@ -450,7 +500,14 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
     current_digest = str(binding.get("digest", "")).strip()
     binding_matches_current = bool(stored_digest) and stored_digest == current_digest
     core_complete = bool(binding.get("core_complete", True))
-    confirmed = status == "confirmed" and binding_matches_current and core_complete
+    parking_lot = summarize_parking_lot(
+        project_dir,
+        artifact_prefix=str(binding.get("artifact_prefix", "")),
+    )
+    parking_clean = bool(parking_lot["passed"])
+    confirmed = (
+        status == "confirmed" and binding_matches_current and core_complete and parking_clean
+    )
     return {
         "has_context": has_context,
         "confirmed": confirmed,
@@ -459,6 +516,7 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
         "confirmed_artifact_binding": confirmed_binding,
         "binding_matches_current": binding_matches_current,
         "core_complete": core_complete,
+        "parking_lot": parking_lot,
         "confirmation": confirmation,
         "ledger_entry": ledger_entry,
     }
@@ -525,6 +583,7 @@ def require_docs_confirmation(
             details={"work_item_id": identity.work_item_id, "requested_phases": sorted(requested)},
         )
     gate_state = docs_gate_status(project_dir)
+    _raise_if_parking_lot_blocked(gate_state, action=action)
     if requested_phases is not None and not requested_phases_require_docs_confirmation(
         requested_phases
     ):

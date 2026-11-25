@@ -2,7 +2,9 @@
 Super Dev 测试配置
 """
 
+import os
 import shutil
+import site
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
@@ -46,9 +48,12 @@ def isolated_user_directories(
 
     home = tmp_path / "isolated-user-home"
     home.mkdir(parents=True, exist_ok=True)
+    real_user_base = site.getuserbase() if site.ENABLE_USER_SITE else ""
     context = UserDirectoryContext.from_home(home)
     for name, value in context.environment({}).items():
         monkeypatch.setenv(name, value)
+    if real_user_base and "PYTHONUSERBASE" not in os.environ:
+        monkeypatch.setenv("PYTHONUSERBASE", real_user_base)
     assert Path.home().resolve() == context.home
     assert Path("~").expanduser().resolve() == context.home
     yield context

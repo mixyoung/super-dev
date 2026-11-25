@@ -65,7 +65,7 @@ jobs:
           path: output/reference-scan-latest.md
 
       - name: Notify Maintainer via Issue if Actionable
-        if: env.has_actionable == 'true'
+        if: steps.checker.outputs.has_actionable == 'true'
         uses: actions/github-script@v7
         with:
           script: |

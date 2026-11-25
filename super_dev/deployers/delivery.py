@@ -115,6 +115,32 @@ class DeliveryPackager:
                 }
             )
 
+        from ..parking_lot import summarize_parking_lot
+
+        parking_lot_path = self.project_dir / ".super-dev" / "parking-lot.json"
+        parking_summary = summarize_parking_lot(
+            self.project_dir,
+            artifact_prefix=self.name,
+            require_no_blocking_open=True,
+        )
+        if parking_summary["exists"] or parking_summary["core_doc_leaks"]:
+            if parking_summary["integrity_error"] is None and parking_lot_path.exists():
+                included_files.append(self._relative(parking_lot_path))
+            if not parking_summary["passed"]:
+                issue_parts = [
+                    f"{v['id']}: {v['error']}" for v in parking_summary["violations"][:2]
+                ]
+                issue_parts.extend(
+                    f"{leak['file']}:{leak['line']} {leak['reason']}"
+                    for leak in parking_summary["core_doc_leaks"][:2]
+                )
+                missing_required.append(
+                    {
+                        "path": ".super-dev/parking-lot.json",
+                        "reason": f"未决事项登记簿硬门禁未通过: {'; '.join(issue_parts)}",
+                    }
+                )
+
         included_files = sorted(set(included_files))
         status = "ready" if not missing_required else "incomplete"
 

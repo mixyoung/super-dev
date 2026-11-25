@@ -194,6 +194,7 @@ This project uses a pipeline-driven development model.
 - After each requested revision inside a gate, stay in the same stage, update the required artifacts, summarize what changed, and wait again for explicit confirmation.
 - Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Before coding
 1. If Claude Code browse/search is available, research similar products first and write output/*-research.md as a real repository file

@@ -275,6 +275,16 @@ def quality_evidence_dependency_paths(
     if include_fresh_verification and fresh_verification_required(config):
         evidence = inspect_current_fresh_verification(project_dir)
         dependencies.extend(evidence.dependencies)
+    parking_lot_path = Path(project_dir) / ".super-dev" / "parking-lot.json"
+    if parking_lot_path.is_file():
+        from ..parking_lot import ParkingLotRegister
+
+        dependencies.append(parking_lot_path)
+        for target_path in ParkingLotRegister.load(project_dir).get_resolved_target_paths(
+            project_dir
+        ):
+            if target_path not in dependencies:
+                dependencies.append(target_path)
     return dependencies
 
 

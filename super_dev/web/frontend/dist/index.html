@@ -1768,6 +1768,122 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card" style="margin-top: 16px; margin-bottom: 0;">
+                    <div class="pipeline-summary-head">
+                        <div>
+                            <h2 style="font-size: 1.2rem; margin-bottom: 6px;">未决事项登记簿（第二套账本）</h2>
+                            <div style="font-size: 13px; color: #5c7084;">
+                                挂起决策统一登记在 <code>.super-dev/parking-lot.json</code>，核心 PRD / 架构文档保持定论纯净；解除前必须先回写核心文档真实锚点。
+                            </div>
+                        </div>
+                        <div class="pipeline-summary-meta">
+                            <span class="pipeline-chip">
+                                门禁状态：{{ parkingLot.passed ? '通过' : '阻断' }}
+                            </span>
+                            <span class="pipeline-chip">
+                                未决 {{ parkingLot.open_count || 0 }} / 总计 {{ parkingLot.total_count || 0 }}
+                            </span>
+                            <span class="pipeline-chip" v-if="parkingLot.blocking_open_count">
+                                阻塞交付 {{ parkingLot.blocking_open_count }}
+                            </span>
+                            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" :disabled="loading" @click="loadParkingLot()">
+                                刷新账本
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="parkingLot.integrity_error" class="pipeline-blocker">
+                        账本完整性校验失败：{{ parkingLot.integrity_error }}
+                    </div>
+                    <div v-if="parkingLot.core_doc_leaks && parkingLot.core_doc_leaks.length" class="pipeline-blocker">
+                        <div><strong>核心文档检测到未入账未决占位（{{ parkingLot.core_doc_leaks.length }} 处）：</strong></div>
+                        <ul style="margin: 6px 0 0 18px;">
+                            <li v-for="(leak, idx) in parkingLot.core_doc_leaks" :key="'leak-' + idx">
+                                <code>{{ leak.file_path }}:{{ leak.line }}</code> — {{ leak.snippet }}
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="pipeline-confirmation" style="margin-top: 12px;">
+                        <strong>登记新未决事项</strong>
+                        <div class="grid" style="margin-top: 10px;">
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>决策主题</label>
+                                <input v-model="parkingLotForm.title" type="text" placeholder="例如：支付渠道双活接入" />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>暂缓原因</label>
+                                <input v-model="parkingLotForm.reason_for_deferral" type="text" placeholder="例如：商户资质审批尚在排队" />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>重开触发条件</label>
+                                <input v-model="parkingLotForm.revisit_trigger" type="text" placeholder="例如：正式商户号下发且回调域名备案完成" />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>当前临时妥协 / 兜底</label>
+                                <input v-model="parkingLotForm.current_compromise" type="text" placeholder="例如：先启用沙箱支付网关适配器" />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>受影响模块（逗号分隔，可选）</label>
+                                <input v-model="parkingLotForm.affected_components_text" type="text" placeholder="checkout, billing" />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px; display: flex; align-items: flex-end;">
+                                <label style="display: flex; align-items: center; margin-bottom: 8px; cursor: pointer;">
+                                    <input type="checkbox" v-model="parkingLotForm.blocks_delivery" style="width: auto; margin-right: 8px;" />
+                                    <span>未解除前阻塞正式交付（blocks_delivery）</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="workflow-actions" style="margin-top: 6px;">
+                            <button class="btn btn-primary" :disabled="loading" @click="addParkingLotItem()">
+                                新增未决事项
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="parkingLot.items && parkingLot.items.length" style="margin-top: 12px; display: grid; gap: 10px;">
+                        <div v-for="item in parkingLot.items" :key="item.id" class="pipeline-confirmation" style="margin-top: 0;">
+                            <div class="pipeline-summary-head">
+                                <div>
+                                    <strong>{{ item.id }} · {{ item.title }}</strong>
+                                    <div style="margin-top: 4px; font-size: 12px; color: #5c7084;">
+                                        原因：{{ item.reason_for_deferral }} ｜ 触发：{{ item.revisit_trigger }} ｜ 妥协：{{ item.current_compromise }}
+                                    </div>
+                                </div>
+                                <div class="pipeline-summary-meta">
+                                    <span class="pipeline-chip">{{ item.status }}</span>
+                                    <span class="pipeline-chip" v-if="item.blocks_delivery">blocks_delivery</span>
+                                </div>
+                            </div>
+                            <div v-if="item.status !== 'open' && item.resolved_target" style="margin-top: 6px; font-size: 12px; color: #0f766e;">
+                                已回写核心文档：<code>{{ item.resolved_target }}</code>
+                                <span v-if="item.resolution_notes"> · {{ item.resolution_notes }}</span>
+                            </div>
+                            <div v-else-if="item.status === 'open' && parkingLotResolveForms[item.id]" style="margin-top: 10px;">
+                                <div class="grid">
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label>核心文档回写锚点（resolved_target）</label>
+                                        <input v-model="parkingLotResolveForms[item.id].resolved_target" type="text" placeholder="output/demo-architecture.md#章节标题" />
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <label>解决说明（resolution_notes）</label>
+                                        <input v-model="parkingLotResolveForms[item.id].resolution_notes" type="text" placeholder="说明定论内容与回写摘要" />
+                                    </div>
+                                </div>
+                                <div class="workflow-actions" style="margin-top: 4px;">
+                                    <button class="btn btn-primary" :disabled="loading" @click="resolveParkingLotItem(item.id, 'resolved')">
+                                        核验核心文档并解除
+                                    </button>
+                                    <button class="btn btn-secondary" :disabled="loading" @click="resolveParkingLotItem(item.id, 'superseded')">
+                                        标记替代关闭
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="loading" style="padding: 18px;">当前项目暂无登记的未决事项</div>
+                </div>
             </div>
 
             <!-- 宿主生态 -->
@@ -2273,6 +2389,26 @@
                     architectureRevisionComment: '',
                     qualityRevisionComment: '',
                     hostRuntimeValidationComment: '',
+                    parkingLot: {
+                        exists: false,
+                        open_count: 0,
+                        blocking_open_count: 0,
+                        total_count: 0,
+                        passed: true,
+                        integrity_error: null,
+                        core_doc_leaks: [],
+                        violations: [],
+                        items: []
+                    },
+                    parkingLotForm: {
+                        title: '',
+                        reason_for_deferral: '',
+                        revisit_trigger: '',
+                        current_compromise: '',
+                        affected_components_text: '',
+                        blocks_delivery: false
+                    },
+                    parkingLotResolveForms: {},
                     pollTimer: null,
                     runsHistory: [],
                     selectedRunArtifacts: [],
@@ -2288,6 +2424,7 @@
                 await this.loadExperts();
                 await this.loadRunsHistory();
                 await this.loadProjectConfig();
+                await this.loadParkingLot();
             },
             beforeUnmount() {
                 if (this.pollTimer) {
@@ -2589,6 +2726,7 @@
                             this.message = { type: 'error', text: error.response?.data?.detail || '读取项目配置失败' };
                         }
                     }
+                    await this.loadParkingLot();
                 },
 
                 async loadPhases() {
@@ -3507,6 +3645,97 @@
                         };
                     } catch (error) {
                         this.message = { type: 'error', text: error.response?.data?.detail || '更新宿主真人验收状态失败' };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                apiAuthHeaders() {
+                    const apiKey = (this.hostDoctorApiKey || '').trim();
+                    return apiKey ? { 'X-Super-Dev-Key': apiKey } : {};
+                },
+
+                async loadParkingLot() {
+                    try {
+                        const response = await axios.get('/api/parking-lot', {
+                            params: { project_dir: this.projectDir || '.' }
+                        });
+                        const data = response.data || {};
+                        this.parkingLot = {
+                            exists: Boolean(data.exists),
+                            open_count: Number(data.open_count || 0),
+                            blocking_open_count: Number(data.blocking_open_count || 0),
+                            total_count: Number(data.total_count || 0),
+                            passed: data.passed !== false,
+                            integrity_error: data.integrity_error || null,
+                            core_doc_leaks: Array.isArray(data.core_doc_leaks) ? data.core_doc_leaks : [],
+                            violations: Array.isArray(data.violations) ? data.violations : [],
+                            items: Array.isArray(data.items) ? data.items : [],
+                        };
+                        this.parkingLot.items.forEach((item) => {
+                            if (item && item.id && !this.parkingLotResolveForms[item.id]) {
+                                this.parkingLotResolveForms[item.id] = {
+                                    resolved_target: '',
+                                    resolution_notes: '',
+                                };
+                            }
+                        });
+                    } catch (error) {
+                        this.message = { type: 'error', text: error.response?.data?.detail || '读取未决事项账本失败' };
+                    }
+                },
+
+                async addParkingLotItem() {
+                    this.loading = true;
+                    try {
+                        const components = (this.parkingLotForm.affected_components_text || '')
+                            .split(',')
+                            .map((item) => item.trim())
+                            .filter(Boolean);
+                        await axios.post('/api/parking-lot', {
+                            title: this.parkingLotForm.title || '',
+                            reason_for_deferral: this.parkingLotForm.reason_for_deferral || '',
+                            revisit_trigger: this.parkingLotForm.revisit_trigger || '',
+                            current_compromise: this.parkingLotForm.current_compromise || '',
+                            affected_components: components,
+                            blocks_delivery: Boolean(this.parkingLotForm.blocks_delivery),
+                        }, {
+                            params: { project_dir: this.projectDir || '.' },
+                            headers: this.apiAuthHeaders(),
+                        });
+                        this.parkingLotForm = {
+                            title: '',
+                            reason_for_deferral: '',
+                            revisit_trigger: '',
+                            current_compromise: '',
+                            affected_components_text: '',
+                            blocks_delivery: false,
+                        };
+                        await this.loadParkingLot();
+                        this.message = { type: 'success', text: '已将未决事项登记至 .super-dev/parking-lot.json' };
+                    } catch (error) {
+                        this.message = { type: 'error', text: error.response?.data?.detail || '新增未决事项失败' };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async resolveParkingLotItem(itemId, status = 'resolved') {
+                    const form = this.parkingLotResolveForms[itemId] || {};
+                    this.loading = true;
+                    try {
+                        await axios.post(`/api/parking-lot/${encodeURIComponent(itemId)}/resolve`, {
+                            resolution_notes: form.resolution_notes || '',
+                            resolved_target: form.resolved_target || '',
+                            status,
+                        }, {
+                            params: { project_dir: this.projectDir || '.' },
+                            headers: this.apiAuthHeaders(),
+                        });
+                        await this.loadParkingLot();
+                        this.message = { type: 'success', text: `已${status === 'superseded' ? '标记替代关闭' : '核验并解除'}未决事项 ${itemId}` };
+                    } catch (error) {
+                        this.message = { type: 'error', text: error.response?.data?.detail || '解除未决事项失败' };
                     } finally {
                         this.loading = false;
                     }

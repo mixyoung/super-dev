@@ -1,14 +1,24 @@
 """E2E tests covering the full Super Dev workflow."""
 
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 PYTHON = sys.executable
+REPO_ROOT = Path(__file__).resolve().parents[2]
 # 只用于防止子进程失控，不作为性能合格线。Doctor 会执行完整宿主检查，
 # 在 Windows 冷启动和实时安全扫描下可能超过 30 秒。
 TIMEOUT = 120
+
+
+def _subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "").strip()
+    repo_path = str(REPO_ROOT)
+    env["PYTHONPATH"] = repo_path if not existing else os.pathsep.join([repo_path, existing])
+    return env
 
 
 def _run(args: list[str], cwd: str, timeout: int = TIMEOUT) -> subprocess.CompletedProcess:
@@ -16,6 +26,7 @@ def _run(args: list[str], cwd: str, timeout: int = TIMEOUT) -> subprocess.Comple
     return subprocess.run(
         [PYTHON, "-m", "super_dev.cli", *args],
         cwd=cwd,
+        env=_subprocess_env(),
         capture_output=True,
         text=True,
         timeout=timeout,

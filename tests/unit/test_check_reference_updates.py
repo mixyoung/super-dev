@@ -6,7 +6,12 @@ import sys
 # Ensure scripts dir is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../scripts")))
 
-from check_reference_updates import classify_changes, matches_any_pattern, render_markdown_report
+from check_reference_updates import (
+    classify_changes,
+    main,
+    matches_any_pattern,
+    render_markdown_report,
+)
 
 
 def test_matches_any_pattern():
@@ -95,3 +100,24 @@ def test_render_markdown_report_structure():
     assert "🟢 建议跟进" in report
     assert "docs/plan/new.md" in report
     assert "docs/CONTRIBUTION_POLICY.md" in report
+
+
+def test_classify_changes_actionable_on_version_tag_commit():
+    files = [{"filename": "skills/core.md"}]
+    commits = [{"commit": {"message": "chore: release v2.1.0"}}]
+    cat, _, touched = classify_changes(files, commits, ["skills/"], [".github/"])
+    assert cat == "actionable"
+    assert touched == ["skills/core.md"]
+
+
+def test_output_report_bare_filename(tmp_path, monkeypatch):
+    cfg = tmp_path / "tracking.json"
+    cfg.write_text('{"sources": {}}', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["check_reference_updates.py", "--config", str(cfg), "--output-report", "report.md"],
+    )
+    main()
+    assert (tmp_path / "report.md").exists()

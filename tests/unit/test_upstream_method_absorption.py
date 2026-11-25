@@ -77,3 +77,64 @@ def test_unrelated_frontend_push_does_not_contaminate_with_adr_or_review(
     injection = result.to_prompt_injection()
     assert "Design It Twice" not in injection
     assert "多视角审查集" not in injection
+
+
+def test_engineering_contracts_embedded_in_generators_and_reviewers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    from super_dev.creators.adr_generator import ADRGenerator
+    from super_dev.creators.document_generator import DocumentGenerator
+    from super_dev.creators.prompt_generator import AIPromptGenerator
+    from super_dev.orchestrator.experts import ExpertRole, get_expert_prompt_section
+    from super_dev.reviewers.code_review import CodeReviewGenerator
+
+    # 1. PRD 术语表契约
+    doc_gen = DocumentGenerator(
+        name="demo",
+        description="企业级SaaS工单系统",
+        frontend="react",
+        backend="python",
+    )
+    prd = doc_gen.generate_prd()
+    assert "禁止使用的别名" in prd
+    assert "概念边界与反例" in prd
+
+    # 2. 架构文档与 ADR 生成器包含双方案比对与放弃理由
+    arch = doc_gen.generate_architecture()
+    assert "双方案比对契约" in arch
+    assert "放弃方案 B 的核心原因" in arch
+
+    adr_gen = ADRGenerator(tmp_path)
+    adrs = adr_gen.generate_from_architecture({"database": "postgresql", "backend": "fastapi"})
+    assert adrs
+    adr_md = adrs[0].to_markdown()
+    assert "放弃其他备选方案的原因" in adr_md
+    assert "适用边界" in adr_md
+
+    # 3. 代码审查指南契约包含四视角、三档严格度与反作弊红线
+    review_md = CodeReviewGenerator(
+        project_dir=tmp_path,
+        name="demo",
+        tech_stack={"platform": "web", "frontend": "react", "backend": "python"},
+    ).generate()
+    assert "多视角审查集与审查严格度档位" in review_md
+    assert "架构一致性视角" in review_md
+    assert "极简速审" in review_md
+    assert "测试完整性反作弊红线" in review_md
+
+    # 4. AI 提示词与专家画像契约对齐
+    (tmp_path / "super-dev.yaml").write_text(
+        "name: demo\ndescription: 构建SaaS平台\nplatform: web\nfrontend: react\nbackend: python\n",
+        encoding="utf-8",
+    )
+    prompt = AIPromptGenerator(project_dir=tmp_path, name="demo").generate()
+    assert "测试完整性反作弊红线" in prompt
+    assert "多视角与按风险分级自审" in prompt
+    assert "设计双方案与词表契约" in prompt
+
+    assert "双方案比对" in get_expert_prompt_section(ExpertRole.ARCHITECT)
+    assert "禁止别名" in get_expert_prompt_section(ExpertRole.PM)
+    assert "极简速审" in get_expert_prompt_section(ExpertRole.CODE)
+    assert "注释断言" in get_expert_prompt_section(ExpertRole.QA)

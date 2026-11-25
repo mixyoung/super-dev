@@ -173,9 +173,49 @@ class SessionBrief:
         """从 .super-dev/parking-lot.json 自动同步未决事项到 SESSION_BRIEF.md 的 Open Decisions 段落。"""
         from super_dev.parking_lot import ParkingLotRegister
 
-        reg = ParkingLotRegister.load(project_dir)
+        project_path = Path(project_dir)
+        brief_path = _brief_path(project_path)
+        reg = ParkingLotRegister.load(project_path)
         table_md = reg.render_markdown_table()
-        SessionBrief.update_section(project_dir, "Open Decisions", table_md)
+
+        # 若 SESSION_BRIEF.md 由 StateStore 生成（含来源工作项/状态修订元数据），则仅就地刷新
+        # ## Open Decisions 段落，避免破坏 StateStore.session_brief_health() 校验头。
+        if brief_path.exists():
+            raw = brief_path.read_text(encoding="utf-8")
+            if "- 来源工作项:" in raw and "- 状态修订:" in raw:
+                updated = SessionBrief._replace_section_preserving_header(
+                    raw, "Open Decisions", table_md
+                )
+                brief_path.write_text(updated, encoding="utf-8")
+                return
+
+        SessionBrief.update_section(project_path, "Open Decisions", table_md)
+
+    @staticmethod
+    def _replace_section_preserving_header(raw: str, section_name: str, content: str) -> str:
+        header_line = _section_header(section_name)
+        lines = raw.splitlines()
+        start_idx: int | None = None
+        end_idx: int = len(lines)
+        for idx, line in enumerate(lines):
+            if line.strip() == header_line:
+                start_idx = idx
+                continue
+            if start_idx is not None and re.match(r"^##\s+.+$", line):
+                end_idx = idx
+                break
+
+        replacement_block = [header_line, "", content.strip() or "_(empty)_", ""]
+        if start_idx is not None:
+            new_lines = lines[:start_idx] + replacement_block + lines[end_idx:]
+        else:
+            insert_at = len(lines)
+            for idx, line in enumerate(lines):
+                if re.match(r"^##\s+.+$", line):
+                    insert_at = idx
+                    break
+            new_lines = lines[:insert_at] + [""] + replacement_block + lines[insert_at:]
+        return "\n".join(new_lines).rstrip() + "\n"
 
     # -- summarize_for_context ----------------------------------------------
 

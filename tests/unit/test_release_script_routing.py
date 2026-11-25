@@ -64,8 +64,12 @@ fi
         )
         path.chmod(0o755)
     log = tmp_path / "calls.log"
+    existing_pythonpath = os.environ.get("PYTHONPATH", "").strip()
     env = {
         **os.environ,
+        "PYTHONPATH": (
+            str(ROOT) if not existing_pythonpath else os.pathsep.join([str(ROOT), existing_pythonpath])
+        ),
         "RELEASE_TEST_LOG": log.as_posix(),
         "RELEASE_TEST_PYTHON": Path(sys.executable).as_posix(),
     }

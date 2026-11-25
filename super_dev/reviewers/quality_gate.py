@@ -1547,37 +1547,47 @@ class QualityGateChecker(QualityGateEvidenceMixin):
             )
         )
 
-        # 检查未决事项登记簿合规性（若存在）
-        parking_lot_path = self.project_dir / ".super-dev" / "parking-lot.json"
-        if parking_lot_path.exists():
-            from ..parking_lot import ParkingLotRegister
+        # 检查未决事项登记簿硬门禁与核心文档反泄漏扫描
+        from ..parking_lot import summarize_parking_lot
 
-            reg = ParkingLotRegister.load(self.project_dir)
-            violations = reg.validate_compliance()
-            open_count = len(reg.get_open_items())
-            if not violations:
+        parking_summary = summarize_parking_lot(
+            self.project_dir,
+            artifact_prefix=self.name,
+            require_no_blocking_open=True,
+        )
+        if parking_summary["exists"] or parking_summary["core_doc_leaks"]:
+            if not parking_summary["passed"]:
+                reason_parts = [
+                    f"{v['id']}: {v['error']}" for v in parking_summary["violations"][:2]
+                ]
+                reason_parts.extend(
+                    f"{leak['file']}:{leak['line']} {leak['reason']}"
+                    for leak in parking_summary["core_doc_leaks"][:2]
+                )
                 checks.append(
                     QualityCheck(
                         name="未决事项登记簿",
                         category="documentation",
-                        description="跨会话架构妥协与挂起决策三要素完整性",
-                        status=CheckStatus.PASSED,
-                        score=100,
+                        description="跨会话架构妥协、核心文档纯净与挂起决策硬门禁",
+                        status=CheckStatus.FAILED,
+                        score=0,
                         weight=doc_weight,
-                        details=f"未决事项登记簿合规，当前共有 {open_count} 项挂起决策已明确触发条件",
+                        details=f"未决事项硬门禁未通过: {'; '.join(reason_parts)}",
                     )
                 )
             else:
-                issues = "; ".join(f"{v['id']}: {v['error']}" for v in violations[:3])
                 checks.append(
                     QualityCheck(
                         name="未决事项登记簿",
                         category="documentation",
-                        description="跨会话架构妥协与挂起决策三要素完整性",
-                        status=CheckStatus.WARNING,
-                        score=60,
+                        description="跨会话架构妥协、核心文档纯净与挂起决策硬门禁",
+                        status=CheckStatus.PASSED,
+                        score=100,
                         weight=doc_weight,
-                        details=f"未决事项存在推诿或要素缺失: {issues}",
+                        details=(
+                            f"未决事项登记簿合规（{parking_summary['open_count']} 项非阻塞挂起已明确重审条件），"
+                            "核心文档无未入账待定补丁且已解除项均已核验回写"
+                        ),
                     )
                 )
 

@@ -233,6 +233,13 @@ class CliSpecMixin:
             self.console.print(f"  需求: {args.req_name}")
 
         elif args.spec_action == "scaffold":
+            from .workflow_guard import require_parking_lot_clean
+
+            try:
+                require_parking_lot_clean(project_dir, action="scaffold_spec")
+            except Exception as exc:
+                self.console.print(f"[red]生成 Spec 模板被第二账本硬门禁阻止: {exc}[/red]")
+                return 1
             generator = SpecGenerator(project_dir)
             try:
                 generated = generator.scaffold_change_artifacts(

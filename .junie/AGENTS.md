@@ -33,6 +33,7 @@
 - Respect Spec tasks sequence.
 - Implement and run the frontend before moving into backend-heavy work.
 - Keep architecture and UIUX consistency.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Delivery Criteria
 - Frontend can be demonstrated early.

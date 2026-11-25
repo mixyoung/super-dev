@@ -15,6 +15,7 @@ from .expert_stage_governance import collect_expert_stage_governance
 from .frameworks import summarize_framework_playbook
 from .host_adapters import get_special_flow_probe
 from .host_registry import get_display_name, get_protocol_summary, supports_slash
+from .parking_lot import summarize_parking_lot
 from .review_state import (
     load_architecture_revision,
     load_docs_confirmation,
@@ -1372,6 +1373,10 @@ def detect_pipeline_summary(
     checkpoint_status = "ready"
     recommended_command = "在宿主里说“继续当前流程”"
     evidence = "未检测到更高优先级阻断项"
+    parking_lot_summary = summarize_parking_lot(
+        project_dir,
+        artifact_prefix=artifact_prefix,
+    )
     if baseline_governance.get("entry_gate") == "waiting_resume_gate":
         blocker = (
             str(baseline_governance.get("blocking_reason", "")).strip()
@@ -1425,6 +1430,23 @@ def detect_pipeline_summary(
         checkpoint_status = "waiting_quality_revision"
         recommended_command = "在宿主里完成质量整改后直接说“质量整改已完成，继续当前流程”"
         evidence = "quality revision requested"
+    elif not parking_lot_summary["passed"]:
+        checkpoint_status = "waiting_parking_lot_closure"
+        if parking_lot_summary.get("integrity_error"):
+            blocker = str(parking_lot_summary["integrity_error"])
+        elif parking_lot_summary.get("core_doc_leaks"):
+            first_leak = parking_lot_summary["core_doc_leaks"][0]
+            blocker = (
+                f"核心文档存在未入账未决项 ({first_leak['file']}:{first_leak['line']}: "
+                f"{first_leak['reason']})"
+            )
+        elif parking_lot_summary.get("violations"):
+            first_v = parking_lot_summary["violations"][0]
+            blocker = f"未决事项账本校验失败 ({first_v['id']}: {first_v['error']})"
+        else:
+            blocker = "第二套账本（未决事项登记簿）尚未闭环。"
+        recommended_command = "运行 super-dev parking check 修复账本或拆解核心文档未决项"
+        evidence = blocker
     elif docs_confirmation_waiting:
         blocker = "三份核心文档已生成，当前必须等待用户确认或提出修改意见。"
         checkpoint_status = "waiting_docs_confirmation"
@@ -1598,6 +1620,7 @@ def detect_pipeline_summary(
         "evidence": evidence,
         "action_card": action_card,
     }
+    summary["parking_lot"] = parking_lot_summary
     if include_shadow_ledger:
         summary["shadow_ledger"] = build_shadow_ledger_summary(project_dir)
     summary["scenario_cards"] = build_workflow_scenario_cards(summary)

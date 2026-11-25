@@ -77,6 +77,7 @@ You do NOT need to open a terminal.
 | `/super-dev review preview` | View/update preview confirmation |
 | `/super-dev review architecture` | View/update architecture revision |
 | `/super-dev review quality` | View/update quality revision |
+| `/super-dev parking list` / `add` / `resolve` / `check` | Manage standalone `.super-dev/parking-lot.json` deferred items |
 | `/super-dev governance report` | Generate governance report |
 
 ### Delivery
@@ -183,7 +184,7 @@ These are the tokens that trigger Bash execution (not pipeline mode):
 ```
 init, bootstrap, setup, install, start, onboard, detect, doctor, migrate, update,
 run, status, next, continue, resume, jump, confirm,
-review, release, quality, enforce,
+review, release, quality, enforce, parking,
 spec, task, config, policy, governance, knowledge,
 memory, hooks, experts, compact,
 analyze, repo-map, impact, regression-guard, dependency-graph,

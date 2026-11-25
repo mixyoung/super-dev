@@ -51,6 +51,7 @@ super-dev spec list
 - 研究结论必须回填到 `output/*-research.md`，并用于约束 PRD / 架构 / UIUX。
 - 编码前必须先读取 `output/*-prd.md`、`output/*-architecture.md`、`output/*-uiux.md`，并完成用户确认门。
 - 如果用户要求修改文档，只允许回到文档阶段修订，不能绕过确认门直接建 Spec 或开工。
+- 挂起决策或临时妥协统一记入 `.super-dev/parking-lot.json`（`super-dev parking add`），禁止向核心文档写入 `TBD`/待定补丁；`super-dev parking resolve` 前必须先更新并引用真实核心文档锚点。
 - UI 必须遵循 UI/UX 文档，禁止直接输出模板化、同质化页面。
 - 禁止使用“AI 感”设计：紫/粉渐变主视觉、emoji 充当功能图标、默认系统字体直出。
 - 编码前必须先明确视觉方向、字体系统、颜色 token、间距 token、栅格系统、组件状态矩阵。

@@ -21,7 +21,7 @@
 | U3 | 测试范围、风险、层次、环境与退出条件相互对应 | [测试计划模板](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/experts/qa-lead/test-plan-template.md) | `knowledge/testing/risk-based-test-matrix.md`、`testing-strategy-deep-dive.md`、QA 定义 |
 | U4 | 单独审查断言、跳过项、快照、夹具和门禁变化，避免以弱化验证换取通过 | [测试完整性](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/test-integrity-and-anti-gaming.md) | `knowledge/testing/testing-strategy-deep-dive.md`、CODE/QA 定义、标准 Skill |
 | U5 | 评审发现附证据，必须修正与可选建议分开；报告复用原始证据，未验证不计通过 | [验证者/评审者](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/verifier-critic-pattern.md)、[review.rs](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/crates/umadev-agent/src/review.rs)、[生产就绪审查](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/operations/01-standards/production-readiness-review.md) | `knowledge/development/code-review-quality-complete.md`、QA/DEVOPS 定义、PRD 交付验收指导 |
-| U6 | 未决事项保留原因与重启条件，交接保留决定、文件、验证与下一步，按需读原文 | [未决事项](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/open-decisions-parking-lot-register.md)、[交付上下文](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/context-engineering-for-delivery.md)、[coach.rs](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/crates/umadev-agent/src/coach.rs) | `knowledge/architecture/adr-template-and-examples.md`、产品知识、标准 Skill，复用现有文档和恢复简报 |
+| U6 | 未决事项保留原因与重启条件，交接保留决定、文件、验证与下一步，按需读原文 | [未决事项](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/open-decisions-parking-lot-register.md)、[交付上下文](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/knowledge/agentic-delivery/01-standards/context-engineering-for-delivery.md)、[coach.rs](https://github.com/umacloud/umadev/blob/585262706174ad4a958cd054f0948509e84ad610/crates/umadev-agent/src/coach.rs) | `.super-dev/parking-lot.json`（`super_dev/parking_lot.py` + `super-dev parking`）、`SESSION_BRIEF.md`（`Open Decisions`）、`adr-template-and-examples.md`、标准 Skill |
 
 ## 择优保留与不采纳项
 
@@ -32,7 +32,7 @@
 - 保留独立视角，缺少真实隔离时诚实标作自检；不强制增加角色团队或独立评审程序。
 - `review.rs` 将缺资料显示为信息项，可借鉴“诚实显示未知”；它的辅助报告聚合规则不能被搬作 Super Dev 发布许可。报告成功生成、没有扫描到问题、测试通过，都不能单独证明全部验收完成。
 - `coach.rs::render_docs` 中只返回文本、固定 API 条数、统一分层/暗色等要求不直接采用。Super Dev 仍由宿主写真实文件，并按已确认的架构与 UIUX 执行。
-- 不吸收 `umadev continue`、`.umadev/coach`、第二计划/状态、自动模型调用或向量服务；未决事项复用原文档，而不建立新的记忆运行通道。
+- 不吸收 `umadev continue`、`.umadev/coach`、第二流程/状态、自动模型调用或向量服务；2026-11-25 架构决议明确采用单一独立的 `.super-dev/parking-lot.json`（`ParkingLotRegister`）隔离挂起妥协并接入质量/发布/交付硬门禁：保持核心 PRD/架构文档纯净且减少模型注意力稀释，解除时强制要求 `resolved_target` 指向项目内真实非空文档且非账本/简报自引用，`QualityGate`、`ReleaseReadiness` 与 `DeliveryPackager` 对违规及 `blocks_delivery` 未决项执行硬阻断。
 - 保留部署可恢复的思想，只对相关交付要求运行证据；离线 CLI 不因模板而强制配置云端值班或 Kubernetes。
 
 ## 与已有方法的关系

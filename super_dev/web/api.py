@@ -280,6 +280,25 @@ class PipelinePolicyUpdateRequest(BaseModel):
     min_required_host_score: int | None = None
 
 
+class ParkingLotCreateRequest(BaseModel):
+    """新增未决事项请求"""
+
+    title: str
+    reason_for_deferral: str
+    revisit_trigger: str
+    current_compromise: str
+    affected_components: list[str] = Field(default_factory=list)
+    blocks_delivery: bool = False
+
+
+class ParkingLotResolveRequest(BaseModel):
+    """解除未决事项请求"""
+
+    resolution_notes: str
+    resolved_target: str = ""
+    status: Literal["resolved", "superseded"] = "resolved"
+
+
 # ==================== FastAPI 应用 ====================
 
 app = FastAPI(
@@ -2228,6 +2247,118 @@ async def post_release_proof_pack(
     payload["persisted"] = request.persist
     payload["frontend_governance_summary"] = _extract_frontend_governance_summary(payload)
     payload["compliance_governance_summary"] = _extract_compliance_governance_summary(payload)
+    return payload
+
+
+# ==================== 未决事项登记簿端点 ====================
+
+
+def _build_parking_lot_payload(project_dir_path: Path) -> dict[str, Any]:
+    from ..parking_lot import ParkingLotRegister, summarize_parking_lot
+
+    reg, _ = ParkingLotRegister.inspect_integrity(project_dir_path)
+    summary = summarize_parking_lot(project_dir_path)
+    return {
+        "exists": summary["exists"],
+        "file_path": summary["file_path"],
+        "integrity_error": summary["integrity_error"],
+        "open_count": summary["open_count"],
+        "blocking_open_count": summary["blocking_open_count"],
+        "total_count": summary["total_count"],
+        "items": [item.to_dict() for item in reg.items],
+        "violations": summary["violations"],
+        "core_doc_leaks": summary["core_doc_leaks"],
+        "passed": summary["passed"],
+        "markdown_table": reg.render_markdown_table(),
+    }
+
+
+@app.get("/api/parking-lot")
+@v1_router.get("/parking-lot")
+async def get_parking_lot(project_dir: str = ".") -> dict[str, Any]:
+    """只读获取未决事项登记簿（.super-dev/parking-lot.json）"""
+    project_dir_path = _validate_project_dir(project_dir)
+    return _build_parking_lot_payload(project_dir_path)
+
+
+@app.post("/api/parking-lot", dependencies=[Depends(get_api_key)])
+@v1_router.post("/parking-lot", dependencies=[Depends(get_api_key)])
+async def add_parking_lot_item(
+    request: ParkingLotCreateRequest, project_dir: str = "."
+) -> dict[str, Any]:
+    """新增未决事项并自动同步至 SESSION_BRIEF.md"""
+    from ..parking_lot import ParkingLotRegister
+    from ..session.brief import SessionBrief
+
+    project_dir_path = _validate_project_dir(project_dir)
+    errors = ParkingLotRegister.validate_item_fields(
+        request.title,
+        request.reason_for_deferral,
+        request.revisit_trigger,
+        request.current_compromise,
+    )
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+
+    reg, integrity_error = ParkingLotRegister.inspect_integrity(project_dir_path)
+    if integrity_error:
+        raise HTTPException(status_code=400, detail=integrity_error)
+    item = reg.add_item(
+        title=request.title,
+        reason_for_deferral=request.reason_for_deferral,
+        revisit_trigger=request.revisit_trigger,
+        current_compromise=request.current_compromise,
+        affected_components=request.affected_components,
+        blocks_delivery=request.blocks_delivery,
+        project_dir=project_dir_path,
+    )
+    reg.save(project_dir_path)
+    SessionBrief.sync_parking_lot(project_dir_path)
+    payload = _build_parking_lot_payload(project_dir_path)
+    payload["created_item"] = item.to_dict()
+    return payload
+
+
+@app.post("/api/parking-lot/{item_id}/resolve", dependencies=[Depends(get_api_key)])
+@v1_router.post("/parking-lot/{item_id}/resolve", dependencies=[Depends(get_api_key)])
+async def resolve_parking_lot_item(
+    item_id: str, request: ParkingLotResolveRequest, project_dir: str = "."
+) -> dict[str, Any]:
+    """解除未决事项并同步 SESSION_BRIEF.md（强制校验核心文档回写落点）"""
+    from ..parking_lot import ParkingLotRegister
+    from ..session.brief import SessionBrief
+
+    project_dir_path = _validate_project_dir(project_dir)
+    reg, integrity_error = ParkingLotRegister.inspect_integrity(project_dir_path)
+    if integrity_error:
+        raise HTTPException(status_code=400, detail=integrity_error)
+    target_item = reg.get_item(item_id)
+    if target_item is None:
+        raise HTTPException(status_code=404, detail=f"未决事项不存在: {item_id}")
+
+    errors = ParkingLotRegister.validate_resolution_fields(
+        request.resolution_notes,
+        request.resolved_target,
+        project_dir=project_dir_path,
+        status=request.status,
+        source_doc_digests=target_item.source_doc_digests,
+    )
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+
+    reg.resolve_item(
+        item_id,
+        resolution_notes=request.resolution_notes,
+        resolved_target=request.resolved_target,
+        status=request.status,
+        project_dir=project_dir_path,
+    )
+
+    reg.save(project_dir_path)
+    SessionBrief.sync_parking_lot(project_dir_path)
+    payload = _build_parking_lot_payload(project_dir_path)
+    resolved_item = reg.get_item(item_id)
+    payload["resolved_item"] = resolved_item.to_dict() if resolved_item else None
     return payload
 
 

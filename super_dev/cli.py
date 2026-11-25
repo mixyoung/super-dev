@@ -168,7 +168,7 @@ class SuperDevCLI(
         argv = list(args) if args is not None else sys.argv[1:]
 
         # P1-8: 启动版本检查（非阻塞，缓存 24h，仅在有子命令时检查）
-        if argv and not argv[0].startswith("-"):
+        if argv and not argv[0].startswith("-") and "--json" not in argv:
             try:
                 from .version_check import check_for_update
 
@@ -390,6 +390,7 @@ class SuperDevCLI(
         "migrate",
         "compliance",
         "web",
+        "parking",
     }
 
     _SUGGESTIBLE_COMMANDS = {
@@ -852,8 +853,10 @@ class SuperDevCLI(
 
         from .web.api import find_available_port
 
-        host = getattr(args, "host", None) or os.getenv("SUPER_DEV_API_HOST", "127.0.0.1")
-        target_port = int(getattr(args, "port", None) or os.getenv("SUPER_DEV_API_PORT", "7890"))
+        raw_host = getattr(args, "host", None)
+        host = str(raw_host) if raw_host else (os.getenv("SUPER_DEV_API_HOST") or "127.0.0.1")
+        raw_port = getattr(args, "port", None) or os.getenv("SUPER_DEV_API_PORT") or "7890"
+        target_port = raw_port if isinstance(raw_port, int) else int(str(raw_port))
         port = find_available_port(host, target_port)
 
         self.console.print("[bold cyan]启动 Super Dev 本地可视化控制台与 API 服务...[/bold cyan]")
@@ -875,6 +878,211 @@ class SuperDevCLI(
         except Exception as e:
             self.console.print(f"[red]启动 Web 服务失败: {e}[/red]")
             return 1
+
+    def _cmd_parking(self, args: Any) -> int:
+        """管理跨会话未决事项登记簿 (.super-dev/parking-lot.json)"""
+        import json
+
+        from .parking_lot import ParkingLotRegister
+        from .session.brief import SessionBrief
+
+        project_dir = Path.cwd()
+        action = getattr(args, "parking_action", None) or "list"
+        as_json = bool(getattr(args, "json", False))
+        reg, integrity_error = ParkingLotRegister.inspect_integrity(project_dir)
+        if integrity_error and action != "add":
+            if as_json:
+                print(
+                    json.dumps(
+                        {"ok": False, "passed": False, "errors": [integrity_error]},
+                        ensure_ascii=False,
+                    )
+                )
+            else:
+                self.console.print(f"[red]✗ {integrity_error}[/red]")
+            return 1
+
+        if action == "add":
+            if integrity_error:
+                if as_json:
+                    print(
+                        json.dumps({"ok": False, "errors": [integrity_error]}, ensure_ascii=False)
+                    )
+                else:
+                    self.console.print(f"[red]✗ {integrity_error}[/red]")
+                return 1
+            title = str(getattr(args, "title", "")).strip()
+            reason = str(getattr(args, "reason", "")).strip()
+            trigger = str(getattr(args, "trigger", "")).strip()
+            compromise = str(getattr(args, "compromise", "")).strip()
+            blocks_delivery = bool(getattr(args, "blocks_delivery", False))
+            errors = ParkingLotRegister.validate_item_fields(title, reason, trigger, compromise)
+            if errors:
+                if as_json:
+                    print(json.dumps({"ok": False, "errors": errors}, ensure_ascii=False))
+                else:
+                    for err in errors:
+                        self.console.print(f"[red]✗ {err}[/red]")
+                return 1
+            raw_components = str(getattr(args, "components", "") or "")
+            components = [c.strip() for c in raw_components.split(",") if c.strip()]
+            item = reg.add_item(
+                title=title,
+                reason_for_deferral=reason,
+                revisit_trigger=trigger,
+                current_compromise=compromise,
+                affected_components=components,
+                blocks_delivery=blocks_delivery,
+                project_dir=project_dir,
+            )
+            saved_path = reg.save(project_dir)
+            SessionBrief.sync_parking_lot(project_dir)
+            if as_json:
+                print(
+                    json.dumps(
+                        {"ok": True, "item": item.to_dict(), "file_path": str(saved_path)},
+                        ensure_ascii=False,
+                    )
+                )
+            else:
+                gate_tag = " [阻塞交付]" if blocks_delivery else ""
+                self.console.print(
+                    f"[green]✓ 已登记未决事项 {item.id}{gate_tag}: {item.title}[/green] ({saved_path})"
+                )
+                self.console.print("[dim]已自动同步至 .super-dev/SESSION_BRIEF.md[/dim]")
+            return 0
+
+        if action == "resolve":
+            item_id = str(getattr(args, "item_id", "")).strip()
+            notes = str(getattr(args, "notes", "")).strip()
+            target = str(getattr(args, "target", "") or "").strip()
+            status = str(getattr(args, "status", "resolved") or "resolved").strip()
+            existing_item = reg.get_item(item_id)
+            if existing_item is None:
+                if as_json:
+                    print(
+                        json.dumps(
+                            {"ok": False, "errors": [f"未找到条目: {item_id}"]}, ensure_ascii=False
+                        )
+                    )
+                else:
+                    self.console.print(f"[red]✗ 未找到条目: {item_id}[/red]")
+                return 1
+            errors = ParkingLotRegister.validate_resolution_fields(
+                notes,
+                target,
+                project_dir=project_dir,
+                status=status,
+                source_doc_digests=existing_item.source_doc_digests,
+            )
+            if errors:
+                if as_json:
+                    print(json.dumps({"ok": False, "errors": errors}, ensure_ascii=False))
+                else:
+                    for err in errors:
+                        self.console.print(f"[red]✗ {err}[/red]")
+                return 1
+            reg.resolve_item(
+                item_id,
+                resolution_notes=notes,
+                resolved_target=target,
+                status=status,
+                project_dir=project_dir,
+            )
+            saved_path = reg.save(project_dir)
+            SessionBrief.sync_parking_lot(project_dir)
+            resolved_item = reg.get_item(item_id)
+            if as_json:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "item": resolved_item.to_dict() if resolved_item else None,
+                            "file_path": str(saved_path),
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+            else:
+                self.console.print(f"[green]✓ 已解除未决事项 {item_id} ({status})[/green]")
+                self.console.print(f"  定论已核验回写目标: {target}")
+            return 0
+
+        if action == "check":
+            from .parking_lot import summarize_parking_lot
+
+            strict_delivery = bool(getattr(args, "strict_delivery", False))
+            if ParkingLotRegister.get_file_path(project_dir).exists():
+                SessionBrief.sync_parking_lot(project_dir)
+            summary = summarize_parking_lot(
+                project_dir,
+                require_no_blocking_open=strict_delivery,
+            )
+            passed = bool(summary["passed"])
+            violations = summary["violations"]
+            core_doc_leaks = summary["core_doc_leaks"]
+            if as_json:
+                print(
+                    json.dumps(
+                        {
+                            "passed": passed,
+                            "open_count": summary["open_count"],
+                            "blocking_open_count": summary["blocking_open_count"],
+                            "violations": violations,
+                            "core_doc_leaks": core_doc_leaks,
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+            elif passed:
+                self.console.print(
+                    f"[green]✓ 未决事项登记簿与核心文档均合规（{summary['open_count']} 项挂起中）[/green]"
+                )
+            else:
+                for v in violations:
+                    self.console.print(f"[red]✗ {v['id']}: {v['error']}[/red]")
+                for leak in core_doc_leaks:
+                    self.console.print(
+                        f"[red]✗ {leak['file']}:{leak['line']}: {leak['reason']}[/red]"
+                    )
+            return 0 if passed else 1
+
+        # default: list
+        from .parking_lot import summarize_parking_lot
+
+        show_all = bool(getattr(args, "all", False))
+        items = reg.items if show_all else reg.get_open_items()
+        summary = summarize_parking_lot(project_dir)
+        violations = summary["violations"]
+        core_doc_leaks = summary["core_doc_leaks"]
+        if as_json:
+            print(
+                json.dumps(
+                    {
+                        "items": [it.to_dict() for it in items],
+                        "open_count": summary["open_count"],
+                        "blocking_open_count": summary["blocking_open_count"],
+                        "total_count": len(reg.items),
+                        "violations": violations,
+                        "core_doc_leaks": core_doc_leaks,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            return 0
+
+        if not items:
+            self.console.print("[dim]当前无未决事项记录。[/dim]")
+            return 0
+        for it in items:
+            comps = ", ".join(it.affected_components) if it.affected_components else "全局"
+            gate_flag = " | [yellow]阻塞交付[/yellow]" if it.blocks_delivery else ""
+            self.console.print(
+                f"[cyan]{it.id}[/cyan] [{it.status}] {it.title}{gate_flag} | "
+                f"原因: {it.reason_for_deferral} | 触发: {it.revisit_trigger} | "
+                f"折衷: {it.current_compromise} | 组件: {comps}"
+            )
+        return 0
 
     def _normalize_pipeline_frontend(self, frontend: str) -> str:
         """将 init 的前端框架映射到 pipeline 可接受值"""

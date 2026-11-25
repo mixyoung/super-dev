@@ -295,6 +295,7 @@ Treat Codex App/Desktop selecting `super-dev` or `super-dev-seeai` from the `/` 
 - After each requested revision inside a gate, stay in the same stage, update the required artifacts, summarize what changed, and wait again for explicit confirmation.
 - Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Super Dev System Flow Contract
 - SUPER_DEV_FLOW_CONTRACT_V1
@@ -346,6 +347,7 @@ Use Super Dev generated artifacts as source of truth.
 - After each requested revision inside a gate, stay in the same stage, update the required artifacts, summarize what changed, and wait again for explicit confirmation.
 - Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Trigger
 - Preferred: `/super-dev <需求描述>`
@@ -451,6 +453,7 @@ These rules apply every time you write or edit a file:
 - After each requested revision inside a gate, stay in the same stage, update the required artifacts, summarize what changed, and wait again for explicit confirmation.
 - Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.
 - Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Work Mode Contract
 - Detect `new`, `evolve`, `variant`, `patch`, and `resume` before planning implementation.

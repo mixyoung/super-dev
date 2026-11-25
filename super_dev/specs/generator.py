@@ -38,10 +38,12 @@ class SpecGenerator:
     ) -> Change:
         """创建新变更提案"""
         from ..artifact_utils import resolve_work_item_identity
-        from ..workflow_guard import require_spec_work_item_binding
+        from ..workflow_guard import require_parking_lot_clean, require_spec_work_item_binding
 
         if not resolve_work_item_identity(self.project_dir).legacy:
             require_spec_work_item_binding(self.project_dir, change_id)
+        else:
+            require_parking_lot_clean(self.project_dir, action="create_spec")
         change = Change(
             id=change_id,
             title=title,
@@ -430,10 +432,12 @@ _Add domain-specific information here_
             "## Before Merge\n"
             "- [ ] 规范与任务一致\n"
             "- [ ] 已确认的 MUST 场景有适用验证，受影响旧行为已复核\n"
+            "- [ ] 核心 PRD/架构文档无未入账的未决/待定占位，`.super-dev/parking-lot.json` 合规\n"
             "- [ ] 风险与适用恢复策略已确认\n\n"
             "## Release Readiness\n"
             "仅在本轮涉及发布时使用；不适用须说明，不能勾选作通过。\n"
             "- [ ] 质量门禁通过\n"
+            "- [ ] 第二套账本交付阻塞项（`blocks_delivery=true`）已实改回写核心文档并解除\n"
             "- [ ] 所需运行与恢复证据可复查，未运行平台单列\n"
             "- [ ] 发布说明已准备\n"
         )

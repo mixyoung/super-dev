@@ -372,6 +372,21 @@ class StateStore:
             lines.append(f"- 原因: {reason}")
         if evidence:
             lines.append(f"- 依据: {evidence}")
+
+        parking_lot_file = self.state_dir / "parking-lot.json"
+        if parking_lot_file.exists():
+            from .parking_lot import ParkingLotRegister
+
+            reg = ParkingLotRegister.load(self.project_dir)
+            lines.extend(
+                [
+                    "",
+                    "## Open Decisions",
+                    "",
+                    reg.render_markdown_table(),
+                ]
+            )
+
         lines.extend(
             [
                 "",

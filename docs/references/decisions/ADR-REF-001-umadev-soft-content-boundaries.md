@@ -36,3 +36,9 @@ UmaDev 包含庞大的 Rust 核心框架以及丰富的开发/交付规范。我
    - Super Dev 拥有既定的标准九阶段与确认门禁。引入外部状态机会导致双头管理，使用户困惑。
 3. **拒绝强制的固定阈值**：
    - UmaDev 示例中的具体 API 个数、延迟数值、覆盖率门槛仅为案例示范，不得作为全局硬门槛强制套用。
+
+---
+
+## 4. 边界演进修订注记 (2026-11-25)
+
+- **未决事项独立账本升级（方案 2 硬门禁）**：第 3.2 节对 `.umadev/coach` 第二开发状态机的拒绝决议保持有效；同时经 2026-11-25 架构决议与用户拍板，将 U6（未决事项登记簿）落地为单一独立的 `.super-dev/parking-lot.json`（`ParkingLotRegister`）以隔离暂缓妥协、避免核心 PRD/架构文档反复打补丁稀释模型注意力，且由 `SESSION_BRIEF.md` 单向同步并在 `workflow_guard`、`QualityGate`、`ReleaseReadiness` 与 `DeliveryPackager` 执行“解除前实改回写核心文档 + 核心文档反泄漏扫描”硬门禁，防止产生两套真相（详见 [adoption.md](../../../.super-dev/changes/upstream-method-absorption-2026-11-24/adoption.md)）。

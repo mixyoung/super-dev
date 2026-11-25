@@ -39,6 +39,7 @@ Use Super Dev generated artifacts as source of truth.
 1. Use the host's native browse/search/web capability to research similar products first and produce output/*-research.md
 2. Freeze PRD, architecture and UIUX documents
 3. Stop after the three core documents, summarize them to the user, and wait for explicit confirmation before creating Spec or coding
+4. Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 4. Create Spec proposal/tasks only after the user confirms the documents
 5. Implement and run the frontend first so it becomes demonstrable before backend-heavy work
 6. Implement backend APIs and data layer, then run tests, quality gate, and release preparation

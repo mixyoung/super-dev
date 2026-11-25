@@ -105,6 +105,7 @@ super-dev pipeline "功能描述" --platform web --frontend react
 - For non-conversational AI products, avoid Claude / ChatGPT-style sidebar chat shells unless the UI plan explicitly justifies them.
 - Keep using the component ecosystem and design token direction defined in output/*-uiux.md rather than switching ad hoc.
 - If `.super-dev/SESSION_BRIEF.md` exists, read it before responding and keep the current Super Dev gate active across follow-up edits.
+- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.
 
 ## Coding Constraints (active during ALL coding phases)
 - Before writing ANY code, run `cat package.json` to check framework versions. If unsure, read official docs first.

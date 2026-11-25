@@ -13,6 +13,7 @@ import argparse
 import fnmatch
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -88,12 +89,13 @@ def classify_changes(
     # 分析提交信息中是否包含核心功能词汇
     actionable_keywords = [
         "feat", "breaking", "spec", "rule", "prompt", "skill",
-        "method", "architecture", "contract", "v[0-9]"
+        "method", "architecture", "contract",
     ]
+    version_tag_re = re.compile(r"\bv\d+(?:\.\d+)*\b")
     has_key_feature = False
     for c in commits:
         msg = c.get("commit", {}).get("message", "").lower()
-        if any(kw in msg for kw in actionable_keywords):
+        if any(kw in msg for kw in actionable_keywords) or version_tag_re.search(msg):
             has_key_feature = True
             break
 
@@ -334,7 +336,9 @@ def main():
 
     if args.output_report:
         out_path = os.path.normpath(args.output_report)
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        out_dir = os.path.dirname(out_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as fp:
             fp.write(report_md)
             fp.write("\n")

@@ -720,6 +720,16 @@ class ReleaseReadinessEvaluator:
                     self._latest("*-ui-contract-alignment.json"),
                 ]
             )
+        parking_lot_file = self.project_dir / ".super-dev" / "parking-lot.json"
+        if parking_lot_file.is_file():
+            from .parking_lot import ParkingLotRegister
+
+            dependencies.append(parking_lot_file)
+            for target_path in ParkingLotRegister.load(self.project_dir).get_resolved_target_paths(
+                self.project_dir
+            ):
+                if target_path not in dependencies:
+                    dependencies.append(target_path)
         fresh_evidence = None
         if self.fresh_verification_required:
             fresh_evidence = inspect_current_fresh_verification(self.project_dir)
@@ -1484,6 +1494,23 @@ class ReleaseReadinessEvaluator:
                 product_status = str(product_payload.get("status", "missing"))
                 if product_status == "revision_required":
                     blockers.append("product audit requires revision")
+
+        from .parking_lot import summarize_parking_lot
+
+        parking_summary = summarize_parking_lot(
+            self.project_dir,
+            artifact_prefix=self.project_name,
+            require_no_blocking_open=True,
+        )
+        if (parking_summary["exists"] or parking_summary["core_doc_leaks"]) and not parking_summary[
+            "passed"
+        ]:
+            issue_parts = [f"{v['id']}: {v['error']}" for v in parking_summary["violations"][:2]]
+            issue_parts.extend(
+                f"{leak['file']}:{leak['line']} {leak['reason']}"
+                for leak in parking_summary["core_doc_leaks"][:2]
+            )
+            blockers.append(f"parking lot gate failed ({'; '.join(issue_parts)})")
 
         if not self.frontend_required:
             passed = not blockers

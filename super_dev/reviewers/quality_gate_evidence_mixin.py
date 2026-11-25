@@ -694,22 +694,25 @@ class QualityGateEvidenceMixin:
 
         report = TestIntegrityChecker.scan_project(self.project_dir)
         if report.passed:
+            advisory = report.advisory_violations
+            score = 100 if not advisory else 90
             return QualityCheck(
                 name="测试完整性与反作弊",
                 category="testing",
-                description="静态 AST 与测试作弊审查（注释断言/跳过标记）",
+                description="静态 AST 与测试作弊审查（注释断言/无条件跳过/空假测试）",
                 status=CheckStatus.PASSED,
-                score=100,
+                score=score,
                 weight=self.CHECKS_CONFIG["testing"]["weight"],
                 details=report.summary,
             )
+        blocking = report.blocking_violations or report.violations
         first_violations = "; ".join(
-            f"{v.file_path}:{v.line_number} {v.message}" for v in report.violations[:3]
+            f"{v.file_path}:{v.line_number} {v.message}" for v in blocking[:3]
         )
         return QualityCheck(
             name="测试完整性与反作弊",
             category="testing",
-            description="静态 AST 与测试作弊审查（注释断言/跳过标记）",
+            description="静态 AST 与测试作弊审查（注释断言/无条件跳过/空假测试）",
             status=CheckStatus.FAILED,
             score=30,
             weight=self.CHECKS_CONFIG["testing"]["weight"],

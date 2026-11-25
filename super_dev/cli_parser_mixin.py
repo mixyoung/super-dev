@@ -1328,9 +1328,66 @@ class CliParserMixin:
             help="启动本地 Web 可视化控制台与 API 服务",
             description="启动本地 FastAPI 服务并在 127.0.0.1:7890 提供可视化控制台（遇端口冲突自动加 1）",
         )
-        web_parser.add_argument("--host", default="127.0.0.1", help="监听主机地址 (默认: 127.0.0.1)")
+        web_parser.add_argument(
+            "--host", default="127.0.0.1", help="监听主机地址 (默认: 127.0.0.1)"
+        )
         web_parser.add_argument(
             "-p", "--port", type=int, default=7890, help="监听端口 (默认: 7890，遇冲突自动递增)"
         )
+
+        # parking 命令 — 管理跨会话未决事项登记簿 (.super-dev/parking-lot.json)
+        parking_parser = subparsers.add_parser(
+            "parking",
+            help="管理未决事项登记簿 (Parking Lot)",
+            description="登记、查看和解除跨会话架构妥协与挂起决策，保持核心文档纯净并自动同步简报",
+        )
+        parking_subparsers = parking_parser.add_subparsers(
+            dest="parking_action",
+            title="未决事项操作",
+            description="使用 'super-dev parking <action> -h' 查看详情",
+        )
+
+        parking_list = parking_subparsers.add_parser("list", help="查看未决事项列表")
+        parking_list.add_argument("--all", action="store_true", help="包含已解决与已替代条目")
+        parking_list.add_argument("--json", action="store_true", help="以 JSON 格式输出")
+
+        parking_add = parking_subparsers.add_parser("add", help="新增一条挂起决策或架构妥协")
+        parking_add.add_argument("--title", required=True, help="挂起主题标题")
+        parking_add.add_argument("--reason", required=True, help="暂缓原因")
+        parking_add.add_argument("--trigger", required=True, help="重启评估触发条件")
+        parking_add.add_argument("--compromise", required=True, help="当前临时折衷方案")
+        parking_add.add_argument("--components", default="", help="受影响组件列表，多个用逗号分隔")
+        parking_add.add_argument(
+            "--blocks-delivery",
+            action="store_true",
+            help="标记为交付前必须拍板回写并解除的阻断项",
+        )
+        parking_add.add_argument("--json", action="store_true", help="以 JSON 格式输出")
+
+        parking_resolve = parking_subparsers.add_parser("resolve", help="解除未决事项并记录定论")
+        parking_resolve.add_argument("item_id", help="未决事项编号，例如 PARK-001")
+        parking_resolve.add_argument(
+            "--notes", required=True, help="最终拍板决策说明（须同时回写核心文档）"
+        )
+        parking_resolve.add_argument(
+            "--target",
+            default="",
+            help="最终定论回写的核心文档或 Spec 路径（必填，例如 output/<project>-architecture.md）",
+        )
+        parking_resolve.add_argument(
+            "--status",
+            choices=["resolved", "superseded"],
+            default="resolved",
+            help="解除状态 (默认: resolved)",
+        )
+        parking_resolve.add_argument("--json", action="store_true", help="以 JSON 格式输出")
+
+        parking_check = parking_subparsers.add_parser("check", help="校验登记簿合规性并同步简报")
+        parking_check.add_argument(
+            "--strict-delivery",
+            action="store_true",
+            help="严格交付校验：若存在标记为阻塞交付的挂起项则返回失败",
+        )
+        parking_check.add_argument("--json", action="store_true", help="以 JSON 格式输出")
 
         return parser

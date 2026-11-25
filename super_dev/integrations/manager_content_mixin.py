@@ -26,7 +26,8 @@ class IntegrationManagerContentMixin:
             "- If the workflow is waiting for docs confirmation, preview confirmation, UI revision, architecture revision, or quality revision, then user replies like `修改`, `补充`, `继续改`, `确认`, `通过`, `继续`, or detailed feedback remain inside the current Super Dev stage.\n"
             "- After each requested revision inside a gate, stay in the same stage, update the required artifacts, summarize what changed, and wait again for explicit confirmation.\n"
             "- Do not silently exit Super Dev mode because the user asked for several edits, follow-up questions, or extra constraints.\n"
-            "- Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.\n\n"
+            "- Only leave the current Super Dev workflow if the user explicitly says to cancel the workflow, restart from scratch, or switch back to normal chat.\n"
+            "- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.\n\n"
         )
 
     def _build_kiro_global_steering_content(self) -> str:
@@ -381,6 +382,7 @@ class IntegrationManagerContentMixin:
                 "- For non-conversational AI products, avoid Claude / ChatGPT-style sidebar chat shells unless the UI plan explicitly justifies them.\n"
                 "- Keep using the component ecosystem and design token direction defined in output/*-uiux.md rather than switching ad hoc.\n"
                 "- If `.super-dev/SESSION_BRIEF.md` exists, read it before responding and keep the current Super Dev gate active across follow-up edits.\n"
+                "- Record deferred decisions or temporary compromises in `.super-dev/parking-lot.json` via `super-dev parking add` (never leave `TBD`/deferral patches in core PRD/architecture docs); before calling `super-dev parking resolve`, update and cite a real non-empty core doc target.\n"
                 "\n## Coding Constraints (active during ALL coding phases)\n"
                 "- Before writing code, read the actual project dependency manifest. UI libraries, tokens and pages apply only to UI changes. If an API is unclear, read official docs first.\n"
                 "- Icons MUST come from Lucide/Heroicons/Tabler. No emoji as functional icons; follow the approved brand and UI scope.\n"
@@ -892,7 +894,8 @@ class IntegrationManagerContentMixin:
                 "2. 再生成 `output/*-prd.md`、`output/*-architecture.md`、`output/*-uiux.md`\n"
                 "3. 三份文档完成后，先向用户汇报文档摘要与路径，等待明确确认；未经确认不得创建 Spec 或开始编码\n"
                 "4. 用户确认后，再生成 `.super-dev/changes/*/proposal.md` 与 `tasks.md`\n"
-                "5. 本轮涉及 UI 时先实现并运行前端，暂停等待用户预览确认后再进入后端；无 UI 沿用原不适用处理\n\n"
+                "5. 本轮涉及 UI 时先实现并运行前端，暂停等待用户预览确认后再进入后端；无 UI 沿用原不适用处理\n"
+                "6. 挂起决策或临时妥协统一记入 `.super-dev/parking-lot.json`（`super-dev parking add`），禁止向核心 PRD/架构文档写入 `TBD`/待定补丁；解决前必须先回写真实核心文档锚点再执行 `super-dev parking resolve`\n\n"
                 "## 研究要求\n"
                 "- 至少研究 3 到 5 个可借鉴产品\n"
                 "- 总结共性功能、关键交互、信息架构、商业表达与差异化方向\n"
@@ -945,6 +948,7 @@ class IntegrationManagerContentMixin:
             "- 研究结论必须回填到 `output/*-research.md`，并用于约束 PRD / 架构 / UIUX。\n"
             "- 编码前必须先读取 `output/*-prd.md`、`output/*-architecture.md`、`output/*-uiux.md`，并完成用户确认门。\n"
             "- 如果用户要求修改文档，只允许回到文档阶段修订，不能绕过确认门直接建 Spec 或开工。\n"
+            "- 挂起决策或临时妥协统一记入 `.super-dev/parking-lot.json`（`super-dev parking add`），禁止向核心文档写入 `TBD`/待定补丁；`super-dev parking resolve` 前必须先更新并引用真实核心文档锚点。\n"
             "- UI 必须遵循 UI/UX 文档，禁止直接输出模板化、同质化页面。\n"
             "- 默认避免宿主自动滑向“AI 感”设计：紫/粉渐变主视觉、emoji 充当功能图标、默认系统字体直出；只有用户或品牌明确要求时才可采用，并写清理由。\n"
             "- 开始任何 UI 实现前，必须先声明图标库；功能图标只能来自 Lucide / Heroicons / Tabler / 官方组件图标。\n"
@@ -1473,6 +1477,7 @@ description: Super Dev 流水线式 AI Coding 辅助工作流 - 从需求到交�
 - 新流程按工作模式进入；恢复已有流程先读 SESSION_BRIEF 并报告原阶段，不得重置为 research
 - 三份核心文档完成后，必须暂停等待用户确认
 - 未经用户确认，不得创建 `.super-dev/changes/*` 或开始编码
+- **未决事项与核心文档纯净（方案 2）**：挂起决策与临时妥协记入 `.super-dev/parking-lot.json`（`super-dev parking add`），禁止向核心文档写入 `TBD`/待定补丁；解决前必须先更新并引用真实核心文档锚点再执行 `super-dev parking resolve`
 - **前端先行**：标准 UI 工作先完成可演示前端并等待用户预览确认，再实现后端；无 UI 沿用原不适用处理
 - **禁止 emoji 图标**：使用 Lucide/Heroicons/Tabler Icons
 - **参数化查询**：禁止字符串拼接 SQL

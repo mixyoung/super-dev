@@ -71,6 +71,7 @@ class PreCodeGate:
             "",
             "- [ ] Read `output/*-architecture.md` and confirm API routes / data model",
             "- [ ] Read `output/*-prd.md` and confirm functional scope",
+            "- [ ] Run `super-dev parking check` to confirm core docs have no untracked TBD/deferral leaks and `.super-dev/parking-lot.json` is compliant",
             "",
             "## UI/UX Confirmation",
             "",
