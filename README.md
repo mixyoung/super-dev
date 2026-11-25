@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="docs/assets/super-dev-logo.png" alt="Super Dev - AI PIPELINE ORCHESTRATOR" width="600">
+<img src="docs/assets/super-dev-logo.png" alt="Super Dev - AI PIPELINE ORCHESTRATOR" width="100%">
 
 ### 面向商业级交付的宿主教练系统 · 知识驱动治理
 

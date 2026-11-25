@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="docs/assets/super-dev-logo.png" alt="Super Dev - AI PIPELINE ORCHESTRATOR" width="600">
+<img src="docs/assets/super-dev-logo.png" alt="Super Dev - AI PIPELINE ORCHESTRATOR" width="100%">
 
 ### Host Coaching System for Commercial-Grade Delivery
 
