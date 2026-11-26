@@ -65,8 +65,11 @@ from .terminal import (
 )
 from .utils import get_logger
 from .workflow_guard import (
+    WorkflowGateError,
     docs_gate_status,
     preview_gate_status,
+    require_docs_confirmation,
+    require_preview_confirmation,
 )
 
 fcntl: Any = None
@@ -643,13 +646,18 @@ class SuperDevCLI(
     def _ensure_docs_confirmation_for_execution(
         self, project_dir: Path, *, action_label: str
     ) -> bool:
-        if not self._has_core_docs(project_dir):
+        try:
+            require_docs_confirmation(project_dir, action=action_label, require_context=True)
             return True
-        if self._docs_confirmation_is_confirmed(project_dir):
-            return True
+        except WorkflowGateError as exc:
+            if exc.gate != "docs_confirmation":
+                self.console.print(f"[red]{action_label}被流程门禁阻止: {exc}[/red]")
+                return False
+            reason = str(exc)
 
         current = self._get_docs_confirmation_state(project_dir)
         self.console.print(f"[red]{action_label}前，必须先完成三文档确认[/red]")
+        self.console.print(f"[dim]原因: {reason}[/dim]")
         self.console.print(
             f"[dim]当前状态: {self._docs_confirmation_label(current['status'])}[/dim]"
         )
@@ -679,20 +687,21 @@ class SuperDevCLI(
         return False
 
     def _ensure_preview_confirmation_for_execution(
-        self, project_dir: Path, *, action_label: str
+        self,
+        project_dir: Path,
+        *,
+        action_label: str,
+        tech_stack: dict[str, Any] | None = None,
     ) -> bool:
-        output_dir = project_dir / "output"
-        frontend_ready = any(output_dir.glob("*-frontend-runtime.json"))
-        if not frontend_ready:
+        try:
+            require_preview_confirmation(project_dir, action=action_label, tech_stack=tech_stack)
             return True
-        if self._preview_confirmation_is_confirmed(project_dir):
-            return True
+        except WorkflowGateError as exc:
+            reason = str(exc)
 
         current = self._get_preview_confirmation_state(project_dir)
         self.console.print(f"[red]{action_label}前，必须先完成前端预览确认[/red]")
-        self.console.print(
-            f"[dim]当前状态: {self._review_status_label(current['status'], review_type='preview')}[/dim]"
-        )
+        self.console.print(f"[dim]原因: {reason}[/dim]")
         if current["comment"]:
             self.console.print(f"[dim]备注: {current['comment']}[/dim]")
         self.console.print(
@@ -737,11 +746,21 @@ class SuperDevCLI(
         self.console.print("[dim]完成后回到宿主里明确回复：“质量整改已完成，继续当前流程”[/dim]")
         return False
 
-    def _ensure_execution_gates(self, project_dir: Path, *, action_label: str) -> bool:
+    def _ensure_execution_gates(
+        self,
+        project_dir: Path,
+        *,
+        action_label: str,
+        preview_required: bool = True,
+        tech_stack: dict[str, Any] | None = None,
+    ) -> bool:
         return (
             self._ensure_docs_confirmation_for_execution(project_dir, action_label=action_label)
-            and self._ensure_preview_confirmation_for_execution(
-                project_dir, action_label=action_label
+            and (
+                not preview_required
+                or self._ensure_preview_confirmation_for_execution(
+                    project_dir, action_label=action_label, tech_stack=tech_stack
+                )
             )
             and self._ensure_ui_revision_clear_for_execution(project_dir, action_label=action_label)
             and self._ensure_architecture_revision_clear_for_execution(
@@ -822,7 +841,13 @@ class SuperDevCLI(
             config.name if config_exists and config.name else args.change_id
         )
 
-        if not self._ensure_execution_gates(project_dir, action_label="执行 Spec 任务"):
+        # 前端任务可先执行；后端/质量/交付由执行器在每项任务分发前检查预览门。
+        if not self._ensure_execution_gates(
+            project_dir,
+            action_label="执行 Spec 任务",
+            preview_required=False,
+            tech_stack=tech_stack,
+        ):
             return 1
 
         executor = SpecTaskExecutor(project_dir=project_dir, project_name=project_name)

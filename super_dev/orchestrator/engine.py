@@ -8,6 +8,7 @@
 
 import asyncio
 import json
+import math
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -24,13 +25,18 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
 
+from ..artifact_utils import resolve_work_item_identity, sanitize_artifact_name
 from ..config.manager import ConfigManager, get_config_manager
 from ..exceptions import PhaseExecutionError, QualityGateError
 from ..review_state import load_workflow_state, save_workflow_state
 from ..shadow_ledger_store import build_shadow_ledger_summary
+from ..state_store import StateStoreError
 from ..terminal import create_console
 from ..utils import get_logger
 from ..workflow_guard import (
+    collect_docs_artifact_binding,
+    docs_gate_status,
+    preview_gate_status,
     record_docs_generated,
     record_stage_progress,
     require_docs_confirmation,
@@ -358,10 +364,18 @@ class WorkflowEngine:
             canonical_completed = []
             for phase_name in completed:
                 canonical_name = canonical_stage_for_engine_phase(phase_name)
-                if canonical_name not in canonical_completed:
+                if canonical_name not in canonical_completed and all(
+                    candidate.value in completed
+                    for candidate in phases
+                    if canonical_stage_for_engine_phase(candidate.value) == canonical_name
+                ):
                     canonical_completed.append(canonical_name)
             phase_idx = all_names.index(current_phase) if current_phase in all_names else 0
-            remaining = all_names[phase_idx:]
+            remaining = [name for name in all_names if name not in completed]
+            current_result = next(
+                (result for phase, result in results.items() if phase.value == current_phase), None
+            )
+            failed = current_result is not None and not current_result.success
             canonical_remaining = []
             for phase_name in remaining:
                 canonical_name = canonical_stage_for_engine_phase(phase_name)
@@ -400,7 +414,7 @@ class WorkflowEngine:
                     "current_stage": canonical_current_phase,
                     "engine_progress": engine_progress,
                     "pipeline_run_state": {
-                        "status": "running",
+                        "status": "failed" if failed else "running",
                         "current_stage": canonical_current_phase,
                         "current_stage_title": canonical_current_phase,
                         "scope_coverage_status": "",
@@ -410,7 +424,11 @@ class WorkflowEngine:
                 }
             )
             save_workflow_state(self.project_dir, workflow_state)
-            current_stage_status = "completed" if current_phase in completed else "running"
+            current_stage_status = (
+                "failed"
+                if failed
+                else "completed" if canonical_current_phase in canonical_completed else "running"
+            )
             record_stage_progress(
                 self.project_dir,
                 stage=canonical_current_phase,
@@ -441,6 +459,8 @@ class WorkflowEngine:
                         "total_phases": len(phases),
                     },
                 )
+        except StateStoreError:
+            raise
         except Exception as exc:
             self.logger.warning("工作流状态记录失败: %s", exc)
 
@@ -457,6 +477,167 @@ class WorkflowEngine:
     def register_phase_handler(self, phase: Phase, handler: Callable) -> None:
         self._phase_handlers[phase] = handler
 
+    def _notify_phase_finished(
+        self, phase: Phase, result: PhaseResult, context: WorkflowContext
+    ) -> None:
+        if self.hook_manager:
+            try:
+                self.hook_manager.execute(
+                    HookEvent.POST_PHASE,
+                    context={
+                        "phase": phase.value,
+                        "success": str(result.success),
+                        "quality_score": str(result.quality_score),
+                    },
+                    phase=phase.value,
+                )
+            except Exception as exc:
+                self.logger.warning(f"PostPhase hook 执行失败: {exc}")
+        if self.governance:
+            try:
+                self.governance.exit_phase(
+                    phase.value,
+                    context={
+                        "success": result.success,
+                        "duration": result.duration,
+                        "quality_score": result.quality_score,
+                        "project_dir": str(self.project_dir),
+                        "name": context.user_input.get("name", self.project_dir.name),
+                        "output_dir": str(self.project_dir / "output"),
+                    },
+                )
+            except Exception as exc:
+                self.logger.warning(f"治理层 exit_phase({phase.value}) 失败: {exc}")
+        if self.cost_tracker:
+            try:
+                self.cost_tracker.end_phase(phase.value)
+            except Exception as exc:
+                self.logger.warning(f"成本追踪器 end_phase({phase.value}) 失败: {exc}")
+
+    def _document_artifact_prefix(self, context: WorkflowContext) -> str:
+        binding = collect_docs_artifact_binding(self.project_dir)
+        return str(binding.get("artifact_prefix", "")) or sanitize_artifact_name(
+            str(
+                context.user_input.get("name")
+                or self.config_manager.config.name
+                or self.project_dir.name
+            )
+        )
+
+    def _require_phase_confirmations(self, phases: list[Phase], context: WorkflowContext) -> None:
+        requested = [phase.value for phase in phases]
+        if not requested:
+            return
+        require_docs_confirmation(
+            self.project_dir,
+            action="workflow_engine_run",
+            requested_phases=requested,
+            require_context=False,
+        )
+        require_preview_confirmation(
+            self.project_dir,
+            action="workflow_engine_run",
+            requested_phases=requested,
+            require_context=True,
+            tech_stack=context.user_input,
+        )
+
+    def _validate_phase_result(
+        self, phase: Phase, result: PhaseResult, context: WorkflowContext
+    ) -> None:
+        if not result.success:
+            raise PhaseExecutionError(
+                phase=phase.value,
+                message="; ".join(str(error) for error in result.errors) or "阶段处理器返回失败",
+            )
+        if phase == Phase.REDTEAM and isinstance(result.output, dict):
+            if not bool(result.output.get("passed", True)):
+                reasons = result.output.get("blocking_reasons") or ["红队审查未通过"]
+                result.errors.extend(str(reason) for reason in reasons)
+                raise QualityGateError(
+                    score=float(result.output.get("score", result.quality_score)),
+                    threshold=float(result.output.get("pass_threshold", 70)),
+                    details={"phase": phase.value, "reasons": reasons},
+                )
+        threshold = context.user_input.get("quality_threshold")
+        if threshold is None:
+            threshold = self.config_manager.config.quality_gate
+        if phase == Phase.QA and (
+            not math.isfinite(result.quality_score) or result.quality_score < float(threshold)
+        ):
+            self._print_quality_gate_failed(phase, result)
+            raise QualityGateError(
+                score=result.quality_score,
+                threshold=float(threshold),
+                details={"phase": phase.value},
+            )
+
+    def _checkpoint_scope(self, context: WorkflowContext) -> dict[str, Any]:
+        identity = resolve_work_item_identity(self.project_dir)
+        docs = docs_gate_status(self.project_dir)
+        preview = preview_gate_status(self.project_dir, tech_stack=context.user_input)
+        return {
+            "work_item_id": identity.work_item_id,
+            "docs_digest": docs["artifact_binding"].get("digest", ""),
+            "preview_digest": (
+                preview["artifact_binding"].get("preview_target_digest", "")
+                if preview["required"]
+                else ""
+            ),
+            "tech_stack": {
+                key: context.user_input.get(key, getattr(self.config_manager.config, key, ""))
+                for key in ("platform", "frontend", "backend", "database")
+            },
+        }
+
+    def _checkpoint_is_accepted(
+        self, phase: Phase, checkpoint: dict, context: WorkflowContext
+    ) -> bool:
+        if (
+            checkpoint.get("success") is not True
+            or checkpoint.get("phase") != phase.value
+            or checkpoint.get("project") != self.config_manager.config.name
+        ):
+            return False
+        if phase in {Phase.REDTEAM, Phase.QA, Phase.DELIVERY, Phase.DEPLOYMENT}:
+            acceptance = checkpoint.get("acceptance", {})
+            if (
+                not isinstance(acceptance, dict)
+                or acceptance.get("version") != 1
+                or acceptance.get("passed") is not True
+                or acceptance.get("scope") != self._checkpoint_scope(context)
+            ):
+                return False
+            if phase == Phase.REDTEAM and acceptance.get("redteam_passed") is not True:
+                return False
+            try:
+                self._validate_phase_result(
+                    phase,
+                    PhaseResult(
+                        phase=phase,
+                        success=True,
+                        duration=0.0,
+                        quality_score=float(checkpoint.get("quality_score", 0.0)),
+                        output={"passed": acceptance.get("redteam_passed", True)},
+                    ),
+                    context,
+                )
+            except (QualityGateError, TypeError, ValueError):
+                return False
+        return True
+
+    def _discard_failed_checkpoint(self, phase: Phase) -> None:
+        (self._checkpoint_dir / f"{phase.value}.json").unlink(missing_ok=True)
+        session_path = self._checkpoint_dir / "sessions" / "latest.json"
+        if session_path.is_file():
+            try:
+                payload = json.loads(session_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                payload = None
+            completed = payload.get("completed_phases") if isinstance(payload, dict) else None
+            if not isinstance(completed, list) or phase.value in completed:
+                session_path.unlink(missing_ok=True)
+
     def _save_checkpoint(self, phase: Phase, result: PhaseResult, context: WorkflowContext) -> None:
         """保存阶段检查点"""
         self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -468,6 +649,16 @@ class WorkflowEngine:
             "errors": [str(e) for e in result.errors],
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "project": self.config_manager.config.name,
+            "acceptance": {
+                "version": 1,
+                "passed": result.success,
+                "scope": self._checkpoint_scope(context),
+                "redteam_passed": (
+                    bool(result.output.get("passed", True))
+                    if phase == Phase.REDTEAM and isinstance(result.output, dict)
+                    else result.success
+                ),
+            },
         }
         path = self._checkpoint_dir / f"{phase.value}.json"
         with open(path, "w", encoding="utf-8") as f:
@@ -548,9 +739,10 @@ class WorkflowEngine:
                 }
 
         elif phase == Phase.DRAFTING:
-            # 恢复三大文档（PRD / architecture / UIUX）
+            # 文档归属与确认绑定一致，不用产品展示名选择另一组文件。
+            artifact_prefix = self._document_artifact_prefix(context)
             for doc_type in ("prd", "architecture", "uiux"):
-                doc_path = output_dir / f"{name}-{doc_type}.md"
+                doc_path = output_dir / f"{artifact_prefix}-{doc_type}.md"
                 if doc_path.exists():
                     context.documents[doc_type] = doc_path.read_text(encoding="utf-8")
 
@@ -580,21 +772,8 @@ class WorkflowEngine:
 
         if phases is None:
             phases = self._get_phases_from_config()
-        # 确认门禁对最终阶段列表统一执行：显式与默认（config）路径在同一位置真阻断。
-        requested_phase_names = [phase.value for phase in phases]
-        if requested_phase_names:
-            require_docs_confirmation(
-                self.project_dir,
-                action="workflow_engine_run",
-                requested_phases=requested_phase_names,
-                require_context=False,
-            )
-            require_preview_confirmation(
-                self.project_dir,
-                action="workflow_engine_run",
-                requested_phases=requested_phase_names,
-                require_context=True,
-            )
+        # 默认和显式入口使用同一份有效技术栈及确认规则。
+        self._require_phase_confirmations(phases, context)
 
         # 启动治理层
         project_name = context.user_input.get("name", self.config_manager.config.name or "project")
@@ -626,14 +805,12 @@ class WorkflowEngine:
                 )
                 break
 
-            # 检查点恢复：跳过已成功完成的阶段
+            # 前一阶段可能使确认失效；恢复跳过也必须先重新检查。
+            self._require_phase_confirmations([phase], context)
+            # 检查点恢复：只跳过已经完成验收的阶段
             if resume:
                 checkpoint = self._load_checkpoint(phase)
-                if (
-                    checkpoint
-                    and checkpoint.get("success")
-                    and checkpoint.get("project") == self.config_manager.config.name
-                ):
+                if checkpoint and self._checkpoint_is_accepted(phase, checkpoint, context):
                     self.logger.info(
                         f"恢复模式：跳过已完成阶段 {phase.value}", extra={"phase": phase.value}
                     )
@@ -717,6 +894,8 @@ class WorkflowEngine:
 
                 result = await self._run_phase(phase, context, phase_timeout=phase_timeout)
                 results[phase] = result
+                # 最终验收先于检查点、完成进度、成功 Hook、摘要和记忆。
+                self._validate_phase_result(phase, result, context)
 
                 # Checkpoint: save after successful phase
                 if result.success:
@@ -728,7 +907,9 @@ class WorkflowEngine:
                             phase.value,
                             {
                                 "completed_phases": [
-                                    p.value for p in phases[: phases.index(phase) + 1]
+                                    completed.value
+                                    for completed, accepted in results.items()
+                                    if accepted.success
                                 ],
                                 "user_input": (
                                     dict(context.user_input)
@@ -779,37 +960,7 @@ class WorkflowEngine:
                     except Exception as e:
                         self.logger.warning(f"记忆提取失败: {e}")
 
-                # Hook: PostPhase
-                if self.hook_manager:
-                    try:
-                        self.hook_manager.execute(
-                            HookEvent.POST_PHASE,
-                            context={
-                                "phase": phase.value,
-                                "success": str(result.success),
-                                "quality_score": str(result.quality_score),
-                            },
-                            phase=phase.value,
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"PostPhase hook 执行失败: {e}")
-
-                # 治理层：退出阶段
-                if self.governance:
-                    try:
-                        self.governance.exit_phase(
-                            phase.value,
-                            context={
-                                "success": result.success,
-                                "duration": result.duration,
-                                "quality_score": result.quality_score,
-                                "project_dir": str(self.project_dir),
-                                "name": context.user_input.get("name", self.project_dir.name),
-                                "output_dir": str(self.project_dir / "output"),
-                            },
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"治理层 exit_phase({phase.value}) 失败: {e}")
+                self._notify_phase_finished(phase, result, context)
 
                 # 保存检查点
                 if result.success:
@@ -818,42 +969,6 @@ class WorkflowEngine:
                 # Update pipeline state after phase completion
                 self._record_engine_progress(phase.value, phases, results)
 
-                # Cost tracker: mark phase end
-                if self.cost_tracker:
-                    try:
-                        self.cost_tracker.end_phase(phase.value)
-                    except Exception as e:
-                        self.logger.warning(f"成本追踪器 end_phase({phase.value}) 失败: {e}")
-
-                # 红队审查必须通过，避免风险进入后续阶段
-                if phase == Phase.REDTEAM and isinstance(result.output, dict):
-                    if not bool(result.output.get("passed", True)):
-                        reasons = result.output.get("blocking_reasons") or ["红队审查未通过"]
-                        reason_text = "; ".join(str(r) for r in reasons)
-                        quality_error = QualityGateError(
-                            score=float(result.output.get("score", result.quality_score)),
-                            threshold=float(result.output.get("pass_threshold", 70)),
-                            details={"phase": phase.value, "reasons": reasons},
-                        )
-                        result.success = False
-                        result.errors.append(reason_text)
-                        raise quality_error
-
-                # 质量门禁只在 QA 阶段执行，避免前置阶段被全局阈值误杀
-                if (
-                    phase == Phase.QA
-                    and result.quality_score < self.config_manager.config.quality_gate
-                ):
-                    self._print_quality_gate_failed(phase, result)
-                    quality_error = QualityGateError(
-                        score=result.quality_score,
-                        threshold=self.config_manager.config.quality_gate,
-                        details={"phase": phase.value},
-                    )
-                    result.success = False
-                    result.errors.append(str(quality_error))
-                    raise quality_error
-
                 self._print_phase_complete(phase, result)
 
             except QualityGateError as e:
@@ -861,10 +976,20 @@ class WorkflowEngine:
                     f"工作流在阶段 {phase.value} 因质量门禁终止",
                     extra={"error": str(e), "phase": phase.value},
                 )
-                if phase in results:
-                    results[phase].success = False
-                    if str(e) not in results[phase].errors:
-                        results[phase].errors.append(str(e))
+                if phase not in results:
+                    results[phase] = PhaseResult(
+                        phase=phase,
+                        success=False,
+                        duration=0.0,
+                        quality_score=e.score,
+                        output=dict(e.details),
+                    )
+                results[phase].success = False
+                if str(e) not in results[phase].errors:
+                    results[phase].errors.append(str(e))
+                self._discard_failed_checkpoint(phase)
+                self._notify_phase_finished(phase, results[phase], context)
+                self._record_engine_progress(phase.value, phases, results)
                 self._save_cost_tracker()  # 异常中断也保存成本
                 break
 
@@ -895,9 +1020,17 @@ class WorkflowEngine:
                     f"工作流在阶段 {phase.value} 终止",
                     extra={"error": str(e), "phase": phase.value},
                 )
-                results[phase] = PhaseResult(
-                    phase=phase, success=False, duration=0.0, errors=[str(e)]
-                )
+                if phase not in results:
+                    results[phase] = PhaseResult(
+                        phase=phase, success=False, duration=0.0, errors=[str(e)]
+                    )
+                else:
+                    results[phase].success = False
+                    if str(e) not in results[phase].errors:
+                        results[phase].errors.append(str(e))
+                self._discard_failed_checkpoint(phase)
+                self._notify_phase_finished(phase, results[phase], context)
+                self._record_engine_progress(phase.value, phases, results)
                 break
 
         # Finalize overseer report
@@ -939,7 +1072,11 @@ class WorkflowEngine:
             send_webhook(
                 "pipeline_complete",
                 {
-                    "status": "completed",
+                    "status": (
+                        "completed"
+                        if not phases_failed and len(results) == len(phases)
+                        else "failed"
+                    ),
                     "phases_completed": phases_completed,
                     "phases_failed": phases_failed,
                     "total_phases": len(results),
@@ -1230,6 +1367,8 @@ class WorkflowEngine:
                     configured_name = getattr(config_obj, "name", None) or configured_name
 
             name = str(context.user_input.get("name", configured_name))
+            if phase == Phase.DRAFTING:
+                name = self._document_artifact_prefix(context)
             scorer = QualityScorer(project_dir=self.project_dir, name=name)
             score = scorer.score_phase(
                 phase_name=phase.value,
@@ -1475,9 +1614,10 @@ class WorkflowEngine:
         output_dir = self.project_dir / "output"
         output_dir.mkdir(exist_ok=True)
 
+        artifact_prefix = self._document_artifact_prefix(context)
         saved_docs = []
         for expert_output in result.outputs:
-            doc_path = output_dir / f"{name}-{expert_output.document_type}.md"
+            doc_path = output_dir / f"{artifact_prefix}-{expert_output.document_type}.md"
             doc_path.write_text(expert_output.content, encoding="utf-8")
             saved_docs.append(str(doc_path))
             context.documents[expert_output.document_type] = expert_output.content
@@ -1486,9 +1626,9 @@ class WorkflowEngine:
         try:
             from ..creators.prompt_generator import AIPromptGenerator
 
-            prompt_gen = AIPromptGenerator(self.project_dir, name)
+            prompt_gen = AIPromptGenerator(self.project_dir, artifact_prefix)
             prompt_content = prompt_gen.generate()
-            prompt_path = output_dir / f"{name}-ai-prompt.md"
+            prompt_path = output_dir / f"{artifact_prefix}-ai-prompt.md"
             prompt_path.write_text(prompt_content, encoding="utf-8")
             saved_docs.append(str(prompt_path))
             self.logger.info(f"AI 提示词已生成: {prompt_path}")

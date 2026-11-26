@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from super_dev.review_state import load_docs_confirmation
+import pytest
+
+from super_dev.review_state import load_docs_confirmation, save_docs_confirmation
 from super_dev.workflow_guard import (
+    WorkflowGateError,
     collect_docs_artifact_binding,
     collect_preview_artifact_binding,
     docs_gate_status,
@@ -84,9 +87,17 @@ def test_active_docs_gate_requires_all_three_core_documents(temp_project_dir: Pa
     (output_dir / f"{change_id}-architecture.md").write_text("architecture", encoding="utf-8")
     _write_active_change(temp_project_dir, change_id)
 
-    save_bound_docs_confirmation(
+    with pytest.raises(WorkflowGateError):
+        save_bound_docs_confirmation(
+            temp_project_dir,
+            {"status": "confirmed", "actor": "pytest"},
+        )
+    save_docs_confirmation(
         temp_project_dir,
-        {"status": "confirmed", "actor": "pytest"},
+        {
+            "status": "confirmed",
+            "artifact_binding": collect_docs_artifact_binding(temp_project_dir),
+        },
     )
     gate = docs_gate_status(temp_project_dir)
 

@@ -154,7 +154,9 @@ class CliSpecMixin:
                     self.console.print(f"  - {delta.spec_name} ({delta.delta_type.value})")
 
         elif args.spec_action == "propose":
-            if not self._ensure_execution_gates(project_dir, action_label="创建 Spec 变更"):
+            if not self._ensure_execution_gates(
+                project_dir, action_label="创建 Spec 变更", preview_required=False
+            ):
                 return 1
             from .workflow_guard import require_spec_work_item_binding
 

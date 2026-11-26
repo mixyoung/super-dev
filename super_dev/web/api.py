@@ -1055,6 +1055,11 @@ async def run_workflow(
         if workflow_updates:
             manager.update(**workflow_updates)
         config = manager.config
+        effective_tech_stack = {
+            "platform": request.platform or config.platform,
+            "frontend": request.frontend or config.frontend,
+            "backend": request.backend or config.backend,
+        }
 
         # 解析阶段
         phases = None
@@ -1093,6 +1098,7 @@ async def run_workflow(
             action="workflow_run",
             requested_phases=requested_phase_names,
             require_context=True,
+            tech_stack=effective_tech_stack,
         )
 
         # 生成运行 ID
@@ -1147,9 +1153,7 @@ async def run_workflow(
                             if request.description is not None
                             else config.description
                         ),
-                        "platform": request.platform or config.platform,
-                        "frontend": request.frontend or config.frontend,
-                        "backend": request.backend or config.backend,
+                        **effective_tech_stack,
                         "domain": request.domain if request.domain is not None else config.domain,
                         "language_preferences": (
                             request.language_preferences
@@ -1193,7 +1197,8 @@ async def run_workflow(
                 completed = []
                 serialized_results = []
                 for phase, result in results.items():
-                    completed.append(phase.value)
+                    if result.success:
+                        completed.append(phase.value)
                     serialized_results.append(
                         {
                             "phase": phase.value,
@@ -1226,6 +1231,20 @@ async def run_workflow(
                     completed_phases=completed,
                     progress=progress,
                     results=serialized_results,
+                    finished_at=_utc_now(),
+                )
+            except WorkflowGateError as exc:
+                cancel_requested = _is_cancel_requested(run_id)
+                _store_run_state(
+                    run_id,
+                    persist_dir=project_dir_path,
+                    status="cancelled" if cancel_requested else "waiting_confirmation",
+                    message=(
+                        "工作流已取消" if cancel_requested else "工作流停在确认门，等待有效确认"
+                    ),
+                    cancel_requested=cancel_requested,
+                    error=str(exc),
+                    gate_error=exc.to_dict(),
                     finished_at=_utc_now(),
                 )
             except Exception as e:
@@ -1401,7 +1420,10 @@ async def update_workflow_docs_confirmation(
         "actor": request.actor.strip() or "user",
         "run_id": run_id.strip(),
     }
-    file_path, ledger_entry = save_bound_docs_confirmation(project_dir_path, payload)
+    try:
+        file_path, ledger_entry = save_bound_docs_confirmation(project_dir_path, payload)
+    except WorkflowGateError as exc:
+        raise HTTPException(status_code=409, detail=exc.to_dict()) from exc
     saved_payload = load_docs_confirmation(project_dir_path) or {}
     return {
         "status": request.status,
@@ -1455,7 +1477,10 @@ async def update_workflow_preview_confirmation(
         "actor": request.actor.strip() or "user",
         "run_id": run_id.strip(),
     }
-    file_path, ledger_entry = save_bound_preview_confirmation(project_dir_path, payload)
+    try:
+        file_path, ledger_entry = save_bound_preview_confirmation(project_dir_path, payload)
+    except WorkflowGateError as exc:
+        raise HTTPException(status_code=409, detail=exc.to_dict()) from exc
     saved_payload = load_preview_confirmation(project_dir_path) or {}
     return {
         "status": request.status,

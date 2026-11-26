@@ -3,11 +3,10 @@ from pathlib import Path
 
 from super_dev.host_runtime_probe import build_host_runtime_probe
 from super_dev.review_state import (
-    save_docs_confirmation,
-    save_preview_confirmation,
     save_workflow_state,
     workflow_event_log_file,
 )
+from super_dev.workflow_guard import save_bound_docs_confirmation, save_bound_preview_confirmation
 
 
 def _prepare_core_docs(project_dir: Path) -> None:
@@ -115,8 +114,7 @@ def test_host_runtime_probe_fails_when_frontend_runtime_misses_claude_design_pro
             "recommended_command": "继续当前流程，进入后端实现",
         },
     )
-    save_docs_confirmation(temp_project_dir, {"status": "confirmed"})
-    save_preview_confirmation(temp_project_dir, {"status": "confirmed"})
+    save_bound_docs_confirmation(temp_project_dir, {"status": "confirmed"})
     output_dir = temp_project_dir / "output"
     (output_dir / f"{temp_project_dir.name}-research.md").write_text(
         "# research\n",
@@ -175,6 +173,7 @@ def test_host_runtime_probe_fails_when_frontend_runtime_misses_claude_design_pro
         ),
         encoding="utf-8",
     )
+    save_bound_preview_confirmation(temp_project_dir, {"status": "confirmed"})
 
     probe = build_host_runtime_probe(
         temp_project_dir,

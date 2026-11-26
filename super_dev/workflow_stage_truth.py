@@ -100,6 +100,19 @@ _WORKFLOW_STAGE_EXPERTS: dict[str, tuple[str, ...]] = {
 WORKFLOW_STAGE_EXPERTS: Mapping[str, tuple[str, ...]] = MappingProxyType(_WORKFLOW_STAGE_EXPERTS)
 
 
+def resolve_flow_variant(payload: Mapping[str, object]) -> str:
+    """Prefer the explicit mode; retain legacy aliases only when it is absent."""
+    explicit = payload.get("flow_variant")
+    if explicit is not None and str(explicit).strip():
+        return "seeai" if str(explicit).strip().lower() == "seeai" else "standard"
+    for key in ("entry_variant", "pipeline_variant", "mode_variant"):
+        if str(payload.get(key, "")).strip().lower() == "seeai":
+            return "seeai"
+    if "seeai" in str(payload.get("current_step_label", "")).strip().lower():
+        return "seeai"
+    return "standard"
+
+
 def normalize_stage_key(stage: str) -> str:
     normalized = str(stage).strip().lower()
     return _ALIAS_TO_CANONICAL.get(normalized, normalized)

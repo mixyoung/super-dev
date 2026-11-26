@@ -123,6 +123,7 @@ def test_detect_pipeline_summary_seeai_skips_preview_gate(temp_project_dir: Path
         json.dumps({"flow_variant": "seeai"}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    save_bound_docs_confirmation(temp_project_dir, {"status": "confirmed", "actor": "pytest"})
 
     summary = detect_pipeline_summary(temp_project_dir)
 
@@ -173,6 +174,7 @@ def _prepare_implemented_project(temp_project_dir: Path, *, frontend: str, backe
             "actor": "pytest",
         },
     )
+    save_bound_docs_confirmation(temp_project_dir, {"status": "confirmed", "actor": "pytest"})
 
 
 def test_detect_pipeline_summary_treats_root_python_cli_as_implemented_backend(
@@ -250,6 +252,7 @@ def _prepare_active_change_pipeline(
         )
     (change_dir / "proposal.md").write_text("proposal", encoding="utf-8")
     (change_dir / "tasks.md").write_text("tasks", encoding="utf-8")
+    save_bound_docs_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
     return output_dir, change_dir
 
 

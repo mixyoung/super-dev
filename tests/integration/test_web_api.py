@@ -1558,9 +1558,12 @@ class TestWebAPI:
             '{"passed": false}', encoding="utf-8"
         )
 
-        save_docs_confirmation(
+        save_bound_docs_confirmation(
             temp_project_dir,
             {"status": "confirmed", "comment": "ok", "actor": "test", "run_id": "delivery01"},
+        )
+        save_bound_preview_confirmation(
+            temp_project_dir, {"status": "confirmed", "actor": "test", "run_id": "delivery01"}
         )
 
         web_api._store_run_state(
@@ -2148,6 +2151,12 @@ class TestWebAPI:
         )
         assert confirm_resp.status_code == 200
         assert confirm_resp.json()["binding_matches_current"] is True
+        (output_dir / "api-redteam-frontend-runtime.json").write_text(
+            '{"passed": true}', encoding="utf-8"
+        )
+        save_bound_preview_confirmation(
+            temp_project_dir, {"status": "confirmed", "actor": "pytest"}
+        )
 
         run_resp = client.post(
             "/api/workflow/run",

@@ -12,6 +12,13 @@ from super_dev.workflow_guard import (
 )
 
 
+def _confirm_runtime(project_dir: Path, name: str) -> None:
+    output = project_dir / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    (output / f"{name}-frontend-runtime.json").write_text('{"passed": true}', encoding="utf-8")
+    save_bound_preview_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
+
+
 def test_task_executor_completes_generated_change(temp_project_dir: Path) -> None:
     requirements = [
         {
@@ -43,6 +50,7 @@ def test_task_executor_completes_generated_change(temp_project_dir: Path) -> Non
         backend="node",
     )
     implementation_builder.generate(requirements=requirements)
+    _confirm_runtime(temp_project_dir, "demo-task-exec")
 
     executor = SpecTaskExecutor(project_dir=temp_project_dir, project_name="demo-task-exec")
     summary = executor.execute(change_id=change_id, tech_stack=tech_stack, max_retries=1)
@@ -126,6 +134,7 @@ def test_task_executor_respects_dependencies(temp_project_dir: Path) -> None:
         encoding="utf-8",
     )
 
+    _confirm_runtime(temp_project_dir, "dep-change")
     executor = SpecTaskExecutor(project_dir=temp_project_dir, project_name="dep-change")
     summary = executor.execute(
         change_id="dep-change",
@@ -305,6 +314,9 @@ def test_task_executor_requires_preview_confirmation_for_backend_and_quality_tas
             max_retries=0,
         )
     assert exc_info.value.gate == "preview_confirmation"
+    (output_dir / "preview-blocked-change-frontend-runtime.json").write_text(
+        '{"passed": true}', encoding="utf-8"
+    )
 
     save_bound_preview_confirmation(
         temp_project_dir,

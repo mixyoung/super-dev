@@ -138,7 +138,11 @@ class StateStore:
         self.lock_timeout_seconds = lock_timeout_seconds
 
     def load_workflow(self) -> dict[str, Any]:
-        return _read_json(self.workflow_path) or _read_json(self.latest_path) or {}
+        current = _read_json(self.workflow_path)
+        if current is not None:
+            return current
+        latest = _read_json(self.latest_path)
+        return latest if latest is not None else {}
 
     @contextmanager
     def exclusive_commit(self) -> Iterator[StateStore]:
@@ -146,6 +150,10 @@ class StateStore:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         with _ProjectStateLock(self.lock_path, timeout_seconds=self.lock_timeout_seconds):
             yield self
+
+    def _has_workflow_history(self) -> bool:
+        """History presence does not imply that a valid recovery candidate exists."""
+        return self.latest_path.exists() or any(self.history_dir.glob("workflow-state-*.json"))
 
     def _recovery_candidates(self, *, limit: int = 5) -> list[dict[str, Any]]:
         candidates: list[dict[str, Any]] = []
@@ -171,7 +179,7 @@ class StateStore:
 
     def workflow_health(self) -> dict[str, Any]:
         """权威状态健康；损坏时给出可解析的历史快照恢复候选，不静默降级。"""
-        if self.workflow_path.is_file():
+        if self.workflow_path.exists():
             payload = _read_json(self.workflow_path)
             if payload is not None:
                 return {
@@ -184,11 +192,12 @@ class StateStore:
                 "current_revision": None,
                 "candidates": self._recovery_candidates(),
             }
-        if self.latest_path.is_file():
+        candidates = self._recovery_candidates(limit=1)
+        if self._has_workflow_history():
             return {
                 "status": "missing_current",
                 "current_revision": None,
-                "candidates": self._recovery_candidates(limit=1),
+                "candidates": candidates,
             }
         return {"status": "missing", "current_revision": 0, "candidates": []}
 
@@ -211,11 +220,11 @@ class StateStore:
     def apply_recovery(self, candidate: dict[str, Any]) -> dict[str, Any]:
         """经授权把恢复候选写回权威状态并追加 state_recovered 审计事件。"""
         snapshot_path = Path(str(candidate.get("path", "")))
-        payload = _read_json(snapshot_path) if snapshot_path.is_file() else None
-        if payload is None:
-            raise StateStoreError(f"recovery candidate unreadable: {snapshot_path}")
-        serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
         with self.exclusive_commit():
+            payload = _read_json(snapshot_path)
+            if payload is None:
+                raise StateStoreError(f"recovery candidate unreadable: {snapshot_path}")
+            serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
             atomic_write_text(self.workflow_path, serialized)
             atomic_write_text(self.latest_path, serialized)
             self._append_event(
@@ -281,18 +290,23 @@ class StateStore:
     ) -> CommitResult:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         with _ProjectStateLock(self.lock_path, timeout_seconds=self.lock_timeout_seconds):
-            if self.workflow_path.is_file():
-                try:
-                    json.loads(self.workflow_path.read_text(encoding="utf-8"))
-                except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-                    candidates = self._recovery_candidates()
+            current = _read_json(self.workflow_path)
+            if self.workflow_path.exists() and current is None:
+                candidates = self._recovery_candidates()
+                raise StateStoreError(
+                    "workflow-state.json 损坏，提交被阻断（主状态必须为 JSON 对象，"
+                    "不静默回退 latest.json）。"
+                    "先用 workflow_health()/prepare_recovery() 核对恢复候选，"
+                    "经授权 apply_recovery() 后再提交。"
+                    f" candidates={[item['path'] for item in candidates]}"
+                )
+            if current is None:
+                if self._has_workflow_history():
                     raise StateStoreError(
-                        "workflow-state.json 损坏，提交被阻断（不静默回退 latest.json）。"
-                        "先用 workflow_health()/prepare_recovery() 核对恢复候选，"
-                        "经授权 apply_recovery() 后再提交。"
-                        f" 解析错误: {exc}; candidates={[item['path'] for item in candidates]}"
-                    ) from exc
-            current = _read_json(self.workflow_path) or _read_json(self.latest_path) or {}
+                        "workflow-state.json 缺失，历史快照不能作为普通提交的当前状态。"
+                        "请先核对恢复候选，经授权 apply_recovery() 后再提交。"
+                    )
+                current = {}
             current_revision = int(current.get("revision", 0) or 0)
             supplied_revision = payload.get("revision")
             expected = expected_revision

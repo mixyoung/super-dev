@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import super_dev.cli_workflow_runtime_mixin as workflow_runtime
@@ -7,6 +8,14 @@ from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
 from super_dev.review_state import save_workflow_state
 from super_dev.scope_advisory import build_scope_advisory
+
+
+def _write_passed_frontend_runtime(project_dir: Path) -> None:
+    output = project_dir / "output"
+    output.mkdir(exist_ok=True)
+    (output / f"{project_dir.name}-frontend-runtime.json").write_text(
+        '{"passed": true}', encoding="utf-8"
+    )
 
 
 def test_resume_stage_resolution_matrix() -> None:
@@ -191,6 +200,7 @@ def test_run_confirm_phase_updates_run_state_for_generic_phase(
 ) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
+    _write_passed_frontend_runtime(temp_project_dir)
     cli._write_pipeline_run_state(
         temp_project_dir,
         {
@@ -215,6 +225,7 @@ def test_run_confirm_phase_updates_run_state_for_generic_phase(
 def test_run_confirm_phase_initializes_status_when_missing(temp_project_dir, monkeypatch) -> None:
     cli = SuperDevCLI()
     monkeypatch.chdir(temp_project_dir)
+    _write_passed_frontend_runtime(temp_project_dir)
 
     code = cli._cmd_run_confirm_phase(
         phase_name="frontend",

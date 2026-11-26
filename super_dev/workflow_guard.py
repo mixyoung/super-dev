@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from .artifact_utils import (
@@ -12,18 +13,26 @@ from .artifact_utils import (
     sanitize_artifact_name,
 )
 from .atomic_io import atomic_write_text
+from .config.manager import ConfigManager
 from .review_state import (
     load_docs_confirmation,
     load_preview_confirmation,
+    load_workflow_state,
     review_state_dir,
     save_docs_confirmation,
     save_preview_confirmation,
 )
 from .state_store import StateStore
-from .workflow_contract import ContentEffect, ControlSource, ensure_control_effect_allowed
+from .workflow_contract import (
+    ContentEffect,
+    ControlSource,
+    ensure_control_effect_allowed,
+    get_gate_config,
+)
 from .workflow_stage_truth import (
     active_experts_for_stage,
     normalize_stage_key,
+    resolve_flow_variant,
     stages_require_docs_confirmation,
     stages_require_preview_confirmation,
 )
@@ -64,6 +73,17 @@ class WorkflowGateError(RuntimeError):
         }
 
 
+def _require_authoritative_workflow(project_dir: Path, *, action: str) -> None:
+    health = StateStore(project_dir).workflow_health()
+    if health["status"] in {"corrupt", "missing_current"}:
+        raise WorkflowGateError(
+            "当前工作流状态损坏或缺失，必须先核对恢复候选并明确恢复，不能继续执行。",
+            gate="workflow_recovery",
+            action=action,
+            details=health,
+        )
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -96,9 +116,10 @@ def _artifact_files(
     patterns: tuple[str, ...],
     *,
     artifact_prefix: str = "",
+    strict_prefix: bool = False,
 ) -> list[Path]:
     output_dir = Path(project_dir).resolve() / "output"
-    if not output_dir.exists():
+    if not output_dir.exists() or (strict_prefix and not artifact_prefix):
         return []
     files: list[Path] = []
     for pattern in patterns:
@@ -133,9 +154,13 @@ def _artifact_binding(
     active_change_id: str = "",
     work_item_id: str = "",
     binding_status: str = "",
+    artifact_prefix: str = "",
+    strict_prefix: bool = False,
 ) -> dict[str, Any]:
-    artifact_prefix = sanitize_artifact_name(work_item_id or active_change_id)
-    files = _artifact_files(project_dir, patterns, artifact_prefix=artifact_prefix)
+    artifact_prefix = artifact_prefix or sanitize_artifact_name(work_item_id or active_change_id)
+    files = _artifact_files(
+        project_dir, patterns, artifact_prefix=artifact_prefix, strict_prefix=strict_prefix
+    )
     return {
         "stage": stage,
         "file_count": len(files),
@@ -149,11 +174,40 @@ def _artifact_binding(
     }
 
 
+def _legacy_artifact_prefix(
+    project_dir: Path, patterns: tuple[str, ...]
+) -> tuple[str, list[str], int]:
+    files = _artifact_files(project_dir, patterns)
+    prefixes = {
+        path.name[: -len(pattern[1:])]
+        for path in files
+        for pattern in patterns
+        if path.name.endswith(pattern[1:])
+    }
+    if len(prefixes) == 1:
+        return next(iter(prefixes)), [], len(files)
+    try:
+        configured = sanitize_artifact_name(ConfigManager(project_dir).load().name)
+    except Exception:
+        configured = ""
+    for preferred in (configured, sanitize_artifact_name(Path(project_dir).name)):
+        if preferred and preferred in prefixes:
+            return preferred, [], len(files)
+    return "", sorted(prefixes), len(files)
+
+
 def collect_docs_artifact_binding(project_dir: Path) -> dict[str, Any]:
     identity = resolve_work_item_identity(project_dir)
     active_change_id = resolve_active_change_id(project_dir)
     work_item_id = identity.work_item_id if not identity.legacy else active_change_id
     artifact_owner_id = work_item_id or active_change_id
+    artifact_prefix = sanitize_artifact_name(artifact_owner_id)
+    ambiguous_prefixes: list[str] = []
+    discovered_count = 0
+    if identity.legacy and not artifact_owner_id:
+        artifact_prefix, ambiguous_prefixes, discovered_count = _legacy_artifact_prefix(
+            project_dir, _DOC_PATTERNS
+        )
     binding = _artifact_binding(
         project_dir,
         stage="docs",
@@ -161,30 +215,123 @@ def collect_docs_artifact_binding(project_dir: Path) -> dict[str, Any]:
         active_change_id=active_change_id,
         work_item_id=work_item_id,
         binding_status=identity.binding_status,
+        artifact_prefix=artifact_prefix,
+        strict_prefix=True,
     )
-    if artifact_owner_id:
-        artifact_prefix = str(binding.get("artifact_prefix", ""))
-        output_dir = Path(project_dir).resolve() / "output"
-        core_files = [output_dir / f"{artifact_prefix}{pattern[1:]}" for pattern in _DOC_PATTERNS]
-        core_file_count = sum(path.is_file() for path in core_files)
-        binding.update(
-            {
-                "core_file_count": core_file_count,
-                "required_core_file_count": len(_DOC_PATTERNS),
-                "core_complete": core_file_count == len(_DOC_PATTERNS),
-            }
-        )
+    output_dir = Path(project_dir).resolve() / "output"
+    core_file_count = (
+        sum((output_dir / f"{artifact_prefix}{pattern[1:]}").is_file() for pattern in _DOC_PATTERNS)
+        if artifact_prefix
+        else 0
+    )
+    binding.update(
+        {
+            "core_file_count": core_file_count,
+            "required_core_file_count": len(_DOC_PATTERNS),
+            "core_complete": identity.valid and core_file_count == len(_DOC_PATTERNS),
+            "discovered_file_count": max(discovered_count, int(binding["file_count"])),
+            "ambiguous_prefixes": ambiguous_prefixes,
+        }
+    )
     return binding
 
 
 def collect_preview_artifact_binding(project_dir: Path) -> dict[str, Any]:
+    identity = resolve_work_item_identity(project_dir)
     active_change_id = resolve_active_change_id(project_dir)
-    return _artifact_binding(
+    work_item_id = identity.work_item_id if not identity.legacy else active_change_id
+    artifact_prefix = sanitize_artifact_name(work_item_id or active_change_id)
+    if identity.legacy and not artifact_prefix:
+        artifact_prefix, _, _ = _legacy_artifact_prefix(project_dir, _PREVIEW_PATTERNS)
+    binding = _artifact_binding(
         project_dir,
         stage="preview",
         patterns=_PREVIEW_PATTERNS,
         active_change_id=active_change_id,
+        work_item_id=work_item_id,
+        binding_status=identity.binding_status,
+        artifact_prefix=artifact_prefix,
+        strict_prefix=True,
     )
+    # QA 会刷新评审附件；人工预览确认绑定运行目标和 UI 契约，而非这些附件的生成时间。
+    target_files = [
+        Path(path)
+        for path in binding["files"]
+        if str(path).endswith(("-frontend-runtime.json", "-ui-contract.json"))
+    ]
+    binding["preview_target_schema_version"] = 1
+    binding["preview_target_files"] = [str(path) for path in target_files]
+    binding["preview_target_digest"] = _binding_digest(target_files) if target_files else ""
+    return binding
+
+
+def _preview_preconditions(
+    project_dir: Path,
+    binding: dict[str, Any],
+    *,
+    tech_stack: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from .deployers.delivery import derive_delivery_applicability
+    from .evidence_identity import load_json_payload
+
+    identity = resolve_work_item_identity(project_dir)
+    payload = load_workflow_state(project_dir) or {}
+    flow_variant = resolve_flow_variant(payload)
+    required = True
+    applicability = "unknown"
+    reason = "无法确定预览适用性，不能按不适用放行。"
+    try:
+        config = ConfigManager(project_dir).load()
+        overrides = tech_stack or {}
+        effective = SimpleNamespace(
+            **{
+                key: overrides[key] if overrides.get(key) is not None else getattr(config, key, "")
+                for key in ("platform", "frontend", "backend", "database")
+            }
+        )
+        frontend_required = bool(derive_delivery_applicability(effective)["frontend_required"])
+        required = frontend_required and get_gate_config(flow_variant)["preview_confirm"]
+        applicability = "required" if required else "not_applicable"
+        reason = (
+            "当前界面项目需要有效运行证据及用户预览确认。"
+            if required
+            else (
+                "当前模式不设中途预览确认门。"
+                if frontend_required
+                else "当前有效技术栈没有前端，预览确认不适用。"
+            )
+        )
+    except Exception:
+        pass
+    if not identity.valid:
+        required = True
+        applicability = "unknown"
+        reason = "工作项身份无效，不能推进预览确认后的阶段。"
+    runtime_files = [
+        Path(path)
+        for path in binding.get("files", [])
+        if str(path).endswith("-frontend-runtime.json")
+    ]
+    runtime_payload = load_json_payload(runtime_files[0]) if len(runtime_files) == 1 else {}
+    runtime_ready = len(runtime_files) == 1 and runtime_payload.get("passed") is True
+    runtime_status = (
+        "passed"
+        if runtime_ready
+        else (
+            "missing"
+            if not runtime_files
+            else "failed" if runtime_payload.get("passed") is False else "invalid"
+        )
+    )
+    return {
+        "required": required,
+        "applicability": applicability,
+        "reason": reason,
+        "identity_valid": identity.valid,
+        "runtime_ready": runtime_ready,
+        "runtime_status": runtime_status,
+        "runtime_files": [str(path) for path in runtime_files],
+    }
 
 
 def require_spec_work_item_binding(project_dir: Path, change_id: str) -> dict[str, Any]:
@@ -372,14 +519,21 @@ def save_bound_docs_confirmation(
             action="save_docs_confirmation",
             details={"issues": list(identity.issues)},
         )
-    binding = collect_docs_artifact_binding(project_dir)
-    normalized = dict(payload)
-    if not identity.legacy and identity.work_item_id:
-        normalized["work_item_id"] = identity.work_item_id
-    normalized["artifact_binding"] = binding
-    # 账本/确认文件/事件必须在同一把项目状态锁内写入；账本先行，确认文件最后落盘，
-    # 中途失败时 docs_gate_status 以确认文件为准，宁可安全阻断也不留下半开状态。
+    # 账本/确认文件/事件必须在同一把项目状态锁内写入；校验失败时不产生确认副作用。
     with StateStore(project_dir).exclusive_commit():
+        _require_authoritative_workflow(project_dir, action="save_docs_confirmation")
+        binding = collect_docs_artifact_binding(project_dir)
+        if str(payload.get("status", "")).strip() == "confirmed" and not binding["core_complete"]:
+            raise WorkflowGateError(
+                "三份核心文档不完整或归属不明确，不能保存文档确认。",
+                gate="docs_confirmation",
+                action="save_docs_confirmation",
+                details={"artifact_binding": binding},
+            )
+        normalized = dict(payload)
+        if not identity.legacy and identity.work_item_id:
+            normalized["work_item_id"] = identity.work_item_id
+        normalized["artifact_binding"] = binding
         ledger_entry = _update_stage_ledger(
             project_dir,
             stage="docs_confirm",
@@ -399,13 +553,33 @@ def save_bound_preview_confirmation(
     project_dir: Path, payload: dict[str, Any]
 ) -> tuple[Path, dict[str, Any]]:
     identity = resolve_work_item_identity(project_dir)
-    binding = collect_preview_artifact_binding(project_dir)
-    normalized = dict(payload)
-    if not identity.legacy and identity.work_item_id:
-        normalized["work_item_id"] = identity.work_item_id
-    normalized["artifact_binding"] = binding
-    # 与文档确认相同的统一锁与顺序：账本先行，确认文件最后落盘。
+    if not identity.valid:
+        raise WorkflowGateError(
+            "工作项身份无效，不能写入预览确认。",
+            gate="work_item_identity",
+            action="save_preview_confirmation",
+            details={"issues": list(identity.issues)},
+        )
+    # 与文档确认相同的统一锁与顺序：先检查运行前提，再写账本和确认文件。
     with StateStore(project_dir).exclusive_commit():
+        _require_authoritative_workflow(project_dir, action="save_preview_confirmation")
+        binding = collect_preview_artifact_binding(project_dir)
+        preconditions = _preview_preconditions(project_dir, binding)
+        if (
+            str(payload.get("status", "")).strip() == "confirmed"
+            and preconditions["required"]
+            and not preconditions["runtime_ready"]
+        ):
+            raise WorkflowGateError(
+                "当前前端运行验证未通过，不能保存预览确认。",
+                gate="preview_confirmation",
+                action="save_preview_confirmation",
+                details={**preconditions, "artifact_binding": binding},
+            )
+        normalized = dict(payload)
+        if not identity.legacy and identity.work_item_id:
+            normalized["work_item_id"] = identity.work_item_id
+        normalized["artifact_binding"] = binding
         ledger_entry = _update_stage_ledger(
             project_dir,
             stage="preview_confirm",
@@ -437,7 +611,9 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
     if not isinstance(ledger_entry, dict) or not ledger_entry:
         legacy_entry = ledger.get("docs", {})
         ledger_entry = legacy_entry if isinstance(legacy_entry, dict) else {}
-    has_context = bool(binding.get("file_count", 0)) or bool(ledger_entry)
+    has_context = bool(binding.get("discovered_file_count", binding.get("file_count", 0))) or bool(
+        ledger_entry
+    )
     status = str(confirmation.get("status", "")).strip() or "pending_review"
     confirmed_binding = confirmation.get("artifact_binding", {})
     if not isinstance(confirmed_binding, dict):
@@ -449,7 +625,7 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
     stored_digest = str(confirmed_binding.get("digest", "")).strip()
     current_digest = str(binding.get("digest", "")).strip()
     binding_matches_current = bool(stored_digest) and stored_digest == current_digest
-    core_complete = bool(binding.get("core_complete", True))
+    core_complete = bool(binding.get("core_complete", False))
     confirmed = status == "confirmed" and binding_matches_current and core_complete
     return {
         "has_context": has_context,
@@ -464,8 +640,11 @@ def docs_gate_status(project_dir: Path) -> dict[str, Any]:
     }
 
 
-def preview_gate_status(project_dir: Path) -> dict[str, Any]:
+def preview_gate_status(
+    project_dir: Path, *, tech_stack: dict[str, Any] | None = None
+) -> dict[str, Any]:
     binding = collect_preview_artifact_binding(project_dir)
+    preconditions = _preview_preconditions(project_dir, binding, tech_stack=tech_stack)
     confirmation = load_preview_confirmation(project_dir) or {}
     ledger = load_stage_ledger(project_dir)
     ledger_entry = ledger.get("preview_confirm", {})
@@ -480,12 +659,23 @@ def preview_gate_status(project_dir: Path) -> dict[str, Any]:
         confirmed_binding = ledger_entry.get("artifact_binding", {})
         if not isinstance(confirmed_binding, dict):
             confirmed_binding = {}
-    stored_digest = str(confirmed_binding.get("digest", "")).strip()
-    current_digest = str(binding.get("digest", "")).strip()
+    digest_key = (
+        "preview_target_digest"
+        if confirmed_binding.get("preview_target_schema_version") == 1
+        else "digest"
+    )
+    stored_digest = str(confirmed_binding.get(digest_key, "")).strip()
+    current_digest = str(binding.get(digest_key, "")).strip()
     binding_matches_current = bool(stored_digest) and stored_digest == current_digest
     return {
+        **preconditions,
         "has_context": bool(binding.get("file_count", 0)) or bool(ledger_entry),
-        "confirmed": status == "confirmed" and binding_matches_current,
+        "confirmed": (
+            status == "confirmed"
+            and binding_matches_current
+            and preconditions["runtime_ready"]
+            and preconditions["identity_valid"]
+        ),
         "status": status,
         "artifact_binding": binding,
         "confirmed_artifact_binding": confirmed_binding,
@@ -529,6 +719,7 @@ def require_docs_confirmation(
         requested_phases
     ):
         return gate_state
+    _require_authoritative_workflow(project_dir, action=action)
     if require_context and not gate_state["has_context"]:
         return gate_state
     if gate_state["confirmed"]:
@@ -553,18 +744,27 @@ def require_preview_confirmation(
     action: str,
     requested_phases: list[str] | None = None,
     require_context: bool = True,
+    tech_stack: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    gate_state = preview_gate_status(project_dir)
+    gate_state = preview_gate_status(project_dir, tech_stack=tech_stack)
     if requested_phases is not None and not requested_phases_require_preview_confirmation(
         requested_phases
     ):
         return gate_state
-    if require_context and not gate_state["has_context"]:
+    _require_authoritative_workflow(project_dir, action=action)
+    if not gate_state["identity_valid"]:
+        raise WorkflowGateError(
+            "工作项身份无效，不能推进预览确认后的阶段。",
+            gate="work_item_identity",
+            action=action,
+        )
+    # require_context 保留调用兼容；缺少证据不能取消实际适用的确认门。
+    if not gate_state["required"]:
         return gate_state
     if gate_state["confirmed"]:
         return gate_state
     raise WorkflowGateError(
-        "前端预览尚未确认，不能跳过 preview_confirm 直接进入后续阶段。",
+        "前端预览尚未确认或当前运行验证未通过，不能跳过 preview_confirm 直接进入后续阶段。",
         gate="preview_confirmation",
         action=action,
         details={
@@ -573,5 +773,8 @@ def require_preview_confirmation(
             "artifact_binding": gate_state["artifact_binding"],
             "confirmed_artifact_binding": gate_state["confirmed_artifact_binding"],
             "binding_matches_current": gate_state["binding_matches_current"],
+            "applicability": gate_state["applicability"],
+            "runtime_status": gate_state["runtime_status"],
+            "reason": gate_state["reason"],
         },
     )

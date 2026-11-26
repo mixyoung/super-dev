@@ -7,6 +7,7 @@ from typing import Any
 from .artifact_utils import (
     resolve_active_change_id,
     resolve_current_artifact_prefix,
+    resolve_work_item_identity,
     sanitize_artifact_name,
 )
 from .baseline_governance import inspect_baseline_governance
@@ -24,10 +25,15 @@ from .review_state import (
     load_workflow_state,
 )
 from .shadow_ledger_store import build_shadow_ledger_summary
+from .state_store import StateStore
 from .work_mode import detect_work_mode
 from .work_mode import work_mode_label as describe_work_mode
 from .workflow_guard import docs_gate_status, preview_gate_status
-from .workflow_stage_truth import active_experts_for_stage, canonical_stage_for_engine_phase
+from .workflow_stage_truth import (
+    active_experts_for_stage,
+    canonical_stage_for_engine_phase,
+    resolve_flow_variant,
+)
 
 BASELINE_STAGE: tuple[str, str, str] = (
     "baseline",
@@ -438,15 +444,7 @@ def _has_any(candidates: list[Path]) -> bool:
 
 
 def detect_flow_variant(project_dir: Path) -> str:
-    payload = load_workflow_state(project_dir) or {}
-    for key in ("flow_variant", "entry_variant", "pipeline_variant", "mode_variant"):
-        value = str(payload.get(key, "")).strip().lower()
-        if value == "seeai":
-            return "seeai"
-    current_step = str(payload.get("current_step_label", "")).strip().lower()
-    if "seeai" in current_step:
-        return "seeai"
-    return "standard"
+    return resolve_flow_variant(load_workflow_state(project_dir) or {})
 
 
 def _latest_json(files: list[Path]) -> tuple[dict[str, Any], str]:
@@ -841,18 +839,26 @@ def detect_pipeline_summary(
     changes_dir = project_dir / ".super-dev" / "changes"
     flow_variant = detect_flow_variant(project_dir)
     workflow_payload = load_workflow_state(project_dir) or {}
+    workflow_health = StateStore(project_dir).workflow_health()
     work_mode = detect_work_mode(project_dir, workflow_payload)
     active_change_id = resolve_active_change_id(project_dir)
-    artifact_prefix = resolve_current_artifact_prefix(
-        project_dir,
-        fallback_name=project_dir.name,
+    identity = resolve_work_item_identity(project_dir)
+    scoped_artifacts = not identity.legacy or bool(active_change_id)
+    artifact_prefix = (
+        identity.artifact_prefix
+        if not identity.legacy
+        else (
+            sanitize_artifact_name(active_change_id)
+            if active_change_id
+            else resolve_current_artifact_prefix(project_dir, fallback_name=project_dir.name)
+        )
     )
-    active_artifact_prefix = sanitize_artifact_name(active_change_id)
+    active_artifact_prefix = artifact_prefix
 
     def _active_output_path(suffix: str) -> Path:
         return output_dir / f"{active_artifact_prefix}-{suffix}"
 
-    if active_change_id:
+    if scoped_artifacts:
         research_file = _active_output_path("research.md")
         prd_file = _active_output_path("prd.md")
         architecture_file = _active_output_path("architecture.md")
@@ -862,15 +868,20 @@ def detect_pipeline_summary(
         architecture_done = architecture_file.is_file()
         uiux_done = uiux_file.is_file()
         active_change_dir = changes_dir / active_change_id
-        spec_done = (active_change_dir / "proposal.md").is_file() and (
-            active_change_dir / "tasks.md"
-        ).is_file()
+        spec_done = (
+            bool(active_change_id)
+            and identity.valid
+            and (active_change_dir / "proposal.md").is_file()
+            and (active_change_dir / "tasks.md").is_file()
+        )
     else:
         research_done = any(output_dir.glob("*-research.md"))
         prd_done = any(output_dir.glob("*-prd.md"))
         architecture_done = any(output_dir.glob("*-architecture.md"))
         uiux_done = any(output_dir.glob("*-uiux.md"))
         spec_done = any(changes_dir.glob("*/proposal.md")) and any(changes_dir.glob("*/tasks.md"))
+    if not identity.valid:
+        research_done = prd_done = architecture_done = uiux_done = spec_done = False
     docs_done = prd_done and architecture_done and uiux_done
 
     try:
@@ -885,7 +896,7 @@ def detect_pipeline_summary(
     frontend_required = frontend_kind not in {"", "none"}
     backend_required = backend_kind not in {"", "none"}
 
-    if active_change_id:
+    if scoped_artifacts:
         frontend_runtime_file = _active_output_path("frontend-runtime.json")
         ui_contract_file = _active_output_path("ui-contract.json")
         ui_alignment_file = _active_output_path("ui-contract-alignment.json")
@@ -955,7 +966,7 @@ def detect_pipeline_summary(
         ui_review_path,
         dependencies=ui_review_dependencies,
     )
-    if active_change_id:
+    if scoped_artifacts:
         active_change_dir = changes_dir / active_change_id
         quality_dependencies: list[str | Path] = [
             path
@@ -998,7 +1009,7 @@ def detect_pipeline_summary(
         quality_gate_path,
         dependencies=quality_dependencies,
     )
-    frontend_runtime_passed = bool(frontend_runtime_payload.get("passed", False))
+    frontend_runtime_passed = identity.valid and frontend_runtime_payload.get("passed") is True
     frontend_implementation_done = frontend_runtime_passed and not frontend_runtime_state["stale"]
     frontend_done = not frontend_required or frontend_implementation_done
 
@@ -1018,8 +1029,8 @@ def detect_pipeline_summary(
     )
     backend_implementation_done = scaffold_backend_done or root_python_backend_done
     backend_done = not backend_required or backend_implementation_done
-    if active_change_id:
-        quality_gate_passed = bool(quality_gate_payload.get("passed", False))
+    if scoped_artifacts:
+        quality_gate_passed = identity.valid and quality_gate_payload.get("passed") is True
         quality_done = quality_gate_passed and not quality_gate_state["stale"]
         quality_gate_state["passed"] = quality_gate_passed
         if quality_gate_state["exists"] and not quality_gate_passed:
@@ -1031,7 +1042,7 @@ def detect_pipeline_summary(
         )
 
     delivery_dir = output_dir / "delivery"
-    if active_change_id:
+    if scoped_artifacts:
         delivery_manifest_file = delivery_dir / f"{active_artifact_prefix}-delivery-manifest.json"
         delivery_manifest_candidates = (
             [delivery_manifest_file] if delivery_manifest_file.is_file() else []
@@ -1041,12 +1052,12 @@ def detect_pipeline_summary(
             sorted(delivery_dir.glob("*-delivery-manifest.json")) if delivery_dir.exists() else []
         )
     delivery_manifest_payload, delivery_manifest_path = _latest_json(delivery_manifest_candidates)
-    delivery_manifest_ready = (
+    delivery_manifest_ready = identity.valid and (
         str(delivery_manifest_payload.get("status", "")).strip().lower() == "ready"
     )
 
     rehearsal_dir = output_dir / "rehearsal"
-    if active_change_id:
+    if scoped_artifacts:
         rehearsal_file = rehearsal_dir / f"{active_artifact_prefix}-rehearsal-report.json"
         rehearsal_candidates = [rehearsal_file] if rehearsal_file.is_file() else []
     else:
@@ -1128,30 +1139,20 @@ def detect_pipeline_summary(
     )
     explicit_quality_revision_requested = quality_revision["status"] == "revision_requested"
     explicit_preview_revision_requested = (
-        frontend_required and preview_confirmation["status"] == "revision_requested"
+        frontend_required
+        and bool(preview_gate.get("required", True))
+        and preview_confirmation["status"] == "revision_requested"
     )
 
     docs_confirmed = bool(docs_gate.get("confirmed", False))
     preview_confirmed = bool(preview_gate.get("confirmed", False))
-    docs_confirmation_waiting = docs_done and not (
-        docs_confirmed
-        or spec_done
-        or frontend_implementation_done
-        or backend_implementation_done
-        or quality_done
-        or delivery_done
-    )
+    docs_confirmation_waiting = docs_done and not docs_confirmed
+    preview_required = frontend_required and bool(preview_gate.get("required", True))
     preview_confirmation_waiting = (
-        frontend_required
-        and flow_variant != "seeai"
+        preview_required
         and frontend_done
-        and not (
-            preview_confirmed
-            or backend_done
-            or quality_done
-            or delivery_done
-            or explicit_preview_revision_requested
-        )
+        and not preview_confirmed
+        and not explicit_preview_revision_requested
     )
 
     run = run or {}
@@ -1231,12 +1232,7 @@ def detect_pipeline_summary(
                 "canonical_id": "docs_confirm",
                 "name": "等待用户确认",
                 "status": _stage_status(
-                    docs_confirmed
-                    or spec_done
-                    or frontend_implementation_done
-                    or backend_implementation_done
-                    or quality_done
-                    or delivery_done,
+                    docs_confirmed,
                     waiting=docs_confirmation_waiting or explicit_docs_revision_requested,
                 ),
                 "description": PHASE_CHAIN[2][2],
@@ -1279,12 +1275,9 @@ def detect_pipeline_summary(
                 "name": "等待预览确认",
                 "status": (
                     "not_applicable"
-                    if not frontend_required
+                    if not preview_required
                     else _stage_status(
-                        preview_confirmed
-                        or backend_implementation_done
-                        or quality_done
-                        or delivery_done,
+                        preview_confirmed,
                         waiting=preview_confirmation_waiting or explicit_preview_revision_requested,
                     )
                 ),
@@ -1302,7 +1295,7 @@ def detect_pipeline_summary(
                         backend_implementation_done,
                         running=canonical_stage_for_engine_phase(running_phase_name) == "delivery"
                         and frontend_done
-                        and (preview_confirmed or not frontend_required)
+                        and (preview_confirmed or not preview_required)
                         and not backend_implementation_done,
                     )
                 ),
@@ -1372,7 +1365,17 @@ def detect_pipeline_summary(
     checkpoint_status = "ready"
     recommended_command = "在宿主里说“继续当前流程”"
     evidence = "未检测到更高优先级阻断项"
-    if baseline_governance.get("entry_gate") == "waiting_resume_gate":
+    if workflow_health["status"] in {"corrupt", "missing_current"}:
+        checkpoint_status = "waiting_resume_gate"
+        blocker = "权威工作流状态损坏或缺失；历史快照仅供核对，不能据此继续执行。"
+        recommended_command = "先核对状态恢复候选并明确恢复点，再继续当前流程"
+        evidence = f"workflow health: {workflow_health['status']}"
+    elif not identity.valid:
+        checkpoint_status = "invalid_work_item_identity"
+        blocker = "当前显式工作项身份无效，不能借用其他工作项产物或继续执行。"
+        recommended_command = "先核对当前工作项身份及绑定状态，不自动选择其他工作项"
+        evidence = "; ".join(identity.issues)
+    elif baseline_governance.get("entry_gate") == "waiting_resume_gate":
         blocker = (
             str(baseline_governance.get("blocking_reason", "")).strip()
             or "当前存在恢复门，必须先明确恢复点，再继续当前流程。"
@@ -1425,16 +1428,6 @@ def detect_pipeline_summary(
         checkpoint_status = "waiting_quality_revision"
         recommended_command = "在宿主里完成质量整改后直接说“质量整改已完成，继续当前流程”"
         evidence = "quality revision requested"
-    elif docs_confirmation_waiting:
-        blocker = "三份核心文档已生成，当前必须等待用户确认或提出修改意见。"
-        checkpoint_status = "waiting_docs_confirmation"
-        recommended_command = "在宿主里确认三文档；如果通过，直接说“文档确认，可以继续”"
-        evidence = "docs confirmation pending"
-    elif preview_confirmation_waiting:
-        blocker = "前端预览已可演示，当前必须先等待用户确认预览或提出继续修改。"
-        checkpoint_status = "waiting_preview_confirmation"
-        recommended_command = "在宿主里确认前端预览；如果通过，直接说“前端预览确认，可以继续”"
-        evidence = "preview confirmation pending"
     elif baseline_governance.get("entry_gate") == "missing_baseline":
         blocker = (
             str(baseline_governance.get("blocking_reason", "")).strip()
@@ -1449,6 +1442,16 @@ def detect_pipeline_summary(
             str(baseline_governance.get("summary", "")).strip()
             or "缺少 output/*-baseline-audit.md / *-baseline-audit.json"
         )
+    elif docs_confirmation_waiting:
+        blocker = "三份核心文档已生成，当前必须等待用户确认或提出修改意见。"
+        checkpoint_status = "waiting_docs_confirmation"
+        recommended_command = "在宿主里确认三文档；如果通过，直接说“文档确认，可以继续”"
+        evidence = "docs confirmation pending"
+    elif preview_confirmation_waiting:
+        blocker = "前端预览已可演示，当前必须先等待用户确认预览或提出继续修改。"
+        checkpoint_status = "waiting_preview_confirmation"
+        recommended_command = "在宿主里确认前端预览；如果通过，直接说“前端预览确认，可以继续”"
+        evidence = "preview confirmation pending"
     elif not research_done:
         blocker = "当前尚未完成同类产品研究。"
         checkpoint_status = "missing_research"
@@ -1492,11 +1495,11 @@ def detect_pipeline_summary(
             recommended_command = "在宿主里说“继续当前 SEEAI 流程，做最终 polish 和演示检查”"
         else:
             recommended_command = "在宿主里说“继续当前流程，进入质量门禁与发布前检查”"
-        if active_change_id and quality_gate_state["stale"]:
+        if scoped_artifacts and quality_gate_state["stale"]:
             evidence = f"output/{artifact_prefix}-quality-gate.json 已过期"
-        elif active_change_id and quality_gate_state["exists"]:
+        elif scoped_artifacts and quality_gate_state["exists"]:
             evidence = f"output/{artifact_prefix}-quality-gate.json 未通过"
-        elif active_change_id:
+        elif scoped_artifacts:
             evidence = f"缺少通过的 output/{artifact_prefix}-quality-gate.json"
         else:
             evidence = "缺少 quality gate / ui review 证据"
@@ -1532,6 +1535,7 @@ def detect_pipeline_summary(
     )
 
     summary = {
+        "workflow_health": workflow_health,
         "active_change_id": active_change_id,
         "artifact_prefix": artifact_prefix,
         "current_stage_id": current_stage["id"],

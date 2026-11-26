@@ -145,6 +145,7 @@ class SpecTaskExecutor:
                 action=f"spec_task_execute:{task.id}",
                 requested_phases=requested_phases,
                 require_context=True,
+                tech_stack=tech_stack,
             )
         if "前端" in title or "frontend" in title:
             self._ensure_frontend_modules(modules, tech_stack.get("frontend", "react"))

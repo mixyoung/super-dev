@@ -1014,6 +1014,10 @@ class TestCLIReview:
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
+            output_dir = temp_project_dir / "output"
+            output_dir.mkdir()
+            for suffix in ("prd", "architecture", "uiux"):
+                (output_dir / f"review-{suffix}.md").write_text(suffix, encoding="utf-8")
             cli = SuperDevCLI()
             result = cli.run(
                 [
@@ -4089,6 +4093,14 @@ class TestCLITask:
                 encoding="utf-8",
             )
 
+            output_dir = temp_project_dir / "output"
+            output_dir.mkdir()
+            (output_dir / "demo-change-frontend-runtime.json").write_text(
+                '{"passed": true}', encoding="utf-8"
+            )
+            save_bound_preview_confirmation(
+                temp_project_dir, {"status": "confirmed", "actor": "pytest"}
+            )
             cli = SuperDevCLI()
             run_result = cli.run(["task", "run", "demo-change", "--backend", "python"])
             assert run_result == 0
@@ -4739,7 +4751,9 @@ class TestCLIPipeline:
         os.chdir(temp_project_dir)
         try:
             _prepare_workflow_context(temp_project_dir)
-            _confirm_docs(temp_project_dir)
+            save_bound_docs_confirmation(
+                temp_project_dir, {"status": "confirmed", "actor": "pytest"}
+            )
             change_dir = temp_project_dir / ".super-dev" / "changes" / "preview-demo"
             change_dir.mkdir(parents=True, exist_ok=True)
             (change_dir / "proposal.md").write_text("# proposal\n", encoding="utf-8")
