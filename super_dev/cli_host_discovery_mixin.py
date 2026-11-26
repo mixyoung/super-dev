@@ -97,7 +97,11 @@ class CliHostDiscoveryMixin:
         skill_manager,
         target: str,
     ) -> dict[str, Any]:
-        managed_surfaces = integration_manager.collect_managed_surface_paths(target=target)
+        managed_surfaces = (
+            integration_manager.collect_uninstall_surface_paths(target=target)
+            if target == "deepseek-harness"
+            else integration_manager.collect_managed_surface_paths(target=target)
+        )
         planned_surface_paths = self._stringify_existing_paths(list(managed_surfaces.values()))
         missing_surface_paths = sorted(
             {str(path) for path in managed_surfaces.values() if not path.exists()}
@@ -1169,6 +1173,8 @@ class CliHostDiscoveryMixin:
                 **SkillManager.OFFICIAL_TARGET_PATHS,
                 **SkillManager.OBSERVED_TARGET_PATHS,
             }.items():
+                if target == "deepseek-harness":
+                    continue
                 target_path = Path(path_str).expanduser()
                 skill_md = target_path / "super-dev" / "SKILL.md"
                 if skill_md.exists():
@@ -1233,7 +1239,7 @@ class CliHostDiscoveryMixin:
             has_integration = any(
                 (project_dir / relative).exists() for relative in integration_files
             )
-            if IntegrationManager.supports_slash(target):
+            if IntegrationManager.supports_command_files(target):
                 project_slash_exists = IntegrationManager.resolve_slash_command_path(
                     target=target,
                     scope="project",
@@ -1824,6 +1830,19 @@ class CliHostDiscoveryMixin:
                 continue
 
             host_actions: dict[str, str] = {}
+            if target == "deepseek-harness":
+                try:
+                    if missing and (check_integrate or check_skill):
+                        integration_manager.setup(target, force=force)
+                        host_actions["project"] = "refreshed"
+                    if include_user_surfaces and check_skill:
+                        skill_manager.install("super-dev", target, force=force)
+                        host_actions["user"] = "refreshed"
+                except (OSError, ValueError) as exc:
+                    host_actions["dsh"] = f"failed: {exc}"
+                if host_actions:
+                    actions[target] = host_actions
+                continue
             contract_needs_repair = "contract" in missing
             user_surfaces_need_repair = include_user_surfaces and "user_surfaces" in missing
             effective_skill_name = SkillManager.default_skill_name(target)

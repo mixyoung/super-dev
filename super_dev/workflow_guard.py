@@ -19,6 +19,7 @@ from .review_state import (
     load_preview_confirmation,
     load_workflow_state,
     review_state_dir,
+    save_baseline_confirmation,
     save_docs_confirmation,
     save_preview_confirmation,
 )
@@ -194,6 +195,17 @@ def _legacy_artifact_prefix(
         if preferred and preferred in prefixes:
             return preferred, [], len(files)
     return "", sorted(prefixes), len(files)
+
+
+def collect_baseline_artifact_binding(project_dir: Path, work_item_id: str) -> dict[str, Any]:
+    """Bind the exact current task's baseline files, never a nearby report."""
+    return _artifact_binding(
+        project_dir,
+        stage="baseline",
+        patterns=("*-baseline-audit.md", "*-baseline-audit.json"),
+        work_item_id=work_item_id,
+        strict_prefix=True,
+    )
 
 
 def collect_docs_artifact_binding(project_dir: Path) -> dict[str, Any]:
@@ -508,8 +520,61 @@ def record_stage_progress(
     )
 
 
+def _require_expected_native_confirmation(
+    project_dir: Path,
+    binding: dict[str, Any],
+    expected_binding: tuple[str, str, str] | None,
+    *,
+    gate: str,
+) -> None:
+    if expected_binding is None:
+        return
+    item, session_id, digest = expected_binding
+    state = load_workflow_state(project_dir) or {}
+    owner = state.get("dsh_primary_binding")
+    digest_key = (
+        "preview_target_digest" if binding.get("preview_target_schema_version") == 1 else "digest"
+    )
+    if (
+        not digest
+        or binding.get(digest_key) != digest
+        or state.get("work_item_id") != item
+        or not isinstance(owner, dict)
+        or owner.get("protocol") != "dsh-primary-v1"
+        or owner.get("work_item_id") != item
+        or owner.get("session_id") != session_id
+    ):
+        raise WorkflowGateError(
+            "会话、工作项或确认版本已变化，请重新核对当前产物。",
+            gate=gate,
+            action="native_dsh_confirmation",
+        )
+
+
+def save_bound_dsh_baseline_confirmation(
+    project_dir: Path,
+    payload: dict[str, Any],
+    *,
+    expected_binding: tuple[str, str, str],
+) -> Path:
+    """Apply native DSH user confirmation to the checked baseline version."""
+    item = expected_binding[0]
+    with StateStore(project_dir).exclusive_commit():
+        _require_authoritative_workflow(project_dir, action="native_dsh_baseline_confirmation")
+        binding = collect_baseline_artifact_binding(project_dir, item)
+        _require_expected_native_confirmation(
+            project_dir, binding, expected_binding, gate="baseline_confirmation"
+        )
+        return save_baseline_confirmation(
+            project_dir, {**payload, "work_item_id": item, "artifact_binding": binding}
+        )
+
+
 def save_bound_docs_confirmation(
-    project_dir: Path, payload: dict[str, Any]
+    project_dir: Path,
+    payload: dict[str, Any],
+    *,
+    expected_binding: tuple[str, str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     identity = resolve_work_item_identity(project_dir)
     if not identity.legacy and not identity.valid:
@@ -523,6 +588,9 @@ def save_bound_docs_confirmation(
     with StateStore(project_dir).exclusive_commit():
         _require_authoritative_workflow(project_dir, action="save_docs_confirmation")
         binding = collect_docs_artifact_binding(project_dir)
+        _require_expected_native_confirmation(
+            project_dir, binding, expected_binding, gate="docs_confirmation"
+        )
         if str(payload.get("status", "")).strip() == "confirmed" and not binding["core_complete"]:
             raise WorkflowGateError(
                 "三份核心文档不完整或归属不明确，不能保存文档确认。",
@@ -550,7 +618,10 @@ def save_bound_docs_confirmation(
 
 
 def save_bound_preview_confirmation(
-    project_dir: Path, payload: dict[str, Any]
+    project_dir: Path,
+    payload: dict[str, Any],
+    *,
+    expected_binding: tuple[str, str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     identity = resolve_work_item_identity(project_dir)
     if not identity.valid:
@@ -564,6 +635,9 @@ def save_bound_preview_confirmation(
     with StateStore(project_dir).exclusive_commit():
         _require_authoritative_workflow(project_dir, action="save_preview_confirmation")
         binding = collect_preview_artifact_binding(project_dir)
+        _require_expected_native_confirmation(
+            project_dir, binding, expected_binding, gate="preview_confirmation"
+        )
         preconditions = _preview_preconditions(project_dir, binding)
         if (
             str(payload.get("status", "")).strip() == "confirmed"

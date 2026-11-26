@@ -111,6 +111,7 @@ include = ["super_dev*"]
 "super_dev.experts" = ["builtin/*.md", "playbooks/*.md"]
 "super_dev.reviewers" = ["rules/*.yaml"]
 "super_dev.extensions" = ["*.yaml", "builtins/*.yaml"]
+"super_dev.integrations" = ["dsh_primary_bundle/package.json", "dsh_primary_bundle/index.js", "dsh_primary_bundle/cordis.patch.yml", "dsh_primary_bundle/README.md"]
 
 [tool.black]
 line-length = 100

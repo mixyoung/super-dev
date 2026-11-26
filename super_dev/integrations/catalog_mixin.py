@@ -2,7 +2,390 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from .models import IntegrationTarget
+
+
+class LegacyRuleSurface(NamedTuple):
+    host: str
+    family: str
+    base: str
+    path: str
+    layout: str
+    begin: str
+    end: str
+    hashes: tuple[str, ...]
+
+
+LEGACY_260_RULE_SURFACES = (
+    LegacyRuleSurface(
+        "codex",
+        "codex",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CODEX -->",
+        "<!-- END SUPER DEV CODEX -->",
+        (
+            "166bf27463cf32aa21df0d0877ea3ac910154472b8c0b62eff51d06081151fbe",
+            "b18e7f833062f03325926708a1d8a4a830ad2c2599ca07eb62d5662a528fdaa5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "codex",
+        "codex",
+        "codex_home",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CODEX -->",
+        "<!-- END SUPER DEV CODEX -->",
+        (
+            "166bf27463cf32aa21df0d0877ea3ac910154472b8c0b62eff51d06081151fbe",
+            "b18e7f833062f03325926708a1d8a4a830ad2c2599ca07eb62d5662a528fdaa5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "codex-cli",
+        "codex",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CODEX -->",
+        "<!-- END SUPER DEV CODEX -->",
+        (
+            "166bf27463cf32aa21df0d0877ea3ac910154472b8c0b62eff51d06081151fbe",
+            "b18e7f833062f03325926708a1d8a4a830ad2c2599ca07eb62d5662a528fdaa5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "codex-cli",
+        "codex",
+        "codex_home",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CODEX -->",
+        "<!-- END SUPER DEV CODEX -->",
+        (
+            "166bf27463cf32aa21df0d0877ea3ac910154472b8c0b62eff51d06081151fbe",
+            "b18e7f833062f03325926708a1d8a4a830ad2c2599ca07eb62d5662a528fdaa5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "claude-code",
+        "claude",
+        "project",
+        "CLAUDE.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CLAUDE -->",
+        "<!-- END SUPER DEV CLAUDE -->",
+        (
+            "c89b41667192d1b5627f6bd9a7eb749b3b283f65f18104492d7eaea70476d833",
+            "7b604da8715b4eb61f7c96c2ea40ac6f85889bc4d095511e3144d668d63bcd32",
+        ),
+    ),
+    LegacyRuleSurface(
+        "claude-code",
+        "claude",
+        "project",
+        ".claude/CLAUDE.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CLAUDE -->",
+        "<!-- END SUPER DEV CLAUDE -->",
+        (
+            "c89b41667192d1b5627f6bd9a7eb749b3b283f65f18104492d7eaea70476d833",
+            "7b604da8715b4eb61f7c96c2ea40ac6f85889bc4d095511e3144d668d63bcd32",
+        ),
+    ),
+    LegacyRuleSurface(
+        "claude-code",
+        "claude",
+        "home",
+        ".claude/CLAUDE.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CLAUDE -->",
+        "<!-- END SUPER DEV CLAUDE -->",
+        (
+            "c89b41667192d1b5627f6bd9a7eb749b3b283f65f18104492d7eaea70476d833",
+            "7b604da8715b4eb61f7c96c2ea40ac6f85889bc4d095511e3144d668d63bcd32",
+        ),
+    ),
+    LegacyRuleSurface(
+        "opencode",
+        "opencode",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV OPENCODE -->",
+        "<!-- END SUPER DEV OPENCODE -->",
+        (
+            "3e0e4c2eac4659bb92fdefc57ea1f29f99531047eb1e9e852dbfd83f1cc79ada",
+            "87be3e587b4d2dd03a65a2a828297f2c00140e0cd499c08ac6544aeb3fb2c5fb",
+        ),
+    ),
+    LegacyRuleSurface(
+        "opencode",
+        "opencode",
+        "home",
+        ".config/opencode/AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV OPENCODE -->",
+        "<!-- END SUPER DEV OPENCODE -->",
+        (
+            "3e0e4c2eac4659bb92fdefc57ea1f29f99531047eb1e9e852dbfd83f1cc79ada",
+            "87be3e587b4d2dd03a65a2a828297f2c00140e0cd499c08ac6544aeb3fb2c5fb",
+        ),
+    ),
+    LegacyRuleSurface(
+        "qoder",
+        "qoder",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV QODER -->",
+        "<!-- END SUPER DEV QODER -->",
+        (
+            "6816a25d82bbf21afa982e7c040908c83e5b383f33d1c79e5d051b762f8d814b",
+            "492135a7e2a5e2bb29fc8159040de66d7929ec75230e0c0dc7209264a6d2e403",
+        ),
+    ),
+    LegacyRuleSurface(
+        "qoder",
+        "qoder",
+        "home",
+        ".qoder/AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV QODER -->",
+        "<!-- END SUPER DEV QODER -->",
+        (
+            "6816a25d82bbf21afa982e7c040908c83e5b383f33d1c79e5d051b762f8d814b",
+            "492135a7e2a5e2bb29fc8159040de66d7929ec75230e0c0dc7209264a6d2e403",
+        ),
+    ),
+    LegacyRuleSurface(
+        "qoder-cli",
+        "qoder",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV QODER -->",
+        "<!-- END SUPER DEV QODER -->",
+        (
+            "26249a5521b1a4e01163d991bf4e0415e624f25808745adff6ce994e6a9d5fc9",
+            "fb6c5465b145ca2941f63559e620aae42df10211edbe10de1e2809d421647448",
+        ),
+    ),
+    LegacyRuleSurface(
+        "qoder-cli",
+        "qoder",
+        "home",
+        ".qoder/AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV QODER -->",
+        "<!-- END SUPER DEV QODER -->",
+        (
+            "26249a5521b1a4e01163d991bf4e0415e624f25808745adff6ce994e6a9d5fc9",
+            "fb6c5465b145ca2941f63559e620aae42df10211edbe10de1e2809d421647448",
+        ),
+    ),
+    LegacyRuleSurface(
+        "cursor",
+        "cursor",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CURSOR -->",
+        "<!-- END SUPER DEV CURSOR -->",
+        (
+            "ff219345da7c30492ac60e5fcf953c9bfb47937e7ce3dc6de6069f3ab02b4db6",
+            "3225227728b1f94fd7030dad9b988c24e340cda54df68cfc346219d4a974f2e5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "cursor-cli",
+        "cursor",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV CURSOR -->",
+        "<!-- END SUPER DEV CURSOR -->",
+        (
+            "ff219345da7c30492ac60e5fcf953c9bfb47937e7ce3dc6de6069f3ab02b4db6",
+            "3225227728b1f94fd7030dad9b988c24e340cda54df68cfc346219d4a974f2e5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "kiro",
+        "kiro",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV KIRO -->",
+        "<!-- END SUPER DEV KIRO -->",
+        (
+            "3296228be4bfdf0c5fb8d0628022317c4b200ca04f6eba505258a5d917338497",
+            "3cf888e674daa3100eac19b90dcac3ea0e3d1ec2df02bb8153c37191015144f4",
+        ),
+    ),
+    LegacyRuleSurface(
+        "kiro-cli",
+        "kiro",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV KIRO -->",
+        "<!-- END SUPER DEV KIRO -->",
+        (
+            "79328aed9b1750cd5f55cbd8bcdcf42d11156fa05872768bb7dda588e80aa572",
+            "64f558ee2020c9719b9f69ce37dc92082d49de55b21dc60f90418bee34ffd15a",
+        ),
+    ),
+    LegacyRuleSurface(
+        "droid-cli",
+        "droid-cli",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV DROID -->",
+        "<!-- END SUPER DEV DROID -->",
+        (
+            "afbe70134c165a56cd9a949a7b3c245c1824284ebde81dd91cad8454ab96371e",
+            "b35ce00eeef004da132a29be6fd78c6bd43924dac1328ae6cd376c883d147086",
+        ),
+    ),
+    LegacyRuleSurface(
+        "droid-cli",
+        "droid-cli",
+        "home",
+        ".factory/AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV DROID -->",
+        "<!-- END SUPER DEV DROID -->",
+        (
+            "afbe70134c165a56cd9a949a7b3c245c1824284ebde81dd91cad8454ab96371e",
+            "b35ce00eeef004da132a29be6fd78c6bd43924dac1328ae6cd376c883d147086",
+        ),
+    ),
+    LegacyRuleSurface(
+        "copilot-cli",
+        "copilot-cli",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV COPILOT -->",
+        "<!-- END SUPER DEV COPILOT -->",
+        (
+            "5031793bd22c938f716a125cd92b4fb6746d34497064e28f6fbeef49d83983e8",
+            "1f3f2852512e9c0fe8836949552117e230dbed740c597085560eb096671d154e",
+        ),
+    ),
+    LegacyRuleSurface(
+        "kimi-code",
+        "kimi-code",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV KIMI -->",
+        "<!-- END SUPER DEV KIMI -->",
+        (
+            "22356a57dae966e5abcad771e74c79c88ce52727223e8efb42d949dd89bc27b0",
+            "7e5f28eccc14358466b1907576a5820d2067587fc65c30661454d498292a922e",
+        ),
+    ),
+    LegacyRuleSurface(
+        "trae-solo",
+        "trae",
+        "project",
+        "AGENTS.md",
+        "block",
+        "<!-- BEGIN SUPER DEV TRAE SOLO -->",
+        "<!-- END SUPER DEV TRAE SOLO -->",
+        (
+            "cb21042dfd95c07cd86257092da86de257acd176bfe3da870074f2f9f12d8a9f",
+            "d71d2ef81ff4d062cd00861fc61570dc6401d3d131df72f49efcff43fca31b05",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        "AGENTS.md",
+        "whole",
+        "<!-- BEGIN SUPER DEV WINDSURF -->",
+        "<!-- END SUPER DEV WINDSURF -->",
+        (
+            "c90a63915d0ea827d61af65f9a11428ce6e799c584731b7e868387c15b9be613",
+            "57a10e3866e3116f9b45978ff82aa1e0c49eada3dd880794d543027703834f68",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        ".windsurf/rules/super-dev.md",
+        "whole",
+        "",
+        "",
+        (
+            "c90a63915d0ea827d61af65f9a11428ce6e799c584731b7e868387c15b9be613",
+            "57a10e3866e3116f9b45978ff82aa1e0c49eada3dd880794d543027703834f68",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        ".windsurf/workflows/super-dev.md",
+        "whole",
+        "",
+        "",
+        (
+            "c90a63915d0ea827d61af65f9a11428ce6e799c584731b7e868387c15b9be613",
+            "57a10e3866e3116f9b45978ff82aa1e0c49eada3dd880794d543027703834f68",
+            "94fbbdbdbcd57b1ac89acbc0b179b77da98ec096743d83911ad393c1ce3a46e7",
+            "b2461972d4832d82a0b84ee4031cd98bffc870bbb158a9d87fda9cc438a987d5",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        ".windsurf/skills/super-dev/SKILL.md",
+        "whole",
+        "",
+        "",
+        (
+            "92cef018c94f77167b962694558461be3a0e9a8fbb6a4d5b4f650cee14bec7f7",
+            "183145bb1daeb8b17f473ab50f4edd08a57d8c6996f20163dd5e7c4eb04dcd4e",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        ".windsurf/workflows/super-dev-seeai.md",
+        "whole",
+        "",
+        "",
+        (
+            "8322668e2147ac7d95fcb0291e7516f3a552765554d7ccb7b4bedbdaac07f4bd",
+            "e91da4b5e0fdd88f515f3386395ae80333cd38d91fe1703f24c97fe4a7fc2a6a",
+        ),
+    ),
+    LegacyRuleSurface(
+        "windsurf",
+        "windsurf",
+        "project",
+        ".windsurf/skills/super-dev-seeai/SKILL.md",
+        "whole",
+        "",
+        "",
+        (
+            "6e07bce7e08c7b99cce1702987baedbe39931ca02e6ed32208e458e6b7b53b40",
+            "50f2232f635ec324d4098ed5e188d2755740f36d0a9795777696bdc5967edca9",
+        ),
+    ),
+)
 
 
 class IntegrationCatalogMixin:
@@ -15,6 +398,10 @@ class IntegrationCatalogMixin:
     SEEAI_TEXT_TRIGGER_PREFIX_FULLWIDTH = "super-dev-seeai："
 
     CODEX_AGENTS_BEGIN = "<!-- BEGIN SUPER DEV CODEX -->"
+
+    DSH_AGENTS_BEGIN = "<!-- BEGIN SUPER DEV DSH -->"
+
+    DSH_AGENTS_END = "<!-- END SUPER DEV DSH -->"
 
     CODEX_AGENTS_END = "<!-- END SUPER DEV CODEX -->"
 
@@ -62,6 +449,7 @@ class IntegrationCatalogMixin:
     }
 
     HOST_USAGE_LOCATIONS: dict[str, str] = {
+        "deepseek-harness": "打开 DeepSeek Harness 桌面当前项目会话，从原生技能菜单选择入口。",
         "antigravity": "打开 Antigravity 的 Agent Chat / Prompt 面板，并确保当前工作区就是目标项目。",
         "claude": "打开 Claude Desktop 当前 Project，对准目标项目的 instructions / knowledge / extensions 后触发。",
         "claude-code": "在项目目录启动 Claude Code 当前会话后，直接在同一会话里触发。",
@@ -97,6 +485,8 @@ class IntegrationCatalogMixin:
     @classmethod
     def _managed_agents_markers(cls, target: str) -> tuple[str, str] | None:
         markers = {
+            "windsurf": ("<!-- BEGIN SUPER DEV WINDSURF -->", "<!-- END SUPER DEV WINDSURF -->"),
+            "deepseek-harness": (cls.DSH_AGENTS_BEGIN, cls.DSH_AGENTS_END),
             "codex": (cls.CODEX_AGENTS_BEGIN, cls.CODEX_AGENTS_END),
             "codex-cli": (cls.CODEX_AGENTS_BEGIN, cls.CODEX_AGENTS_END),
             "opencode": (cls.OPENCODE_AGENTS_BEGIN, cls.OPENCODE_AGENTS_END),
@@ -114,6 +504,12 @@ class IntegrationCatalogMixin:
         return markers.get(target)
 
     HOST_USAGE_NOTES: dict[str, list[str]] = {
+        "deepseek-harness": [
+            "默认只写项目 .dsh/skills 双技能与 AGENTS.local.md 的 DSH 限定块。",
+            "原生技能斜杠、模型自然语言选择与自定义命令文件分别处理；不生成 .dsh/commands。",
+            "PATH 中没有 dsh 不能据此判断桌面未安装；可用宿主路径覆盖指定安装位置。",
+            "接入文件检查与静态声明不代表真实桌面流程、目标续跑或卸载回退已通过。",
+        ],
         "antigravity": [
             "Antigravity 当前优先按 `GEMINI.md + custom commands` 模式接入，`.agent/workflows/` 继续作为当前推荐增强面。",
             "项目内会写入 `GEMINI.md`、`.gemini/commands/super-dev.toml` 与 `.agent/workflows/super-dev.md`。",
@@ -436,6 +832,7 @@ class IntegrationCatalogMixin:
     }
 
     SHARED_DETECTION_FILES: set[str] = {
+        "AGENTS.local.md",
         "AGENTS.md",
         "CODEBUDDY.md",
         "GEMINI.md",
@@ -445,6 +842,15 @@ class IntegrationCatalogMixin:
     }
 
     TARGETS: dict[str, IntegrationTarget] = {
+        "deepseek-harness": IntegrationTarget(
+            name="deepseek-harness",
+            description="DeepSeek Harness 桌面原生双技能与项目规则",
+            files=[
+                "AGENTS.local.md",
+                ".dsh/skills/super-dev/SKILL.md",
+                ".dsh/skills/super-dev-seeai/SKILL.md",
+            ],
+        ),
         "antigravity": IntegrationTarget(
             name="antigravity",
             description="Antigravity IDE 工作流 + Gemini 上下文注入",
@@ -760,6 +1166,10 @@ class IntegrationCatalogMixin:
     }
 
     OFFICIAL_DOCS_INDEX: dict[str, tuple[str, ...]] = {
+        "deepseek-harness": (
+            "https://github.com/deepseek-ai/deepseek-harness/blob/b830ec950faba0a46dda564be3e2d854afed94f1/packages/skill/skill-filesystem/src/index.ts",
+            "https://github.com/deepseek-ai/deepseek-harness/blob/b830ec950faba0a46dda564be3e2d854afed94f1/packages/context/agent-instructions/src/files.ts",
+        ),
         "antigravity": ("https://antigravity.im/documentation",),
         "claude": (
             "https://support.anthropic.com/en/articles/9487310-what-are-projects",
@@ -923,6 +1333,14 @@ class IntegrationCatalogMixin:
     }
 
     HOST_CERTIFICATIONS: dict[str, dict[str, object]] = {
+        "deepseek-harness": {
+            "level": "experimental",
+            "reason": "rc.5 技能和规则接口已有固定源码依据；正式双模式桌面、确认等待、active/armed 续跑及卸载回退尚待验收。",
+            "evidence": [
+                "固定官方提交 b830ec950faba0a46dda564be3e2d854afed94f1",
+                "静态能力核实不等于当前代码真实桌面验收",
+            ],
+        },
         "antigravity": {
             "level": "experimental",
             "reason": "Antigravity 当前按公开可证实的 GEMINI 上下文 + custom commands 建模，并结合仓库推荐的 workflow 增强面接入；安装面可用，但官方本地注入文档证据仍偏弱。",

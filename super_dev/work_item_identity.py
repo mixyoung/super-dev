@@ -43,10 +43,17 @@ def start_standard_work_item(project_dir: Path, work_item_id: str) -> dict[str, 
         return previous
     if previous_identity.active_change_id and previous_status not in terminal_statuses:
         raise ValueError("active bound work item must be resumed or explicitly closed")
-    payload = {
+    payload = _pre_spec_payload(previous, identity, "standard")
+    # 新工作项起点是授权的整体状态重置：显式 allow_unconditional，绕开旧读冲突保护。
+    save_workflow_state(project_path, payload, allow_unconditional=True)
+    return load_workflow_state(project_path) or payload
+
+
+def _pre_spec_payload(previous: dict[str, Any], identity: str, flow_variant: str) -> dict[str, Any]:
+    return {
         **previous,
         "workflow_state_schema_version": WORK_ITEM_IDENTITY_SCHEMA_VERSION,
-        "flow_variant": "standard",
+        "flow_variant": flow_variant,
         "work_item_id": identity,
         "artifact_prefix": sanitize_artifact_name(identity),
         "active_change_id": "",
@@ -65,12 +72,64 @@ def start_standard_work_item(project_dir: Path, work_item_id: str) -> dict[str, 
             "skipped_gates": [],
         },
     }
-    # 新工作项起点是授权的整体状态重置：显式 allow_unconditional，绕开旧读冲突保护。
-    save_workflow_state(project_path, payload, allow_unconditional=True)
-    return load_workflow_state(project_path) or payload
+
+
+def start_dsh_primary_work_item(
+    project_dir: Path, work_item_id: str, *, flow_variant: str, session_id: str
+) -> dict[str, Any]:
+    """Initialize a new DSH item and its origin in one Core commit."""
+    from .creators.requirement_parser import RequirementParser
+    from .state_store import StateStore
+    from .work_mode import work_mode_requires_baseline
+
+    if flow_variant not in {"standard", "seeai"} or not session_id.strip():
+        raise ValueError("invalid native DSH work-item origin")
+    project = Path(project_dir).resolve()
+    identity = _validated_work_item_id(work_item_id)
+    store = StateStore(project)
+    if store.workflow_health()["status"] != "missing":
+        raise ValueError("existing workflow requires explicit recovery or resume")
+    # Presence of an old output report is not a new task's project scenario.
+    mode = "evolve" if RequirementParser().detect_scenario(project) == "1-N+1" else "new"
+    payload = _pre_spec_payload({}, identity, flow_variant)
+    payload["work_mode"] = mode
+    payload["current_stage"] = "research"
+    if work_mode_requires_baseline(mode):
+        payload.update(current_stage="baseline", status="baseline", current_step_label="基线核对")
+        payload["pipeline_run_state"].update(
+            status="baseline", current_stage="baseline", current_stage_title="基线核对"
+        )
+    payload["dsh_primary_binding"] = {
+        "protocol": "dsh-primary-v1",
+        "work_item_id": identity,
+        "session_id": session_id,
+    }
+    save_workflow_state(project, payload, expected_revision=0)
+    return load_workflow_state(project) or payload
 
 
 def bind_standard_work_item(project_dir: Path, change_id: str) -> dict[str, Any]:
+    return _bind_work_item(project_dir, change_id, "standard")
+
+
+def bind_dsh_primary_work_item(
+    project_dir: Path, change_id: str, *, session_id: str
+) -> dict[str, Any]:
+    payload = load_workflow_state(project_dir) or {}
+    binding = payload.get("dsh_primary_binding")
+    variant = payload.get("flow_variant")
+    if (
+        not isinstance(binding, dict)
+        or binding.get("protocol") != "dsh-primary-v1"
+        or binding.get("session_id") != session_id
+        or binding.get("work_item_id") != change_id
+        or variant not in ("standard", "seeai")
+    ):
+        raise ValueError("not the bound DSH work item")
+    return _bind_work_item(project_dir, change_id, variant)
+
+
+def _bind_work_item(project_dir: Path, change_id: str, flow_variant: str) -> dict[str, Any]:
     """Bind a formal change only after identity and current document digest agree."""
 
     project_path = Path(project_dir).resolve()
@@ -91,7 +150,7 @@ def bind_standard_work_item(project_dir: Path, change_id: str) -> dict[str, Any]
     payload = {
         **(load_workflow_state(project_path) or {}),
         "workflow_state_schema_version": WORK_ITEM_IDENTITY_SCHEMA_VERSION,
-        "flow_variant": "standard",
+        "flow_variant": flow_variant,
         "work_item_id": identity.work_item_id,
         "artifact_prefix": identity.artifact_prefix,
         "active_change_id": normalized_change,

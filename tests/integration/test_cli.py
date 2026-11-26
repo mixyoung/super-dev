@@ -3240,7 +3240,7 @@ class TestCLISkillAndIntegrate:
         finally:
             os.chdir(original_cwd)
 
-    def test_integrate_audit_repair_refreshes_stale_contract_content(
+    def test_integrate_audit_repair_preserves_modified_contract_content(
         self, temp_project_dir: Path, monkeypatch, capsys
     ):
         fake_home = temp_project_dir / "fake-home"
@@ -3257,17 +3257,17 @@ class TestCLISkillAndIntegrate:
 
             agents_file = temp_project_dir / "AGENTS.md"
             agents_file.write_text("# stale\nsuper-dev:\n", encoding="utf-8")
+            modified_bytes = agents_file.read_bytes()
 
             result = cli.run(
                 ["integrate", "audit", "--target", "codex-cli", "--repair", "--force", "--json"]
             )
-            assert result == 0
+            assert result == 1
 
             payload = json.loads(capsys.readouterr().out)
-            assert payload["report"]["hosts"]["codex-cli"]["ready"] is True
-            refreshed = agents_file.read_text(encoding="utf-8")
-            assert "research" in refreshed
-            assert "output/*-prd.md" in refreshed
+            assert payload["report"]["hosts"]["codex-cli"]["ready"] is False
+            assert "contract" in payload["report"]["hosts"]["codex-cli"]["missing"]
+            assert agents_file.read_bytes() == modified_bytes
         finally:
             os.chdir(original_cwd)
 

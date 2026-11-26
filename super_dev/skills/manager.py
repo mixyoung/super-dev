@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ..catalogs import HOST_TOOL_IDS
 from ..host_registry import HostInstallMode, get_install_mode
-from ..user_directories import UserDirectoryContext
+from ..user_directories import UserDirectoryContext, ensure_plain_path
 from .skill_template import SkillTemplate
 
 
@@ -38,6 +38,7 @@ class SkillManager:
 
     LEGACY_SKILL_ALIASES: dict[str, list[str]] = {}
     SUPPLEMENTAL_BUILTIN_SKILLS = {
+        "deepseek-harness": ["super-dev-seeai"],
         "codex-cli": ["super-dev-seeai"],
         "codex": ["super-dev-seeai"],
         "claude-code": ["super-dev-seeai"],
@@ -71,6 +72,7 @@ class SkillManager:
 
     # Official user-level skill paths confirmed by vendor docs.
     OFFICIAL_TARGET_PATHS = {
+        "deepseek-harness": "~/.dsh/skills",
         "antigravity": "~/.gemini/skills",
         "claude-code": "~/.claude/skills",
         "cline": "~/.cline/skills",
@@ -122,6 +124,7 @@ class SkillManager:
         project_dir: Path,
         user_directories: UserDirectoryContext | None = None,
     ):
+        ensure_plain_path(Path(project_dir))
         self.project_dir = Path(project_dir).resolve()
         self.user_directories = user_directories or UserDirectoryContext.current()
 
@@ -221,6 +224,22 @@ class SkillManager:
     ) -> SkillInstallResult:
         """安装 skill 到指定 target"""
         base = self._target_dir(target)
+        if target == "deepseek-harness" and source == "super-dev":
+            from ..integrations.managed_content import plain_path, write_owned_file
+
+            skill_name = name or self.default_skill_name(target)
+            if skill_name not in self.managed_builtin_skill_names(target):
+                raise ValueError(f"Unsupported DSH builtin skill: {skill_name}")
+            names = [skill_name, *self.supplemental_builtin_skills(target)]
+            for builtin_name in dict.fromkeys(names):
+                plain_path(base / builtin_name / "SKILL.md")
+            plain_path(self.project_dir / ".super-dev/install-manifest.json")
+            for builtin_name in dict.fromkeys(names):
+                content = SkillTemplate.for_builtin(builtin_name, target).render(target)
+                write_owned_file(
+                    self.project_dir, base / builtin_name / "SKILL.md", content.encode("utf-8")
+                )
+            return SkillInstallResult(skill_name, target, base / skill_name, "builtin")
         base.mkdir(parents=True, exist_ok=True)
 
         if self._is_git_source(source):
@@ -307,7 +326,7 @@ class SkillManager:
             **self.OFFICIAL_TARGET_PATHS,
             **self.OBSERVED_TARGET_PATHS,
         }.items():
-            target_path = self.user_directories.expanduser(target_path_str)
+            target_path = self._target_dir(target)
             # Check if super-dev skill exists for this target
             skill_dir = target_path / "super-dev"
             if skill_dir.exists() and (skill_dir / "SKILL.md").exists():
@@ -315,7 +334,8 @@ class SkillManager:
                     self.install(source="super-dev", target=target, force=True)
                     refreshed.append(target)
                 except Exception:
-                    pass
+                    if target == "deepseek-harness":
+                        raise
         return refreshed
 
     @classmethod
@@ -329,6 +349,10 @@ class SkillManager:
         all_paths = {**cls.OFFICIAL_TARGET_PATHS, **cls.OBSERVED_TARGET_PATHS}
         directories = user_directories or UserDirectoryContext.current()
         search_dirs = [directories.expanduser(p) for p in all_paths.values()]
+        protected_dirs = {
+            (directories.home / ".dsh" / "skills").resolve(),
+            ((directories.dsh_home or directories.home / ".dsh") / "skills").resolve(),
+        }
         # 常见但不在列表里的旧路径
         home = directories.home
         for pattern in (
@@ -340,6 +364,8 @@ class SkillManager:
                     search_dirs.append(match)
         # 扫描并清理
         for skill_dir in search_dirs:
+            if skill_dir.resolve() in protected_dirs:
+                continue
             for legacy_name in cls.legacy_cleanup_skill_names():
                 legacy = skill_dir / legacy_name
                 if legacy.exists():
@@ -348,6 +374,17 @@ class SkillManager:
         return cleaned
 
     def uninstall(self, name: str, target: str) -> Path:
+        if target == "deepseek-harness":
+            from ..integrations.managed_content import reconcile_dsh_installation, remove_owned_file
+
+            if name not in self.managed_builtin_skill_names(target):
+                raise ValueError(f"Unsupported DSH builtin skill: {name}")
+            directory = self._target_dir(target) / name
+            removed = remove_owned_file(self.project_dir, directory / "SKILL.md")
+            reconcile_dsh_installation(self.project_dir, self.user_directories)
+            if not removed:
+                raise FileNotFoundError(f"Skill not found: {name} ({target})")
+            return directory
         names = self.compatibility_skill_names(target, name)
         target_dir = self._target_dir(target) / name
         removed_any = False
@@ -366,6 +403,10 @@ class SkillManager:
         return target_dir
 
     def managed_skill_cleanup_paths(self, target: str, name: str) -> list[Path]:
+        if target == "deepseek-harness" and name not in self.scoped_user_skill_cleanup_names(
+            target
+        ):
+            return []
         paths: list[Path] = []
         for candidate in self.compatibility_skill_names(target, name):
             paths.append(self._target_dir(target) / candidate)
@@ -381,7 +422,47 @@ class SkillManager:
             deduped.append(path)
         return deduped
 
+    def scoped_user_skill_cleanup_names(self, target: str) -> list[str]:
+        if target != "deepseek-harness":
+            return self.managed_builtin_skill_names(target)
+        from ..integrations.install_manifest import load_install_manifest
+        from ..integrations.managed_content import ownership
+
+        records = ownership(self.project_dir)
+        entry = load_install_manifest(self.project_dir).get("targets", {}).get(target, {})
+        scopes = entry.get("scopes", {}) if isinstance(entry, dict) else {}
+        paths = entry.get("paths", []) if isinstance(entry, dict) else []
+        names: list[str] = []
+        for name in self.managed_builtin_skill_names(target):
+            path = self._target_dir(target) / name / "SKILL.md"
+            record = records.get(str(path.absolute()))
+            if str(path.absolute()) in records:
+                if not isinstance(record, dict) or not any(
+                    isinstance(record.get(key), str)
+                    and len(record[key]) == 64
+                    and all(character in "0123456789abcdef" for character in record[key])
+                    for key in ("sha256", "pending_sha256")
+                ):
+                    raise ValueError(f"用户技能归属记录损坏，保留现场：{path}")
+                names.append(name)
+                continue
+            if (
+                isinstance(scopes, dict)
+                and scopes.get("global") is True
+                and isinstance(paths, list)
+            ):
+                if any(
+                    isinstance(item, str)
+                    and Path(item).is_absolute()
+                    and Path(item) in {path.absolute(), path.parent.absolute()}
+                    for item in paths
+                ):
+                    names.append(name)
+        return names
+
     def legacy_skill_cleanup_paths(self, target: str) -> list[Path]:
+        if target == "deepseek-harness":
+            return []
         paths: list[Path] = []
         for legacy_name in self.legacy_cleanup_skill_names():
             paths.append(self._target_dir(target) / legacy_name)
@@ -398,6 +479,8 @@ class SkillManager:
         return deduped
 
     def cleanup_legacy_skill_aliases(self, target: str) -> list[str]:
+        if target == "deepseek-harness":
+            return []
         removed: list[str] = []
         for legacy_name in self.legacy_cleanup_skill_names():
             removed_any = False
@@ -415,6 +498,10 @@ class SkillManager:
         return removed
 
     def _target_dir(self, target: str) -> Path:
+        if target == "deepseek-harness":
+            return (
+                self.user_directories.dsh_home or self.user_directories.home / ".dsh"
+            ) / "skills"
         relative = self.TARGET_PATHS.get(target)
         if relative is None:
             raise ValueError(f"Unsupported target: {target}")

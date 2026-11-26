@@ -158,6 +158,8 @@ def build_runtime_evidence_record(
     install_mode = get_install_mode(host_id)
     if install_mode == HostInstallMode.MANUAL:
         integration_status = IntegrationStatus.MANUAL
+    elif surface_ready and host_id == "deepseek-harness":
+        integration_status = IntegrationStatus.PROJECT_ONLY_INSTALLED
     elif surface_ready:
         integration_status = IntegrationStatus.PROJECT_AND_GLOBAL_INSTALLED
     else:

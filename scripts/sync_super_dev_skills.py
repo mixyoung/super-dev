@@ -28,6 +28,11 @@ SEEAI_SURFACES = (
     REPO_ROOT / "plugins" / "super-dev-codex" / "skills" / "super-dev-seeai" / "SKILL.md",
 )
 
+DSH_SURFACES = {
+    name: REPO_ROOT / ".dsh" / "skills" / name / "SKILL.md"
+    for name in ("super-dev", "super-dev-seeai")
+}
+
 
 def rendered_skill(host: str, skill_name: str = "super-dev") -> str:
     from super_dev.skills.skill_template import SkillTemplate
@@ -54,6 +59,10 @@ def collect_mismatches(user_codex_path: Path | None = None) -> list[Path]:
         expected = rendered_skill("codex")
         if not user_codex_path.exists() or user_codex_path.read_text(encoding="utf-8") != expected:
             mismatches.append(user_codex_path)
+    for name, path in DSH_SURFACES.items():
+        expected_bytes = rendered_skill("deepseek-harness", name).encode("utf-8")
+        if not path.exists() or path.read_bytes() != expected_bytes:
+            mismatches.append(path)
     return mismatches
 
 
@@ -61,14 +70,25 @@ def write_surfaces(user_codex_path: Path | None = None) -> None:
     for host, paths in TRACKED_SURFACES.items():
         expected = rendered_skill(host)
         for path in paths:
+            if path.exists() and path.read_text(encoding="utf-8") == expected:
+                continue
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(expected, encoding="utf-8")
     for path in SEEAI_SURFACES:
+        if path.exists() and path.read_text(encoding="utf-8") == rendered_skill(
+            "codex", "super-dev-seeai"
+        ):
+            continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(rendered_skill("codex", "super-dev-seeai"), encoding="utf-8")
     if user_codex_path is not None:
         user_codex_path.parent.mkdir(parents=True, exist_ok=True)
         user_codex_path.write_text(rendered_skill("codex"), encoding="utf-8")
+    for name, path in DSH_SURFACES.items():
+        expected_bytes = rendered_skill("deepseek-harness", name).encode("utf-8")
+        if not path.exists() or path.read_bytes() != expected_bytes:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(expected_bytes)
 
 
 def main() -> int:

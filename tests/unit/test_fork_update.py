@@ -287,6 +287,7 @@ def test_installation_detection_uses_receipts_not_path_substrings(tmp_path, monk
 
 
 def test_shared_host_file_preserves_surrounding_user_rules(tmp_path, monkeypatch):
+    from super_dev.integrations.install_manifest import record_install_manifest
     from super_dev.integrations.manager import IntegrationManager
 
     manager = IntegrationManager(project_dir=tmp_path)
@@ -298,6 +299,13 @@ def test_shared_host_file_preserves_surrounding_user_rules(tmp_path, monkeypatch
     path.write_text(
         f"User policy before\n{markers[0]}\n{content.rstrip()}\n{markers[1]}\nUser policy after\n",
         encoding="utf-8",
+    )
+    record_install_manifest(
+        tmp_path,
+        host="codex-cli",
+        family=manager.host_family("codex-cli"),
+        scopes={"project": True, "global": False, "runtime": False},
+        paths=[str(path)],
     )
     snapshot = snapshot_hosts(tmp_path, include_user=False)
     build = IntegrationManager._build_file_content

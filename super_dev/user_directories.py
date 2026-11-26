@@ -7,9 +7,24 @@
 from __future__ import annotations
 
 import os
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def ensure_plain_path(path: Path) -> None:
+    absolute = Path(path).absolute()
+    for candidate in (*reversed(absolute.parents), absolute):
+        try:
+            info = candidate.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or (
+            getattr(info, "st_file_attributes", 0)
+            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        ):
+            raise ValueError(f"拒绝连接点或符号链接，保留原路径：{path}")
 
 
 @dataclass(frozen=True)
@@ -19,6 +34,11 @@ class UserDirectoryContext:
     home: Path
     codex_home: Path
     xdg_config_home: Path
+    dsh_home: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.dsh_home is None:
+            object.__setattr__(self, "dsh_home", self.home / ".dsh")
 
     @classmethod
     def current(cls) -> UserDirectoryContext:
@@ -28,10 +48,12 @@ class UserDirectoryContext:
         home = Path(explicit_home) if explicit_home else Path.home()
         codex_raw = os.getenv("CODEX_HOME", "").strip()
         xdg_raw = os.getenv("XDG_CONFIG_HOME", "").strip()
+        dsh_raw = os.getenv("DSH_HOME", "").strip()
         return cls.from_home(
             home,
             codex_home=codex_raw or None,
             xdg_config_home=xdg_raw or None,
+            dsh_home=dsh_raw or None,
         )
 
     @classmethod
@@ -41,9 +63,11 @@ class UserDirectoryContext:
         *,
         codex_home: str | Path | None = None,
         xdg_config_home: str | Path | None = None,
+        dsh_home: str | Path | None = None,
     ) -> UserDirectoryContext:
         """从一个明确的用户主目录构造上下文。"""
 
+        ensure_plain_path(Path(home))
         resolved_home = Path(home).resolve()
         context = cls(
             home=resolved_home,
@@ -56,6 +80,7 @@ class UserDirectoryContext:
             xdg_config_home=(
                 context.expanduser(xdg_config_home) if xdg_config_home else context.xdg_config_home
             ),
+            dsh_home=context.expanduser(dsh_home) if dsh_home else resolved_home / ".dsh",
         )
 
     def expanduser(self, value: str | Path) -> Path:
@@ -79,6 +104,7 @@ class UserDirectoryContext:
                 "HOME": home,
                 "USERPROFILE": home,
                 "CODEX_HOME": str(self.codex_home),
+                "DSH_HOME": str(self.dsh_home),
                 "XDG_CONFIG_HOME": str(self.xdg_config_home),
                 "XDG_DATA_HOME": str(self.home / ".local" / "share"),
                 "XDG_CACHE_HOME": str(self.home / ".cache"),

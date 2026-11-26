@@ -250,7 +250,11 @@ class CliHostCommandsMixin:
                     target_errors.append(f"global integrate: {exc}")
                     self.console.print(f"  [yellow]⚠[/yellow] 宿主协议写入失败: {exc}")
 
-            if not args.skip_skill and IntegrationManager.requires_skill(target):
+            if (
+                not args.skip_skill
+                and IntegrationManager.requires_skill(target)
+                and (target != "deepseek-harness" or include_user_surfaces)
+            ):
                 try:
                     if not skill_manager.skill_surface_available(target):
                         self.console.print(
@@ -271,7 +275,9 @@ class CliHostCommandsMixin:
                                 force=args.force,
                             )
                             manifest_paths.append(str(install_result.path))
-                            if str(install_result.path).startswith(str(Path.home())):
+                            if target == "deepseek-harness" or str(install_result.path).startswith(
+                                str(Path.home())
+                            ):
                                 has_global_surface = True
                             else:
                                 has_project_surface = True
@@ -315,7 +321,7 @@ class CliHostCommandsMixin:
 
             if not args.skip_slash:
                 try:
-                    if integration_manager.supports_slash(target):
+                    if integration_manager.supports_command_files(target):
                         slash_file = integration_manager.setup_slash_command(
                             target=target,
                             force=args.force,
@@ -406,7 +412,9 @@ class CliHostCommandsMixin:
                                     )
                     else:
                         self.console.print(
-                            "  [dim]- 该宿主不支持 /super-dev 或 /super-dev-seeai，已跳过 slash 映射[/dim]"
+                            "  [dim]- DSH 使用原生技能菜单，已跳过自定义命令文件[/dim]"
+                            if target == "deepseek-harness"
+                            else "  [dim]- 该宿主不支持 /super-dev 或 /super-dev-seeai，已跳过 slash 映射[/dim]"
                         )
                 except Exception as exc:
                     has_error = True
@@ -478,16 +486,18 @@ class CliHostCommandsMixin:
                     self.console.print(f"  [dim]- {failure}[/dim]")
             else:
                 self.console.print("  [green]✓[/green] 宿主契约校验通过")
-                if not manifest_paths:
+                if not manifest_paths or (target == "deepseek-harness" and not target_errors):
                     managed_surfaces = integration_manager.collect_managed_surface_paths(
                         target=target,
                         skill_name=args.skill_name,
                         include_user_surfaces=include_user_surfaces,
                     )
-                    for surface_path in managed_surfaces.values():
+                    for surface_key, surface_path in managed_surfaces.items():
                         if surface_path.exists():
                             manifest_paths.append(str(surface_path))
-                            if str(surface_path).startswith(str(Path.home())):
+                            if (
+                                target == "deepseek-harness" and surface_key.startswith("skill:")
+                            ) or str(surface_path).startswith(str(Path.home())):
                                 has_global_surface = True
                             else:
                                 has_project_surface = True
@@ -498,6 +508,8 @@ class CliHostCommandsMixin:
                 ):
                     has_runtime_surface = True
                 try:
+                    if target == "deepseek-harness" and target_errors:
+                        raise ValueError("接入失败，保留安装归属清单，未重写安装记录")
                     record_install_manifest(
                         project_dir,
                         host=target,
@@ -509,8 +521,10 @@ class CliHostCommandsMixin:
                         },
                         paths=manifest_paths,
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    if target == "deepseek-harness":
+                        has_error = True
+                        target_errors.append(f"manifest: {exc}")
             target_results.append(
                 {
                     "target": target,
@@ -648,7 +662,7 @@ class CliHostCommandsMixin:
                 refreshed.append("user-agents")
             refreshed.append("user-surfaces")
 
-        if integration_manager.supports_slash(target):
+        if integration_manager.supports_command_files(target):
             integration_manager.setup_slash_command(target=target, force=True)
             refreshed.append("slash")
             if include_user_surfaces:
@@ -659,6 +673,7 @@ class CliHostCommandsMixin:
             not skip_skill
             and IntegrationManager.requires_skill(target)
             and skill_manager.skill_surface_available(target)
+            and (target != "deepseek-harness" or include_user_surfaces)
         ):
             skill_manager.install(
                 source="super-dev",
@@ -771,7 +786,8 @@ class CliHostCommandsMixin:
             check_slash=not args.skip_slash,
         )
         repair_actions: dict[str, dict[str, str]] = {}
-        if args.repair:
+        dsh_fix = bool(getattr(args, "fix", False)) and targets == ["deepseek-harness"]
+        if args.repair or dsh_fix:
             repair_actions = self._repair_host_diagnostics(
                 project_dir=project_dir,
                 report=report,
@@ -841,7 +857,11 @@ class CliHostCommandsMixin:
         )
 
         # --fix: auto-repair common issues
-        if getattr(args, "fix", False) and not bool(report.get("overall_ready", False)):
+        if (
+            getattr(args, "fix", False)
+            and not dsh_fix
+            and not bool(report.get("overall_ready", False))
+        ):
             fix_actions: list[str] = []
             claude_code_missing = False
             skill_missing = False
@@ -1028,7 +1048,11 @@ class CliHostCommandsMixin:
             protocol = integration_manager._protocol_profile(target=target)
             protocol_summary = protocol.get("summary", "") if isinstance(protocol, dict) else ""
 
-            status = "[green]已就绪[/green]" if host["ready"] else "[red]未安装[/red]"
+            status = (
+                ("[green]接入文件通过[/green]" if host["ready"] else "[red]接入待修复[/red]")
+                if target == "deepseek-harness"
+                else ("[green]已就绪[/green]" if host["ready"] else "[red]未安装[/red]")
+            )
 
             integrate_ok = bool(host.get("checks", {}).get("integrate", {}).get("ok", True))
             skill_ok = bool(host.get("checks", {}).get("skill", {}).get("ok", True))
@@ -1282,6 +1306,11 @@ class CliHostCommandsMixin:
                 skill_manager=skill_manager,
                 target=target,
             )
+            cleanup_skill_names = (
+                skill_manager.scoped_user_skill_cleanup_names(target)
+                if target == "deepseek-harness"
+                else skill_manager.managed_builtin_skill_names(target)
+            )
             removed_paths: list[str] = []
             removed_skills: list[str] = []
             removed_skill_paths: list[str] = []
@@ -1297,7 +1326,7 @@ class CliHostCommandsMixin:
                     errors.append(f"surface cleanup failed: {exc}")
 
                 if skill_manager.skill_surface_available(target):
-                    for skill_name in skill_manager.managed_builtin_skill_names(target):
+                    for skill_name in cleanup_skill_names:
                         existing_paths = self._stringify_existing_paths(
                             skill_manager.managed_skill_cleanup_paths(target, skill_name)
                         )

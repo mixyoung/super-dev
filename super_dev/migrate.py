@@ -145,6 +145,7 @@ def migrate_project(project_dir: Path) -> list[str]:
 
         for target in detected_hosts:
             written: list[Path] = []
+            refreshed_user_skill = False
             try:
                 written = mgr.setup(target=target, force=True)
                 if written:
@@ -154,7 +155,7 @@ def migrate_project(project_dir: Path) -> list[str]:
 
             # 重新生成 slash command
             try:
-                if mgr.supports_slash(target):
+                if mgr.supports_command_files(target):
                     mgr.setup_slash_command(target=target, force=True)
                     mgr.setup_global_slash_command(target=target, force=True)
                     mgr.setup_seeai_slash_command(target=target, force=True)
@@ -171,7 +172,10 @@ def migrate_project(project_dir: Path) -> list[str]:
             # 重新安装 Skill
             if mgr.requires_skill(target):
                 try:
-                    if sm.skill_surface_available(target):
+                    if sm.skill_surface_available(target) and (
+                        target != "deepseek-harness"
+                        or sm.default_skill_name(target) in sm.list_installed(target)
+                    ):
                         skill_name = sm.default_skill_name(target)
                         sm.install(
                             source="super-dev",
@@ -179,18 +183,26 @@ def migrate_project(project_dir: Path) -> list[str]:
                             name=skill_name,
                             force=True,
                         )
+                        refreshed_user_skill = True
                         changes.append(f"已更新 {target} Skill ({skill_name})")
                 except Exception as exc:
                     changes.append(f"{target} Skill 更新失败: {exc}")
 
             try:
                 manifest_paths = [str(path) for path in written] if written else []
+                if target == "deepseek-harness" and refreshed_user_skill:
+                    for name in sm.managed_builtin_skill_names(target):
+                        manifest_paths.extend(
+                            str(path)
+                            for path in mgr.expected_skill_paths(target, name)
+                            if path.exists()
+                        )
                 global_protocol = mgr.resolve_global_protocol_path(target)
                 if global_protocol is not None and global_protocol.exists():
                     manifest_paths.append(str(global_protocol))
                 global_slash = (
                     mgr.resolve_slash_command_path(target=target, scope="global")
-                    if mgr.supports_slash(target)
+                    if mgr.supports_command_files(target)
                     else None
                 )
                 if global_slash is not None and global_slash.exists():
@@ -204,6 +216,7 @@ def migrate_project(project_dir: Path) -> list[str]:
                         "global": bool(
                             (global_protocol is not None and global_protocol.exists())
                             or (global_slash is not None and global_slash.exists())
+                            or (target == "deepseek-harness" and refreshed_user_skill)
                         ),
                         "runtime": target == "claude-code"
                         and any(

@@ -273,7 +273,15 @@ class CliIntegrationRuntimeMixin:
                     "required": manager.requires_skill(target),
                     "installed": False,
                 }
-                if manager.requires_skill(target):
+                if target == "deepseek-harness" and not include_user_surfaces:
+                    project_skill = manager.expected_skill_path(target, project_dir=project_dir)
+                    skill_install = {
+                        "required": True,
+                        "installed": bool(project_skill and project_skill.is_file()),
+                        "path": str(project_skill) if project_skill else "",
+                        "scope": "project",
+                    }
+                elif manager.requires_skill(target):
                     try:
                         skill_path = skill_manager.install(
                             source="super-dev",

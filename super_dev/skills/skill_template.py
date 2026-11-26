@@ -103,6 +103,12 @@ class SkillFrontmatter:
                     '\\""'
                 )
                 lines.append("          timeout: 5")
+        elif host == "deepseek-harness":
+            lines.append(f"whenToUse: {self.when_to_use}")
+            lines.append("metadata:")
+            lines.append(f'  version: "{self.version}"')
+            lines.append(f"user-invocable: {str(self.user_invocable).lower()}")
+            lines.append(f"disable-model-invocation: {str(self.disable_model_invocation).lower()}")
         elif host in {"codex", "codex-cli"}:
             lines.append("metadata:")
             lines.append(f'  version: "{self.version}"')
@@ -149,6 +155,18 @@ class SuperDevSkillContent:
 
     def render_body(self) -> str:
         """Return the full Markdown body (everything below the frontmatter)."""
+        if self.host == "deepseek-harness":
+            body = (
+                self._render_seeai_generic_body()
+                if self.skill_name == SEEAI_SKILL_NAME
+                else self._render_generic_body()
+            )
+            knowledge = (
+                self._section_knowledge_contract() + "\n\n"
+                if self.skill_name == SEEAI_SKILL_NAME
+                else ""
+            )
+            return self._section_dsh_runtime() + "\n\n" + knowledge + body
         if self.skill_name == SEEAI_SKILL_NAME:
             if self.host in {"codex", "codex-cli"}:
                 return self._render_seeai_codex_body()
@@ -156,6 +174,34 @@ class SuperDevSkillContent:
         if self.host in {"codex", "codex-cli"}:
             return self._render_codex_body()
         return self._render_generic_body()
+
+    def render_dsh_plugin_body(self) -> str:
+        """Render the same workflow for a DSH native command, without a Skill loader."""
+        if self.host != "deepseek-harness":
+            raise ValueError("The native DSH contract requires the deepseek-harness host.")
+        seeai = self.skill_name == SEEAI_SKILL_NAME
+        command = "/super-dev-seeai" if seeai else "/super-dev"
+        runtime = (
+            "## DSH 主开发插件契约\n\n"
+            f"- 当前会话已由 DSH 原生命令 `{command}` 接入 Super Dev，"
+            "下面就是本任务完整流程。不要发现、调用或回退到同名共享 Skill。\n"
+            "- DSH 负责模型和本任务已授权的工具，Super Dev Core 唯一负责工作项、"
+            "阶段和确认；使用当前会话的已验证工作项与产物，不推测另一任务。\n"
+            "- 不自行写入流程状态或确认记录，不用终端或管理命令绕开 Core。"
+            "到文档或适用预览门，报告当前产物并等待用户通过原生命令确认当前版本。\n"
+            "- 自动续跑、历史消息或模型回复不是批准；要继续，必须重新核对当前会话、任务及绑定。\n"
+            "- 使用 DSH 实际提供且已获准的工具完成调研、编写规定产物、实现和验证；"
+            "如缺少权限或必要工具，明确说明受阻（BLOCKED），不自行扩权。"
+        )
+        if seeai:
+            return (
+                runtime
+                + "\n\n"
+                + self._section_knowledge_contract()
+                + "\n\n"
+                + self._render_seeai_generic_body(dsh_plugin=True)
+            )
+        return runtime + "\n\n" + self._render_generic_body(dsh_plugin=True)
 
     # ------------------------------------------------------------------
     # Codex CLI body
@@ -220,6 +266,23 @@ class SuperDevSkillContent:
             self._section_seeai_flow_contract(),
         ]
         return "\n\n".join(sections) + "\n"
+
+    def _section_dsh_runtime(self) -> str:
+        return (
+            f"# {self.skill_name} for DeepSeek Harness 桌面版\n\n"
+            "## DSH rc.5 宿主与入口\n\n"
+            "- 当前执行宿主为 DeepSeek Harness；模型厂商由当前连接决定，不能从宿主名称推断。\n"
+            "- 原生技能菜单支持 `/super-dev` 和 `/super-dev-seeai`；自然语言入口为对应的 `super-dev:` / `super-dev：` 前缀。原生技能斜杠不代表支持自定义命令文件。\n"
+            "- 本宿主使用项目 `.dsh/skills` 双技能与 `AGENTS.local.md` 的 DSH 限定块；用户级技能只在明确授权时使用 DSH_HOME（默认用户 .dsh 目录）。\n"
+            "- 本轮完整技能已注入或已成功加载时直接复用，不要重复加载；缺少检索、文件或终端工具时明确报告受阻（BLOCKED），不以重载技能代替执行，不新增全局一次性守卫。\n"
+            "- 使用 DSH 当前可用的检索、文件编辑和终端能力，不猜工具函数名，不安装模型桥、插件或修改全局权限。\n"
+            "- 专属技能缺失、损坏、来源不适用或规则未加载时停止错误宿主指令，报告接入问题，不创建受限产物或推进阶段；文件存在不证明规则进入预算或行为安全。\n"
+            "- 只读解释、分析和审查不授权实施或阶段推进。恢复先读取有效活动工作项、SESSION_BRIEF 与当前确认绑定，不按时间戳选任务。\n"
+            "- 目标 active、续跑 armed 或自动续跑都不是用户对当前文档/预览的明确确认。等待、拒绝或修订时留在原门，不自行记录批准、不创建 Spec/代码或反复推进阶段。\n"
+            "- 标准模式保持九阶段和适用预览确认；无 UI 与 SEEAI 沿用原适用规则。真实用户确认仍绑定当前产物，修订后重新等待。\n"
+            "- Super Dev Core 是唯一持久流程状态来源。安装、测试守卫与其他执行者结果不授予确认权；缺失、损坏和真实卸载的桌面回退必须分别验证。"
+            "每个可变工作区保持单一生产写入者，分层编排不得扩大权限。"
+        )
 
     def _section_activation_rules_codex(self) -> str:
         return (
@@ -357,9 +420,13 @@ class SuperDevSkillContent:
     # Generic body (all other hosts)
     # ------------------------------------------------------------------
 
-    def _render_generic_body(self) -> str:
+    def _render_generic_body(self, *, dsh_plugin: bool = False) -> str:
         sections = [
-            f"# {self.skill_name} - Super Dev AI Coding Skill",
+            (
+                f"# {self.skill_name} - Super Dev AI Coding Skill"
+                if not dsh_plugin
+                else f"# {self.skill_name} - DSH 原生开发流程"
+            ),
             self._section_critical_reminders(),
             self._section_version_banner(),
             "---",
@@ -367,9 +434,15 @@ class SuperDevSkillContent:
             self._section_positioning(),
             self._section_language_and_environment(),
             self._section_nested_coordination(),
-            self._section_trigger_generic(),
-            self._section_runtime_contract_generic(),
-            self._section_cli_command_guide(),
+            *(
+                []
+                if dsh_plugin
+                else [
+                    self._section_trigger_generic(),
+                    self._section_runtime_contract_generic(),
+                    self._section_cli_command_guide(),
+                ]
+            ),
             self._section_first_response_contract(),
             self._section_changed_surface_contract(),
             self._section_knowledge_contract(),
@@ -386,13 +459,13 @@ class SuperDevSkillContent:
         ]
         return "\n\n".join(sections) + "\n"
 
-    def _render_seeai_generic_body(self) -> str:
+    def _render_seeai_generic_body(self, *, dsh_plugin: bool = False) -> str:
         sections = [
             "# Super Dev SEEAI - 赛事极速版",
             self._section_seeai_critical_reminders(),
             self._section_language_and_environment(),
             self._section_nested_coordination(),
-            self._section_seeai_trigger_generic(),
+            self._section_seeai_trigger_generic(dsh_plugin=dsh_plugin),
             self._section_seeai_runtime_contract_generic(),
             self._section_seeai_first_response_contract(),
             self._section_seeai_first_response_template(),
@@ -484,11 +557,16 @@ class SuperDevSkillContent:
             "**规则 5 — 无参数**：如果用户只输入 `/super-dev` 或 `super-dev:`，默认返回当前恢复卡片与推荐下一句。"
         )
 
-    def _section_seeai_trigger_generic(self) -> str:
+    def _section_seeai_trigger_generic(self, *, dsh_plugin: bool = False) -> str:
+        trigger = (
+            "当前 DSH 会话已通过原生 `/super-dev-seeai <需求>` 命令启动。\n"
+            if dsh_plugin
+            else "用户在宿主内使用比赛专用入口：`/super-dev-seeai <需求>` 或 `super-dev-seeai: <需求>` / `super-dev-seeai：<需求>`。\n"
+        )
         return (
             "## 触发方式与命令路由（强制）\n"
             "\n"
-            "用户在宿主内使用比赛专用入口：`/super-dev-seeai <需求>` 或 `super-dev-seeai: <需求>` / `super-dev-seeai：<需求>`。\n"
+            f"{trigger}"
             "该入口进入 Super Dev SEEAI 赛事极速版，而不是标准 Super Dev 长流程。\n"
             "\n"
             "### SEEAI 模式行为\n"
@@ -1834,6 +1912,7 @@ class SuperDevSkillContent:
 
     def _host_display_name(self) -> str:
         display_map = {
+            "deepseek-harness": "DeepSeek Harness",
             "codex": "Codex",
             "codex-cli": "Codex",
             "claude-code": "Claude Code",

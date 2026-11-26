@@ -4,24 +4,28 @@ from __future__ import annotations
 
 import json
 import os
-import stat
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
 
+from .integrations.managed_content import (
+    block_span,
+    digest,
+    legacy_whole_block_record,
+    ownership,
+    plain_path,
+    upsert_block,
+    verified_block_record,
+    verified_legacy_surface,
+    write_owned_file,
+)
 from .integrations.manager import IntegrationManager
 from .skills.skill_template import SkillTemplate
 
 
 def _plain_path(path: Path) -> None:
-    for item in (path, *path.parents):
-        if item.is_symlink() or (
-            item.exists()
-            and getattr(item.stat(), "st_file_attributes", 0)
-            & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-        ):
-            raise ValueError(f"拒绝连接点或符号链接：{path}")
+    plain_path(path)
 
 
 def _surfaces(
@@ -46,6 +50,7 @@ def _surfaces(
             path = path.absolute()
             if not include_user and (path in user_paths or not path.is_relative_to(project)):
                 continue
+            _plain_path(path)
             if not path.is_file():
                 continue  # update never introduces a new integration surface
             if path.suffix not in {".md", ".mdc", ".toml"}:
@@ -54,7 +59,9 @@ def _surfaces(
             relative = (
                 path.relative_to(project).as_posix() if path.is_relative_to(project) else path.name
             )
-            if path.name == "AGENTS.md":
+            if path.name == "AGENTS.md" or (
+                host == "deepseek-harness" and path.name == "AGENTS.local.md"
+            ):
                 markers = manager._managed_agents_markers(host)
             if host == "claude-code" and path.name == "CLAUDE.md":
                 markers = (manager.CLAUDE_RULES_BEGIN, manager.CLAUDE_RULES_END)
@@ -105,7 +112,29 @@ def snapshot_hosts(project: Path, *, include_user: bool) -> dict[str, Any]:
         try:
             _plain_path(path)
             actual = path.read_bytes().decode("utf-8")
-            old, _, _ = _owned(actual, markers)
+            legacy_whole = False
+            if markers:
+                raw = actual.encode("utf-8")
+                span = block_span(raw, *markers)
+                if span is None:
+                    record = legacy_whole_block_record(project, path, markers[0], raw)
+                    if record is None:
+                        raise ValueError("托管块缺失，保留原文件")
+                    legacy_whole = True
+                else:
+                    record, _legacy = verified_block_record(project, path, markers[0], raw, span)
+                if record.get("pending_delete"):
+                    raise ValueError("删除尚未提交，请先重跑原装卸入口")
+            elif key.startswith(("deepseek-harness|", "windsurf|project:")):
+                record = ownership(project).get(str(path.absolute()), {})
+                fragment = actual.encode("utf-8")
+                if not record and key.startswith("windsurf|"):
+                    record = verified_legacy_surface(
+                        project, path, digest(fragment), "whole", host="windsurf"
+                    )
+                if digest(fragment) not in {record.get("sha256"), record.get("pending_sha256")}:
+                    raise ValueError("保留用户修改或归属不明的 DSH 内容")
+            old, _, _ = _owned(actual, None if legacy_whole else markers)
             if _normalized(old) != _normalized(expected):
                 raise ValueError("内容不等于当前安装版本的模板，保留用户修改并等待手工复核")
         except (OSError, ValueError) as exc:
@@ -113,7 +142,7 @@ def snapshot_hosts(project: Path, *, include_user: bool) -> dict[str, Any]:
             continue
         seen.add(identity)
         owned_paths.add(str(path))
-        entries.append({"key": key, "path": str(path), "old": old})
+        entries.append({"key": key, "path": str(path), "old": old, "legacy_whole": legacy_whole})
     return {
         "entries": entries,
         "issues": [f"{p}: {v}" for p, v in issues.items() if p not in owned_paths],
@@ -134,7 +163,22 @@ def refresh_hosts(project: Path, snapshot: dict[str, Any], *, include_user: bool
             _plain_path(path)
             original = path.read_bytes()
             text = original.decode("utf-8")
-            owned, start, stop = _owned(text, markers)
+            legacy_whole = bool(entry.get("legacy_whole"))
+            owned, start, stop = _owned(text, None if legacy_whole else markers)
+            if markers:
+                span = block_span(original, *markers)
+                if span is None:
+                    record = legacy_whole_block_record(project, path, markers[0], original)
+                    if record is None or not legacy_whole:
+                        raise ValueError("托管块缺失，保留原文件")
+                else:
+                    if legacy_whole:
+                        raise ValueError("更新前托管布局已变化，保留原文件")
+                    record, _legacy = verified_block_record(
+                        project, path, markers[0], original, span
+                    )
+                if record.get("pending_delete"):
+                    raise ValueError("删除尚未提交，请先重跑原装卸入口")
             if owned != entry["old"]:
                 raise ValueError("安装期间文件发生变化，保留现场")
             replacement = f"\n{content.rstrip()}\n" if markers else content
@@ -149,6 +193,20 @@ def refresh_hosts(project: Path, snapshot: dict[str, Any], *, include_user: bool
                 ),
                 encoding="utf-8",
             )
+            if markers:
+                upsert_block(project, path, *markers, content, expected_current=original)
+                changed.append(str(path))
+                continue
+            if key.startswith(("deepseek-harness|", "windsurf|project:")):
+                write_owned_file(
+                    project,
+                    path,
+                    content.encode("utf-8"),
+                    legacy_host="windsurf" if key.startswith("windsurf|") else None,
+                    expected_current=original,
+                )
+                changed.append(str(path))
+                continue
             fd, temporary = tempfile.mkstemp(prefix=".super-dev-update-", dir=path.parent)
             try:
                 with os.fdopen(fd, "wb") as stream:

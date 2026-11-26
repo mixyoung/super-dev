@@ -73,11 +73,14 @@ def build_host_injection_closure(
         competition_project_available and not missing_competition_project
     )
     competition_user_surfaces_ready = competition_user_available and not missing_competition_user
+    competition_user_required = competition_user_available and not (
+        scope == "project-first" and competition_project_available
+    )
     standard_flow_ready = default_ready
     competition_flow_ready = (
         default_ready
         and (not competition_project_available or competition_project_surfaces_ready)
-        and (not competition_user_available or competition_user_surfaces_ready)
+        and (not competition_user_required or competition_user_surfaces_ready)
     )
 
     if not default_ready:
@@ -106,7 +109,7 @@ def build_host_injection_closure(
     competition_gap_labels: list[str] = []
     if competition_project_available and not competition_project_surfaces_ready:
         competition_gap_labels.append("SEEAI 项目补充面")
-    if competition_user_available and not competition_user_surfaces_ready:
+    if competition_user_required and not competition_user_surfaces_ready:
         competition_gap_labels.append("SEEAI 用户级补充面")
 
     if default_ready and competition_gap_labels:
@@ -118,6 +121,14 @@ def build_host_injection_closure(
         )
         label = f"{label}；{gap_text}待补齐"
         summary = f"{summary.rstrip('。')}；{gap_text}还未闭环。"
+
+    if competition_flow_ready:
+        competition_flow_label = "SEEAI 比赛模式可直接开工"
+    elif not default_ready:
+        competition_flow_label = "默认接入检查未通过，暂不能确认 SEEAI 比赛模式就绪"
+    else:
+        gap_text = "与".join(item.removeprefix("SEEAI ") for item in competition_gap_labels)
+        competition_flow_label = f"SEEAI 比赛模式待补齐{gap_text}"
 
     recommended_opt_in = (
         "如需跨项目共享统一宿主心智，再显式加 --with-user-surfaces 重新运行 super-dev。"
@@ -135,23 +146,7 @@ def build_host_injection_closure(
             "标准流可直接开工" if standard_flow_ready else "标准流待补齐默认接入面"
         ),
         "competition_flow_ready": competition_flow_ready,
-        "competition_flow_label": (
-            "SEEAI 比赛模式可直接开工"
-            if competition_flow_ready
-            else (
-                "SEEAI 比赛模式待补齐项目与用户级补充面"
-                if competition_project_available and competition_user_available
-                else (
-                    "SEEAI 比赛模式待补齐项目补充面"
-                    if competition_project_available
-                    else (
-                        "SEEAI 比赛模式待补齐用户级补充面"
-                        if competition_user_available
-                        else "SEEAI 比赛模式未配置补充面"
-                    )
-                )
-            )
-        ),
+        "competition_flow_label": competition_flow_label,
         "project_default_ready": default_ready,
         "user_surface_scope": user_surface_scope,
         "user_surface_opt_in_available": optional_user_available,
@@ -436,6 +431,39 @@ def collect_host_diagnostics(
                     "mode": "rules-only",
                 }
 
+        if target == "deepseek-harness":
+            from .skills.skill_template import SkillTemplate
+
+            checks: dict[str, bool] = {}
+            for name in ("super-dev", "super-dev-seeai"):
+                skill_file = project_dir / ".dsh/skills" / name / "SKILL.md"
+                try:
+                    checks[name] = skill_file.read_bytes() == SkillTemplate.for_builtin(
+                        name, target
+                    ).render(target).encode("utf-8")
+                except OSError:
+                    checks[name] = False
+            host_report["checks"]["dsh_skill_content"] = {
+                "ok": all(checks.values()),
+                "skills": checks,
+            }
+            if not all(checks.values()):
+                host_report["ready"] = False
+                host_report["missing"].append("dsh_skill_content")
+            host_report["evidence_scope"] = "project-files-and-static-contracts"
+            host_report["desktop_validation"] = {
+                "status": "unverified",
+                "reason": "桌面双模式、确认门、active/armed 续跑与卸载回退须独立验收",
+            }
+            if check_slash:
+                host_report["checks"]["slash"] = {
+                    "ok": all(checks.values()),
+                    "mode": "native-skill-entry",
+                    "scope": "project-skill-files",
+                    "command_files": False,
+                    "desktop_verified": False,
+                }
+
         host_report["injection_closure"] = build_host_injection_closure(
             host_ready=bool(host_report.get("ready", False)),
             surface_sets=surface_groups,
@@ -468,9 +496,16 @@ def collect_host_diagnostics(
             }
             if not bool(injection_closure.get("competition_user_surfaces_ready", False)):
                 host_report["optional_missing"].append("competition_user_surfaces")
-                host_report["suggestions"].append(
-                    "如需启用 SEEAI 比赛模式，先补齐当前宿主的 Super Dev SEEAI 用户级 Skill 或补充面。"
-                )
+                if injection_closure.get("scope") == "project-first" and injection_closure.get(
+                    "managed_competition_project_surfaces"
+                ):
+                    host_report["suggestions"].append(
+                        "用户级 SEEAI 接入为可选项；仅在需要跨项目使用时才显式启用。"
+                    )
+                else:
+                    host_report["suggestions"].append(
+                        "如需启用 SEEAI 比赛模式，先补齐当前宿主的 Super Dev SEEAI 用户级 Skill 或补充面。"
+                    )
 
         host_report["usage_profile"] = build_usage_profile_fn(integration_manager, target)
         usage_profile = host_report["usage_profile"]

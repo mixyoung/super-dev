@@ -134,8 +134,9 @@ def test_host_tool_category_map_is_complete():
 
 
 def test_primary_product_host_scope_is_locked():
-    assert len(PRIMARY_HOST_TOOL_IDS) == 26
-    assert len(PRODUCT_HOST_TOOL_IDS) == 26
+    assert len(PRIMARY_HOST_TOOL_IDS) == 27
+    assert len(PRODUCT_HOST_TOOL_IDS) == 27
+    assert "deepseek-harness" in PRIMARY_HOST_TOOL_IDS
     assert SPECIAL_INSTALL_HOST_TOOL_IDS == ()
     assert "claude" in PRIMARY_HOST_TOOL_IDS
     assert "codex" in PRIMARY_HOST_TOOL_IDS

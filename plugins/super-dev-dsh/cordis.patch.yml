@@ -1,0 +1,4 @@
+- insert:
+    - id: super-dev-dsh-companion
+      name: '@local/super-dev-dsh'
+      config: {}

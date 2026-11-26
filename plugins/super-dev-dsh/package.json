@@ -1,0 +1,12 @@
+{
+  "name": "@local/super-dev-dsh",
+  "version": "0.1.0",
+  "description": "Super Dev 项目接入检查与只读任务状态",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "dsh": "0.2.2-rc.3" },
+  "exports": { ".": "./index.js" },
+  "files": ["index.js", "cordis.patch.yml", "README.md"],
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

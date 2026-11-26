@@ -153,6 +153,7 @@ HOST_TOOL_CATALOG: list[dict[str, str]] = [
     {"id": "antigravity", "name": "Antigravity"},
     {"id": "claude", "name": "Claude"},
     {"id": "claude-code", "name": "Claude Code"},
+    {"id": "deepseek-harness", "name": "DeepSeek Harness（桌面版）"},
     {"id": "cline", "name": "Cline"},
     {"id": "codebuddy-cli", "name": "CodeBuddy CLI"},
     {"id": "codebuddy", "name": "CodeBuddy"},
@@ -185,6 +186,7 @@ HOST_TOOL_CATALOG: list[dict[str, str]] = [
 HOST_TOOL_IDS: tuple[str, ...] = tuple(item["id"] for item in HOST_TOOL_CATALOG)
 HOST_TOOL_NAME_MAP: dict[str, str] = {item["id"]: item["name"] for item in HOST_TOOL_CATALOG}
 HOST_TOOL_ALIASES: dict[str, list[str]] = {
+    "deepseek-harness": ["dsh"],
     "claude": ["claude-app", "claude-desktop"],
     "claude-code": ["claude-cli", "claudecode"],
     "droid-cli": ["droid", "factory", "factory-droid"],
@@ -232,6 +234,7 @@ PRIMARY_IDE_HOST_TOOL_IDS: tuple[str, ...] = (
 )
 
 DESKTOP_ASSISTANT_HOST_TOOL_IDS: tuple[str, ...] = (
+    "deepseek-harness",
     "claude",
     "codex",
     "workbuddy",
@@ -275,6 +278,7 @@ IDE_HOST_TOOL_IDS: tuple[str, ...] = (
     "windsurf",
 )
 ASSISTANT_HOST_TOOL_IDS: tuple[str, ...] = (
+    "deepseek-harness",
     "claude",
     "codex",
     "trae-solo",
@@ -611,6 +615,7 @@ def host_runtime_validation_overrides(target: str) -> dict[str, list[str]]:
 
 
 HOST_COMMAND_CANDIDATES: dict[str, list[str]] = {
+    "deepseek-harness": ["dsh"],
     "antigravity": ["antigravity"],
     "claude": ["claude"],
     "claude-code": ["claude", "claude-code"],
@@ -642,6 +647,10 @@ HOST_COMMAND_CANDIDATES: dict[str, list[str]] = {
 }
 
 HOST_PATH_PATTERNS: dict[str, list[str]] = {
+    "deepseek-harness": [
+        "%LOCALAPPDATA%/Programs/DeepSeek Harness/DeepSeek Harness.exe",
+        "%PROGRAMFILES%/DeepSeek Harness/DeepSeek Harness.exe",
+    ],
     "antigravity": [
         "~/Applications/Antigravity.app",
         "/Applications/Antigravity.app",

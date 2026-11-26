@@ -32,17 +32,24 @@ def inspect_baseline_governance(
     project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
     work_mode = detect_work_mode(project_dir, payload)
     required = work_mode_requires_baseline(work_mode)
-
-    markdown_path = latest_artifact(
-        output_dir,
-        "*-baseline-audit.md",
-        preferred_prefix=project_name,
+    native_binding = payload.get("dsh_primary_binding")
+    native_item = (
+        native_binding.get("work_item_id")
+        if isinstance(native_binding, dict) and native_binding.get("protocol") == "dsh-primary-v1"
+        else None
     )
-    json_path = latest_artifact(
-        output_dir,
-        "*-baseline-audit.json",
-        preferred_prefix=project_name,
-    )
+    if native_item:
+        owned_markdown = output_dir / f"{project_name}-baseline-audit.md"
+        owned_json = output_dir / f"{project_name}-baseline-audit.json"
+        markdown_path = owned_markdown if owned_markdown.is_file() else None
+        json_path = owned_json if owned_json.is_file() else None
+    else:
+        markdown_path = latest_artifact(
+            output_dir, "*-baseline-audit.md", preferred_prefix=project_name
+        )
+        json_path = latest_artifact(
+            output_dir, "*-baseline-audit.json", preferred_prefix=project_name
+        )
     audit_json_schema_valid = False
     audit_json_schema_errors: list[str] = []
     if json_path is not None and json_path.exists():
@@ -62,6 +69,18 @@ def inspect_baseline_governance(
     audit_exists = audit_path is not None and audit_path.exists()
 
     confirmation_payload = load_baseline_confirmation(project_dir) or {}
+    if native_item:
+        from .workflow_guard import collect_baseline_artifact_binding
+
+        current_binding = collect_baseline_artifact_binding(project_dir, native_item)
+        confirmed_binding = confirmation_payload.get("artifact_binding")
+        if (
+            confirmation_payload.get("work_item_id") != native_item
+            or not isinstance(confirmed_binding, dict)
+            or not current_binding["digest"]
+            or confirmed_binding.get("digest") != current_binding["digest"]
+        ):
+            confirmation_payload = {}
     confirmation_exists = bool(confirmation_payload)
     confirmation_status = (
         str(confirmation_payload.get("status", "")).strip() if confirmation_payload else ""

@@ -47,10 +47,12 @@ def serialize_host_usage_profile(
         "managed_competition_user_surfaces": list(managed_competition_user_surfaces or []),
     }
     skill_slash_command_map = {
+        "deepseek-harness": "/super-dev",
         "codex": "/super-dev",
         "kimi-code": "/skill:super-dev",
     }
     skill_slash_note_map = {
+        "deepseek-harness": "表示 DSH 原生技能菜单入口；自然语言选择独立，不生成自定义命令文件。",
         "codex": "表示 Codex App/Desktop `/` 列表里的已启用 Skill 入口，不代表项目支持自定义 slash 文件。",
         "kimi-code": "表示 Kimi Code 官方显式 Skill 入口，不代表项目支持自定义 `/super-dev` slash 文件。",
     }
@@ -118,7 +120,7 @@ def serialize_host_usage_profile(
         "adaptation_contract": build_host_adaptation_contract(
             profile,
             host_id=host_id,
-            supports_slash=bool(profile.slash_command_file),
+            supports_slash=bool(profile.slash_command_file) or target == "deepseek-harness",
         ),
     }
     if include_host_id:

@@ -147,6 +147,7 @@
 | --- | --- | --- | --- | --- |
 | Claude | Compatible | 不支持 | 在 Claude Desktop 的 Project / Instructions / Knowledge / extensions 场景里输入 `super-dev: 你的需求` | 是 |
 | Codex | Certified | App/Desktop 支持技能入口 | 在 Codex App/Desktop 的 `/` 列表里选择 `super-dev`；CLI 入口另见 `Codex CLI` | 是 |
+| DeepSeek Harness（桌面版） | Experimental，桌面验收待完成 | 原生技能菜单；不生成命令文件 | 在 DSH 当前项目选择 `/super-dev` 或 `/super-dev-seeai`；自然语言 `super-dev:` 为回退入口 | 否 |
 | WorkBuddy | Experimental | 不支持 | 在 WorkBuddy 当前任务会话中输入 `super-dev: 你的需求` | 是 |
 | Trae SOLO | Compatible | 支持 | 在 Trae SOLO workspace 中优先输入 `/super-dev 你的需求` | 是 |
 | Trae SOLOCN | Compatible | 不支持项目级 `/super-dev` | 在 Trae SOLOCN 工作区中输入 `super-dev: 你的需求` | 是 |

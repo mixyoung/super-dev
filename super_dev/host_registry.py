@@ -90,6 +90,22 @@ def _tuple(*items: str) -> tuple[str, ...]:
 DEFAULT_HOST_REGISTRY = HostRegistry(
     definitions=(
         HostDefinition(
+            host_id="deepseek-harness",
+            display_name="DeepSeek Harness（桌面版）",
+            install_mode=HostInstallMode.HYBRID,
+            protocol_mode="official-skill",
+            protocol_summary="DSH rc.5 原生技能菜单 + .dsh/skills + AGENTS.local.md",
+            supports_slash=True,
+            triggers=_tuple("/super-dev", "/super-dev-seeai", "super-dev:", "super-dev："),
+            docs=_tuple(
+                "Project-level `.dsh/skills/super-dev/SKILL.md`",
+                "Project-level `.dsh/skills/super-dev-seeai/SKILL.md`",
+                "Project root `AGENTS.local.md` (DSH-scoped managed block)",
+                "Optional user-level `$DSH_HOME/skills/` (default `~/.dsh/skills/`)",
+                "Native skill slash entries; no custom command files",
+            ),
+        ),
+        HostDefinition(
             host_id="antigravity",
             display_name="Antigravity",
             install_mode=HostInstallMode.HYBRID,

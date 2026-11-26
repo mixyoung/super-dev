@@ -30,6 +30,7 @@ def load_install_manifest(project_dir: Path) -> dict[str, Any]:
     if not isinstance(targets, dict):
         targets = {}
     return {
+        **payload,
         "version": int(payload.get("version", 1) or 1),
         "targets": targets,
         "updated_at": str(payload.get("updated_at", "")).strip(),
@@ -37,15 +38,17 @@ def load_install_manifest(project_dir: Path) -> dict[str, Any]:
 
 
 def save_install_manifest(project_dir: Path, payload: dict[str, Any]) -> Path:
+    from .managed_content import atomic_write
+
     normalized = load_install_manifest(project_dir)
     normalized.update(payload)
     normalized["version"] = int(normalized.get("version", 1) or 1)
     normalized["updated_at"] = _utc_now()
     file_path = install_manifest_path(project_dir)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(
-        json.dumps(normalized, ensure_ascii=False, indent=2, sort_keys=True),
-        encoding="utf-8",
+    atomic_write(
+        file_path,
+        json.dumps(normalized, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8"),
     )
     return file_path
 

@@ -970,6 +970,16 @@ def _repair_host_diagnostics(
             continue
 
         host_actions: dict[str, str] = {}
+        if target == "deepseek-harness":
+            try:
+                if missing and (check_integrate or check_skill):
+                    integration_manager.setup(target, force=force)
+                    host_actions["project"] = "fixed"
+            except (OSError, ValueError) as exc:
+                host_actions["dsh"] = f"failed: {exc}"
+            if host_actions:
+                actions[target] = host_actions
+            continue
         try:
             if check_integrate and "integrate" in missing:
                 integration_manager.setup(target=target, force=force)
@@ -1016,8 +1026,8 @@ def run_host_doctor(
     repair: bool = False,
     force: bool = False,
 ) -> dict[str, Any]:
-    """宿主诊断与可选修复的唯一实现；repair=True 会写项目级与用户级接入文件，
-    只能由带 API Key 鉴权的入口调用。"""
+    """宿主诊断与可选修复；DSH 仅修复项目级文件，其他宿主保留原作用域。
+    写入只能由带 API Key 鉴权的入口调用。"""
     integration_manager = IntegrationManager(project_dir_path)
     all_targets = [item.name for item in integration_manager.list_targets()]
     available_targets = _public_host_targets(integration_manager=integration_manager)

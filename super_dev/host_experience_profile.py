@@ -33,6 +33,21 @@ def _profile(
 
 
 _EXPERIENCE_PROFILES: dict[str, dict[str, Any]] = {
+    "deepseek-harness": _profile(
+        tier="experimental",
+        label="Experimental",
+        best_for="DSH rc.5 项目内双技能接入验证；真实桌面验收待完成",
+        resume_style="skill-and-session",
+        market_focus="global",
+        strengths=("原生技能菜单", "项目 .dsh/skills", "DSH 限定项目规则"),
+        preferred_entries=("/super-dev 你的需求", "/super-dev-seeai 比赛需求"),
+        native_resume=("/super-dev 继续当前流程", "super-dev: 继续当前流程"),
+        start_playbook=(
+            "在 DSH 当前项目会话选择原生技能；已注入的内容直接复用。",
+            "项目文件检查通过不代表桌面流程或卸载回退已通过。",
+        ),
+        repair_playbook="技能缺失、损坏或来源不适用时停止推进，使用已有接入诊断；不要修改模型、profile 或全局权限。",
+    ),
     "antigravity": _profile(
         tier="specialized",
         label="Specialized",

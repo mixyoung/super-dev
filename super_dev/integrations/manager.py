@@ -27,7 +27,7 @@ from ..seeai_smoke_scenarios import (
     build_seeai_smoke_suite,
     get_seeai_acceptance_gates,
 )
-from ..user_directories import UserDirectoryContext
+from ..user_directories import UserDirectoryContext, ensure_plain_path
 from ..workflow_contract import readonly_request_guidance
 from .catalog_mixin import IntegrationCatalogMixin
 from .manager_content_mixin import IntegrationManagerContentMixin
@@ -131,6 +131,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
         if not isinstance(targets, dict):
             targets = {}
         return {
+            **payload,
             "version": int(payload.get("version", 1) or 1),
             "targets": targets,
             "updated_at": str(payload.get("updated_at", "")).strip(),
@@ -154,6 +155,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
         project_dir: Path,
         user_directories: UserDirectoryContext | None = None,
     ):
+        ensure_plain_path(Path(project_dir))
         self.project_dir = Path(project_dir).resolve()
         self.templates_dir = self.project_dir / "templates"
         self.user_directories = user_directories or UserDirectoryContext.current()
@@ -219,7 +221,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
         declared = set(HOST_TOOL_IDS)
         target_keys = set(cls.TARGETS)
         slash_keys = set(cls.SLASH_COMMAND_FILES)
-        slash_required = declared - cls.NO_SLASH_TARGETS
+        slash_required = declared - cls.NO_SLASH_TARGETS - {"deepseek-harness"}
         docs_keys = set(cls.OFFICIAL_DOCS)
         verified_keys = set(cls.DOCS_VERIFIED_TARGETS)
         declared_with_docs = {item for item, value in cls.OFFICIAL_DOCS.items() if bool(value)}
@@ -437,7 +439,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
             "audit surface contract markers",
             "generate host usage profile",
         ]
-        if self.supports_slash(target):
+        if self.supports_command_files(target):
             required_steps.append("setup project slash command")
             if include_user_surfaces:
                 required_steps.append("setup user-level slash command")
@@ -471,6 +473,8 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
 
     def _capability_labels(self, *, target: str) -> dict[str, str]:
         slash_label = "native" if self.supports_slash(target) else "none"
+        if target == "deepseek-harness":
+            slash_label = "native-skill"
         if target in {"codex", "codex-cli"}:
             slash_label = "skill-list"
         protocol = self._protocol_profile(target=target)
@@ -827,6 +831,8 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
                     paths.append(project_root / ".agents" / "skills" / name / "SKILL.md")
                 elif target == "claude-code":
                     paths.append(project_root / ".claude" / "skills" / name / "SKILL.md")
+                elif target == "deepseek-harness":
+                    paths.append(project_root / ".dsh" / "skills" / name / "SKILL.md")
                 elif target in {"codebuddy", "codebuddy-cli", "codebuddy-cn"}:
                     paths.append(project_root / ".codebuddy" / "skills" / name / "SKILL.md")
                 elif target == "kimi-code":
@@ -839,7 +845,11 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
                     paths.append(project_root / ".trae" / "skills" / name / "SKILL.md")
             if target not in SkillManager.TARGET_PATHS:
                 continue
-            target_root = self.user_directories.expanduser(SkillManager.TARGET_PATHS[target])
+            target_root = (
+                (self.user_directories.dsh_home or self.user_directories.home / ".dsh") / "skills"
+                if target == "deepseek-harness"
+                else self.user_directories.expanduser(SkillManager.TARGET_PATHS[target])
+            )
             if surface_kind == "observed-compatibility-surface" and not target_root.exists():
                 continue
             paths.append(target_root / name / "SKILL.md")
@@ -979,6 +989,20 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
     ) -> list[str]:
         normalized = content or ""
         missing: list[str] = []
+        if target == "deepseek-harness" and surface_key == "project:AGENTS.local.md":
+            from .managed_content import block_span
+
+            raw = normalized.encode("utf-8")
+            try:
+                span = block_span(raw, cls.DSH_AGENTS_BEGIN, cls.DSH_AGENTS_END)
+            except ValueError:
+                span = None
+            if span is None:
+                missing.append("dsh_project_rule_block")
+                normalized = ""
+            else:
+                start, stop = span
+                normalized = raw[start:stop].decode("utf-8")
         for label, options in cls.contract_validation_groups_for_surface(
             target, surface_key, surface_path
         ):
@@ -1016,7 +1040,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
                 compatibility_protocol_path
             )
 
-        if self.supports_slash(target):
+        if self.supports_command_files(target):
             project_slash = self.resolve_slash_command_path(
                 target=target,
                 scope="project",
@@ -1040,6 +1064,8 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
         if skill_name not in managed_skill_names:
             managed_skill_names.append(skill_name)
         for managed_skill_name in managed_skill_names:
+            if target == "deepseek-harness" and not include_user_surfaces:
+                continue
             for skill_path in self.expected_skill_paths(
                 target=target, skill_name=managed_skill_name
             ):
@@ -1047,8 +1073,24 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
 
         return surfaces
 
+    def collect_uninstall_surface_paths(self, target: str) -> dict[str, Path]:
+        if target != "deepseek-harness":
+            return self.collect_managed_surface_paths(target)
+        from ..skills import SkillManager
+
+        surfaces = self.collect_managed_surface_paths(target, include_user_surfaces=False)
+        skills = SkillManager(self.project_dir, user_directories=self.user_directories)
+        for name in skills.scoped_user_skill_cleanup_names(target):
+            for path in self.expected_skill_paths(target, name):
+                surfaces[f"skill:{path}"] = path
+        return surfaces
+
     def _resolve_surface_declaration(self, *, target: str, surface: str) -> Path:
         normalized = str(surface).strip()
+        if target == "deepseek-harness" and normalized.startswith("~/.dsh/"):
+            return (
+                self.user_directories.dsh_home or self.user_directories.home / ".dsh"
+            ) / normalized[len("~/.dsh/") :]
         if normalized == "~/.codex/AGENTS.md":
             return self.resolve_global_protocol_path("codex") or self.user_directories.expanduser(
                 normalized
@@ -1145,7 +1187,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
 
         project_slash: Path | None = None
         global_slash: Path | None = None
-        if self.supports_slash(target):
+        if self.supports_command_files(target):
             project_slash = self.resolve_slash_command_path(
                 target=target,
                 scope="project",
@@ -1202,6 +1244,67 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
 
     def remove(self, target: str) -> list[Path]:
         """卸载指定宿主的 Super Dev 集成文件"""
+        if target == "deepseek-harness":
+            from .managed_content import plain_path, reconcile_dsh_installation, remove_owned_file
+
+            removed_dsh: list[Path] = []
+            issues: list[str] = []
+            for path in [
+                *(self.project_dir / item for item in self.TARGETS[target].files),
+                self.install_manifest_path(),
+            ]:
+                plain_path(path)
+            for relative in self.TARGETS[target].files:
+                path = self.project_dir / relative
+                try:
+                    if relative == "AGENTS.local.md":
+                        changed = self._remove_managed_block(
+                            file_path=path, begin=self.DSH_AGENTS_BEGIN, end=self.DSH_AGENTS_END
+                        )
+                    else:
+                        changed = remove_owned_file(self.project_dir, path)
+                    if changed:
+                        removed_dsh.append(path)
+                except (OSError, ValueError) as exc:
+                    issues.append(str(exc))
+            if issues:
+                raise ValueError("; ".join(issues))
+            reconcile_dsh_installation(self.project_dir, self.user_directories)
+            return removed_dsh
+        if target == "windsurf":
+            from .managed_content import (
+                plain_path,
+                reconcile_windsurf_project_removal,
+                remove_owned_file,
+            )
+
+            surfaces = {
+                key: path
+                for key, path in self.collect_managed_surface_paths(target).items()
+                if key.startswith("project:")
+            }
+            for path in (*surfaces.values(), self.install_manifest_path()):
+                plain_path(path)
+            removed_windsurf: list[Path] = []
+            issues = []
+            for path in surfaces.values():
+                try:
+                    if path == self.project_dir / "AGENTS.md":
+                        markers = self._managed_agents_markers(target)
+                        if markers is None:
+                            raise ValueError("缺少 Windsurf 托管边界声明")
+                        begin, end = markers
+                        changed = self._remove_managed_block(file_path=path, begin=begin, end=end)
+                    else:
+                        changed = remove_owned_file(self.project_dir, path, legacy_host=target)
+                    if changed:
+                        removed_windsurf.append(path)
+                except (ValueError, OSError) as exc:
+                    issues.append(str(exc))
+            if issues:
+                raise ValueError("; ".join(issues))
+            reconcile_windsurf_project_removal(self.project_dir)
+            return removed_windsurf
         surfaces = self.collect_managed_surface_paths(target=target)
         removed: list[Path] = []
         for _key, path in surfaces.items():
@@ -1209,12 +1312,11 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
                 try:
                     if path.name == "AGENTS.md":
                         markers = self._managed_agents_markers(target)
-                        if markers is not None and self._remove_managed_block(
-                            file_path=path,
-                            begin=markers[0],
-                            end=markers[1],
-                        ):
-                            removed.append(path)
+                        if markers is not None:
+                            if self._remove_managed_block(
+                                file_path=path, begin=markers[0], end=markers[1]
+                            ):
+                                removed.append(path)
                             continue
                     if target == "claude-code" and path.name == "CLAUDE.md":
                         if self._remove_managed_block(
@@ -1223,7 +1325,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
                             end=self.CLAUDE_RULES_END,
                         ):
                             removed.append(path)
-                            continue
+                        continue
                     path.unlink()
                     removed.append(path)
                     # 清理空父目录
@@ -1272,6 +1374,17 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
         )
         if special_usage is not None:
             return special_usage
+        if target == "deepseek-harness":
+            return {
+                "usage_mode": "desktop-native-skill",
+                "primary_entry": "DeepSeek Harness 桌面原生技能菜单 /super-dev；自然语言 super-dev: 为回退入口。",
+                "trigger_command": "/super-dev",
+                "trigger_context": "DeepSeek Harness 桌面当前项目会话",
+                "usage_location": usage_location,
+                "usage_notes": usage_notes,
+                "requires_restart_after_onboard": False,
+                "notes": "文件和静态接口已接通；双模式桌面、确认门、active/armed 与卸载回退未验证。",
+            }
         if target == "codex":
             return {
                 "usage_mode": "desktop-skill-and-agents",
@@ -1855,6 +1968,14 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
             adapter_surfaces.setdefault("optional_user_surfaces", [])
             return adapter_surfaces
         by_target: dict[str, dict[str, list[str]]] = {
+            "deepseek-harness": {
+                "official_project_surfaces": list(self.TARGETS[target].files),
+                "official_user_surfaces": [
+                    "~/.dsh/skills/super-dev/SKILL.md",
+                    "~/.dsh/skills/super-dev-seeai/SKILL.md",
+                ],
+                "observed_compatibility_surfaces": [],
+            },
             "claude": {
                 "official_project_surfaces": [],
                 "official_user_surfaces": [],
@@ -2187,6 +2308,69 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
     def setup(self, target: str, force: bool = False) -> list[Path]:
         if target not in self.TARGETS:
             raise ValueError(f"Unsupported target: {target}")
+        if target == "deepseek-harness":
+            from .managed_content import plain_path, write_owned_file
+
+            written_dsh: list[Path] = []
+            for relative in self.TARGETS[target].files:
+                plain_path(self.project_dir / relative)
+            plain_path(self.install_manifest_path())
+            for relative in self.TARGETS[target].files:
+                path = self.project_dir / relative
+                content = self._append_flow_contract(
+                    content=self._build_file_content(target, relative), relative=relative
+                )
+                changed = (
+                    self._upsert_managed_block(
+                        file_path=path,
+                        begin=self.DSH_AGENTS_BEGIN,
+                        end=self.DSH_AGENTS_END,
+                        block_content=content,
+                    )
+                    if relative == "AGENTS.local.md"
+                    else write_owned_file(self.project_dir, path, content.encode("utf-8"))
+                )
+                if changed:
+                    written_dsh.append(path)
+            return written_dsh
+
+        if target == "windsurf":
+            from .managed_content import plain_path, write_owned_file
+
+            relatives = list(
+                dict.fromkeys(
+                    [
+                        *self.TARGETS[target].files,
+                        *self.managed_competition_project_surfaces(target),
+                    ]
+                )
+            )
+            for path in [
+                *(self.project_dir / item for item in relatives),
+                self.install_manifest_path(),
+            ]:
+                plain_path(path)
+            written_windsurf: list[Path] = []
+            for relative in relatives:
+                path = self.project_dir / relative
+                content = self._append_flow_contract(
+                    content=self._build_file_content(target, relative), relative=relative
+                )
+                if relative == "AGENTS.md":
+                    markers = self._managed_agents_markers(target)
+                    if markers is None:
+                        raise ValueError("缺少 Windsurf 托管边界声明")
+                    begin, end = markers
+                    changed = self._upsert_managed_block(
+                        file_path=path, begin=begin, end=end, block_content=content
+                    )
+                else:
+                    changed = write_owned_file(
+                        self.project_dir, path, content.encode("utf-8"), legacy_host=target
+                    )
+                if changed:
+                    written_windsurf.append(path)
+            return written_windsurf
 
         written_files: list[Path] = []
         integration = self.TARGETS[target]
@@ -2258,7 +2442,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
             seen.add(key)
             written.append(path)
 
-        if self.supports_slash(target):
+        if self.supports_command_files(target):
             seeai_slash = self.setup_seeai_slash_command(target=target, force=force)
             _append(seeai_slash)
 
@@ -2282,7 +2466,7 @@ class IntegrationManager(IntegrationCatalogMixin, IntegrationManagerContentMixin
             return []
 
         candidates: list[str] = []
-        if cls.supports_slash(target):
+        if cls.supports_command_files(target):
             seeai_slash_relative = cls.SLASH_COMMAND_FILES[target].replace(
                 "super-dev",
                 "super-dev-seeai",

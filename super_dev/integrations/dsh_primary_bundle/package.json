@@ -1,0 +1,12 @@
+{
+  "name": "@local/super-dev-dsh-primary",
+  "version": "0.1.0",
+  "description": "Super Dev 的 DSH 原生开发入口与 Core 门禁",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {"dsh": "0.2.2-rc.3"},
+  "exports": {".": "./index.js"},
+  "files": ["index.js", "cordis.patch.yml", "README.md"],
+  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}}
+}

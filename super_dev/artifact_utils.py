@@ -155,11 +155,28 @@ def resolve_work_item_identity(project_dir: Path) -> WorkItemIdentity:
     """Read the standard-flow identity without selecting by age or directory order."""
 
     project_path = Path(project_dir).resolve()
-    payload = _load_workflow_identity_payload(project_path)
-    explicit_work_item = (
-        "work_item_id" in payload
-        and str(payload.get("flow_variant", "standard")).strip().lower() != "seeai"
+    return work_item_identity_from_snapshot(
+        project_path, _load_workflow_identity_payload(project_path)
     )
+
+
+def has_explicit_work_item_identity(payload: dict[str, Any]) -> bool:
+    """Keep legacy SEEAI separate from the native DSH work-item protocol."""
+    if "work_item_id" not in payload:
+        return False
+    if str(payload.get("flow_variant", "standard")).strip().lower() != "seeai":
+        return True
+    binding = payload.get("dsh_primary_binding")
+    return isinstance(binding, dict) and binding.get("protocol") == "dsh-primary-v1"
+
+
+def work_item_identity_from_snapshot(
+    project_dir: Path, payload: dict[str, Any]
+) -> WorkItemIdentity:
+    """Validate one already-read workflow snapshot without restoring or selecting another."""
+
+    project_path = Path(project_dir).resolve()
+    explicit_work_item = has_explicit_work_item_identity(payload)
     raw_work_item = payload.get("work_item_id", "")
     work_item_id = _valid_identity_text(raw_work_item)
     raw_active = payload.get("active_change_id", payload.get("change_id", ""))
@@ -235,10 +252,7 @@ def resolve_active_change_id(project_dir: Path) -> str:
     workflow_payload = _load_workflow_identity_payload(project_path)
 
     if isinstance(workflow_payload, dict):
-        if (
-            "work_item_id" in workflow_payload
-            and str(workflow_payload.get("flow_variant", "standard")).strip().lower() != "seeai"
-        ):
+        if has_explicit_work_item_identity(workflow_payload):
             identity = resolve_work_item_identity(project_path)
             return identity.active_change_id if identity.valid else ""
         for key in ("active_change_id", "change_id"):

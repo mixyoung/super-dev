@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifact_utils import (
+    has_explicit_work_item_identity,
     normalize_work_item_id,
     resolve_work_item_identity,
     sanitize_artifact_name,
@@ -84,9 +85,7 @@ def _only_for_current_work_item(
 
 def _normalize_work_item_fields(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
-    if str(normalized.get("flow_variant", "standard")).strip().lower() == "seeai":
-        return normalized
-    if "work_item_id" not in normalized:
+    if not has_explicit_work_item_identity(normalized):
         return normalized
     work_item_id = normalize_work_item_id(normalized.get("work_item_id", ""))
     if not work_item_id:
