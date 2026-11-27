@@ -11,23 +11,19 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-import subprocess
 from pathlib import Path
 from typing import Any, cast
-
-from PIL import Image
 
 from super_dev.artifact_utils import ui_contract_filename
 
 from ..design import UIIntelligenceAdvisor
+from .ui_review_evidence import UIReviewEvidence
 from .ui_review_execution_mixin import UIReviewExecutionMixin
 from .ui_review_models import (
     UIReviewFinding,
     UIReviewReport,
     _HTMLSurfaceParser,
-    shutil_which,
 )
 
 _logger = logging.getLogger("super_dev.reviewers.ui_review")
@@ -99,6 +95,36 @@ class UIReviewReviewer(UIReviewExecutionMixin):
         except Exception:
             self._ui_toolkit = None
             self._ux_toolkit = None
+
+    def evidence(self) -> UIReviewEvidence:
+        frontend = self.tech_stack.get("frontend") or self._load_project_config().get("frontend")
+        return UIReviewEvidence(
+            self.project_dir, self.name, required=str(frontend).strip().lower() != "none"
+        )
+
+    def review(self) -> UIReviewReport:
+        evidence = self.evidence()
+        if not evidence.required:
+            return UIReviewReport(self.name, 100, results=evidence.results())
+        try:
+            evidence.capture_binding()
+        except (ValueError, OSError, RuntimeError):
+            pass  # Unbound projects can still receive non-authoritative source diagnostics.
+        report = super().review()
+        source = evidence.source_result(
+            status=report.source_status,
+            detail=(
+                "已按文档与工程约束检查源码。"
+                if report.source_complete
+                else "源码、UI/UX、契约或扫描范围不完整。"
+            ),
+            score=report.score,
+            findings=[finding.to_dict() for finding in report.findings],
+            alignment=report.alignment_summary,
+            files=report.source_inputs,
+        )
+        report.results = evidence.results(source=source)
+        return report
 
     # ------------------------------------------------------------------
     # UI/UX 专家视角
@@ -385,105 +411,28 @@ class UIReviewReviewer(UIReviewExecutionMixin):
                 return candidate
         return None
 
-    def _capture_preview_screenshot(self, preview_path: Path) -> Path | None:
-        if os.getenv("SUPER_DEV_DISABLE_VISUAL_CAPTURE") == "1" or os.getenv("PYTEST_CURRENT_TEST"):
-            return None
-        if not shutil_which("npx"):
-            return None
-
-        artifact_dir = self.project_dir / "output" / "ui-review"
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        screenshot_path = artifact_dir / f"{self.name}-preview-desktop.png"
-        url = preview_path.resolve().as_uri()
-
-        cmd = [
-            "npx",
-            "-y",
-            "playwright",
-            "screenshot",
-            "--device=Desktop Chrome",
-            url,
-            str(screenshot_path),
-        ]
-
-        try:
-            subprocess.run(  # nosec B603
-                cmd,
-                cwd=str(self.project_dir),
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=45,
-            )
-        except Exception as e:
-            _logger.debug(f"Failed to capture preview screenshot: {e}")
-            return None
-
-        return screenshot_path if screenshot_path.exists() else None
-
-    def _analyze_screenshot(
-        self, screenshot_path: Path | None
-    ) -> dict[str, float] | dict[str, int]:
-        if not screenshot_path or not screenshot_path.exists():
-            return {}
-        try:
-            with Image.open(screenshot_path) as image:
-                rgb = image.convert("RGB")
-                width, height = rgb.size
-                sample = rgb.resize((min(220, width), min(220, height)))
-                pixels = cast(
-                    list[tuple[int, int, int]],
-                    list(sample.get_flattened_data()),
+    def _package_json_path(self) -> Path | None:
+        return next(
+            (
+                path
+                for path in (
+                    self.project_dir / "package.json",
+                    self.project_dir / "frontend" / "package.json",
                 )
-        except Exception as e:
-            _logger.debug(f"Failed to analyze screenshot: {e}")
-            return {}
-
-        if not pixels:
-            return {}
-
-        blank_pixels = 0
-        accent_pixels = 0
-        reduced = []
-        brightness_values: list[float] = []
-        for r, g, b in pixels:
-            brightness = (r + g + b) / 3
-            spread = max(r, g, b) - min(r, g, b)
-            brightness_values.append(brightness)
-            if brightness > 235 and spread < 16:
-                blank_pixels += 1
-            if spread > 60 and 35 < brightness < 220:
-                accent_pixels += 1
-            reduced.append((r // 32, g // 32, b // 32))
-
-        total = len(pixels)
-        color_histogram: dict[tuple[int, int, int], int] = {}
-        for color in reduced:
-            color_histogram[color] = color_histogram.get(color, 0) + 1
-        dominant_color_ratio = (max(color_histogram.values()) / total) if color_histogram else 1.0
-        contrast_span = (
-            (max(brightness_values) - min(brightness_values)) / 255 if brightness_values else 0.0
+                if path.is_file()
+            ),
+            None,
         )
-        return {
-            "blank_ratio": blank_pixels / total,
-            "accent_ratio": accent_pixels / total,
-            "unique_colors": len(set(reduced)),
-            "dominant_color_ratio": dominant_color_ratio,
-            "contrast_span": contrast_span,
-        }
 
     def _read_package_json(self) -> dict[str, Any] | None:
-        for candidate in (
-            self.project_dir / "package.json",
-            self.project_dir / "frontend" / "package.json",
-        ):
-            if candidate.exists():
-                try:
-                    payload: object = json.loads(candidate.read_text(encoding="utf-8"))
-                    return cast(dict[str, Any], payload) if isinstance(payload, dict) else None
-                except (json.JSONDecodeError, OSError):
-                    return None
-        return None
+        path = self._package_json_path()
+        if path is None:
+            return None
+        try:
+            payload: object = json.loads(path.read_text(encoding="utf-8"))
+            return cast(dict[str, Any], payload) if isinstance(payload, dict) else None
+        except (ValueError, OSError):
+            return None
 
     def _load_ui_contract(self) -> dict[str, Any]:
         contract_path = self.project_dir / "output" / ui_contract_filename(self.name)
@@ -493,17 +442,6 @@ class UIReviewReviewer(UIReviewExecutionMixin):
             payload: object = json.loads(contract_path.read_text(encoding="utf-8"))
         except Exception as e:
             _logger.debug(f"Failed to parse UI contract: {e}")
-            return {}
-        return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
-
-    def _load_frontend_runtime_report(self) -> dict[str, Any]:
-        runtime_path = self.project_dir / "output" / f"{self.name}-frontend-runtime.json"
-        if not runtime_path.exists():
-            return {}
-        try:
-            payload: object = json.loads(runtime_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            _logger.debug(f"Failed to parse frontend runtime report: {e}")
             return {}
         return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
 

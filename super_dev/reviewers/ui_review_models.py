@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import Any
 
-_logger = logging.getLogger("super_dev.reviewers.ui_review")
+from ..evidence_contract import EvidenceStatus
+from .ui_review_evidence import (
+    LABELS,
+    STATUS_LABELS,
+    UIResult,
+    aggregate_ui_status,
+    ui_result_details,
+    ui_status_ok,
+)
 
 
 @dataclass
@@ -36,6 +44,48 @@ class UIReviewReport:
     strengths: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     alignment_summary: dict[str, Any] = field(default_factory=dict)
+    results: tuple[UIResult, ...] = ()
+    source_inputs: tuple[Path, ...] = ()
+    source_complete: bool = False
+
+    @property
+    def status(self) -> EvidenceStatus:
+        return aggregate_ui_status(self.results)
+
+    @property
+    def source_status(self) -> EvidenceStatus:
+        if self.critical_count:
+            return EvidenceStatus.FAIL
+        if not self.source_complete:
+            return EvidenceStatus.BLOCKED
+        gaps = (
+            "ui_contract",
+            "emoji_policy",
+            "banned_patterns",
+            "design_tokens",
+            "theme_entry",
+            "navigation_shell",
+            "component_imports",
+            "icon_system",
+            "font_pair",
+            "component_ecosystem",
+            "source_claude_design_protocol",
+            "screen_recipes",
+            "design_context_protocol",
+            "tweak_strategy",
+            "verification_handoff",
+            "framework_playbook",
+            "framework_execution",
+            "brand_signal_manifest",
+            "proof_composition_rules",
+            "component_craft_requirements",
+            "layout_tension_rules",
+        )
+        if self.score < 80 or any(
+            self.alignment_summary.get(key, {}).get("passed") is False for key in gaps
+        ):
+            return EvidenceStatus.FAIL
+        return EvidenceStatus.PASS
 
     @property
     def critical_count(self) -> int:
@@ -51,27 +101,12 @@ class UIReviewReport:
 
     @property
     def passed(self) -> bool:
-        return self.critical_count == 0 and self.score >= 80
+        return ui_status_ok(self.status)
 
     @property
     def executive_summary(self) -> str:
-        if self.passed:
-            return (
-                f"当前 UI 审查已通过，score={self.score}/100。"
-                " 从产品视角看，页面已经具备对外演示、继续联调和进入交付验收的基础可信度。"
-            )
-
-        top_findings = [item.title for item in self.findings[:3]]
-        top_text = "、".join(top_findings) if top_findings else "关键商业级 UI 风险"
-        if self.critical_count > 0:
-            risk_text = "当前仍有会直接破坏演示观感或商业信任感的高优先级问题。"
-        elif self.high_count > 0:
-            risk_text = "当前虽然能继续开发，但用户仍会明显感知到页面不够成熟或不够像正式商业产品。"
-        else:
-            risk_text = "当前还存在一批会拖慢验收效率和细节打磨的问题。"
-        return (
-            f"当前 UI 审查未通过，score={self.score}/100。" f" {risk_text} 优先修复：{top_text}。"
-        )
+        summary = ui_result_details(self.results) or "未取得当前的三份独立结果。"
+        return f"UI 验收：{STATUS_LABELS[self.status]}。{summary} 用户预览确认另行记录。"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -81,6 +116,9 @@ class UIReviewReport:
             "high_count": self.high_count,
             "medium_count": self.medium_count,
             "passed": self.passed,
+            "status": self.status.value,
+            "schema_version": 1,
+            "results": {result.kind: result.summary() for result in self.results},
             "strengths": list(self.strengths),
             "notes": list(self.notes),
             "alignment_summary": dict(self.alignment_summary),
@@ -91,11 +129,12 @@ class UIReviewReport:
         lines = [
             f"# {self.project_name} - UI 审查报告",
             "",
-            f"- **总分**: {self.score}/100",
-            f"- **Critical**: {self.critical_count}",
-            f"- **High**: {self.high_count}",
-            f"- **Medium**: {self.medium_count}",
-            f"- **结论**: {'通过' if self.passed else '需继续修正'}",
+            (
+                f"- **源码规则分**: {self.score}/100（不代表视觉评审）"
+                if self.status is not EvidenceStatus.NOT_APPLICABLE
+                else "- **源码规则分**: 不适用"
+            ),
+            f"- **结论**: {STATUS_LABELS[self.status]}",
             "",
             "---",
             "",
@@ -106,6 +145,16 @@ class UIReviewReport:
             "## 优点",
             "",
         ]
+        for result in self.results:
+            if result.path:
+                lines.append(f"- {LABELS[result.kind]}独立结果：`{result.path.name}`")
+            if result.payload.get("uncovered"):
+                lines.append(f"- {LABELS[result.kind]}未覆盖：{result.payload['uncovered']}")
+            if result.kind == "ui-visual-review":
+                for finding in result.payload.get("findings", []):
+                    lines.append(
+                        f"- 视觉发现｜截图 `{finding['screenshot_id']}`｜{finding['location']}：{finding['observation']}；建议：{finding['recommendation']}"
+                    )
         if self.strengths:
             lines.extend(f"- {strength}" for strength in self.strengths)
         else:
@@ -113,7 +162,7 @@ class UIReviewReport:
 
         lines.extend(["", "## 发现的问题", ""])
         if not self.findings:
-            lines.append("- 未发现明显的商业级 UI 违例。")
+            lines.append("- 源码检查未报告额外问题；不代表页面已完成视觉验证。")
         else:
             for index, finding in enumerate(self.findings, 1):
                 lines.extend(
@@ -283,13 +332,3 @@ class _HTMLSurfaceParser(HTMLParser):
             "first_section_media": self.first_section_media,
             "trust_hits": trust_hits,
         }
-
-
-def shutil_which(command: str) -> str | None:
-    try:
-        import shutil
-
-        return shutil.which(command)
-    except Exception as e:
-        _logger.debug(f"Failed to check command availability for {command}: {e}")
-        return None

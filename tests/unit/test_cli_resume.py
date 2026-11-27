@@ -1,12 +1,16 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 import super_dev.cli_workflow_runtime_mixin as workflow_runtime
 from super_dev.catalogs import PRIMARY_HOST_TOOL_IDS
 from super_dev.change_ledger import ChangeLedger
 from super_dev.cli import SuperDevCLI
 from super_dev.review_state import save_workflow_state
+from super_dev.reviewers.ui_review_evidence import RUNTIME
 from super_dev.scope_advisory import build_scope_advisory
+from tests.support.ui_evidence_inputs import create_ui_project, dump, publish_browser
 
 
 def test_resume_stage_resolution_matrix() -> None:
@@ -75,30 +79,40 @@ def test_adjust_resume_stage_falls_back_when_docs_missing(temp_project_dir) -> N
     assert reasons
 
 
-def test_adjust_resume_stage_keeps_stage_when_docs_complete(temp_project_dir) -> None:
+@pytest.mark.parametrize("runtime_state", ["current", "legacy", "non_ui"])
+def test_adjust_resume_stage_validates_current_runtime_if_required(
+    temp_project_dir, runtime_state: str
+) -> None:
     cli = SuperDevCLI()
-    output_dir = temp_project_dir / "output"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    required = cli._stage_one_artifact_paths(output_dir=output_dir, project_name="resume-demo")
-    for path in required.values():
-        path.write_text("ok", encoding="utf-8")
-    (output_dir / "resume-demo-frontend-runtime.json").write_text(
-        '{"passed": true}', encoding="utf-8"
+    evidence = create_ui_project(temp_project_dir)
+    required = cli._stage_one_artifact_paths(
+        output_dir=evidence.output, project_name=evidence.prefix
     )
-    change_dir = temp_project_dir / ".super-dev" / "changes" / "resume-change"
-    change_dir.mkdir(parents=True, exist_ok=True)
+    for path in required.values():
+        if not path.exists():
+            path.write_text("ok", encoding="utf-8")
+    change_dir = temp_project_dir / ".super-dev" / "changes" / evidence.prefix
     (change_dir / "proposal.md").write_text("# proposal", encoding="utf-8")
     (change_dir / "tasks.md").write_text("# tasks", encoding="utf-8")
+    if runtime_state == "current":
+        publish_browser(evidence)
+    elif runtime_state == "legacy":
+        dump(evidence.path(RUNTIME), {"passed": True})
 
     adjusted, reasons = cli._adjust_resume_stage_for_artifacts(
         project_dir=temp_project_dir,
-        output_dir=output_dir,
-        project_name="resume-demo",
+        output_dir=evidence.output,
+        project_name=evidence.prefix,
         resume_from_stage=7,
+        frontend_required=runtime_state != "non_ui",
     )
 
-    assert adjusted == 7
-    assert reasons == []
+    if runtime_state == "legacy":
+        assert adjusted == 3
+        assert "旧报告" in reasons[0]
+    else:
+        assert adjusted == 7
+        assert reasons == []
 
 
 def test_write_resume_audit_outputs_json_and_markdown(temp_project_dir) -> None:

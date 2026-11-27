@@ -11,6 +11,7 @@ class CheckStatus(Enum):
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
+    BLOCKED = "blocked"
 
 
 @dataclass

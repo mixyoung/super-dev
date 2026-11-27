@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-from .artifact_utils import latest_artifact, resolve_project_artifact_prefix
+from .artifact_utils import resolve_current_artifact_prefix
 from .baseline_governance import inspect_baseline_governance
+from .evidence_contract import EvidenceStatus
 from .framework_harness import FrameworkHarnessBuilder
 from .host_workflow_context import build_host_workflow_context
 from .operational_harness import OperationalHarnessBuilder
-from .ui_contract_governance import missing_claude_design_runtime_checks
+from .reviewers.ui_review_evidence import SOURCE, UIReviewEvidence, ui_result_details, ui_status_ok
 from .workflow_harness import WorkflowHarnessBuilder
 from .workflow_state import detect_pipeline_summary
 
@@ -59,7 +59,7 @@ def build_host_runtime_probe(
     framework_harness = FrameworkHarnessBuilder(project_dir).build()
     operational_harness = OperationalHarnessBuilder(project_dir).build()
     output_dir = project_dir / "output"
-    project_name = resolve_project_artifact_prefix(project_dir, fallback_name=project_dir.name)
+    project_name = resolve_current_artifact_prefix(project_dir, fallback_name=project_dir.name)
 
     artifacts = pipeline_summary.get("artifacts", {})
     if not isinstance(artifacts, dict):
@@ -77,40 +77,17 @@ def build_host_runtime_probe(
     )
     spec_present = bool(artifacts.get("spec"))
     frontend_runtime_state = artifacts.get("frontend_runtime_state", {})
-    frontend_runtime_current = bool(artifacts.get("frontend")) and not bool(
-        isinstance(frontend_runtime_state, dict) and frontend_runtime_state.get("stale", False)
+    runtime_status = frontend_runtime_state.get("evidence_status")
+    runtime_required = workflow_status in _FRONTEND_RUNTIME_REQUIRED_STATUSES
+    source = (
+        UIReviewEvidence(
+            project_dir,
+            project_name,
+            required=runtime_status != EvidenceStatus.NOT_APPLICABLE.value,
+        ).result(SOURCE)
+        if runtime_required
+        else None
     )
-    ui_contract_path = latest_artifact(
-        output_dir, "*-ui-contract.json", preferred_prefix=project_name
-    )
-    frontend_runtime_path = latest_artifact(
-        output_dir, "*-frontend-runtime.json", preferred_prefix=project_name
-    )
-    ui_contract_payload: dict[str, Any] = {}
-    frontend_runtime_payload: dict[str, Any] = {}
-    if ui_contract_path is not None:
-        try:
-            loaded_contract = json.loads(ui_contract_path.read_text(encoding="utf-8"))
-            if isinstance(loaded_contract, dict):
-                ui_contract_payload = loaded_contract
-        except Exception:
-            ui_contract_payload = {}
-    if frontend_runtime_path is not None:
-        try:
-            loaded_runtime = json.loads(frontend_runtime_path.read_text(encoding="utf-8"))
-            if isinstance(loaded_runtime, dict):
-                frontend_runtime_payload = loaded_runtime
-        except Exception:
-            frontend_runtime_payload = {}
-    missing_protocol_checks = missing_claude_design_runtime_checks(
-        (
-            frontend_runtime_payload.get("checks", {})
-            if isinstance(frontend_runtime_payload.get("checks"), dict)
-            else {}
-        ),
-        ui_contract_payload,
-    )
-    ui_execution_protocol_current = not missing_protocol_checks
 
     active_context = (
         session_brief_path.exists()
@@ -153,16 +130,13 @@ def build_host_runtime_probe(
         ),
         "core_docs_present": docs_present,
         "spec_present": True if workflow_status not in _SPEC_REQUIRED_STATUSES else spec_present,
-        "frontend_runtime_current": (
-            True
-            if workflow_status not in _FRONTEND_RUNTIME_REQUIRED_STATUSES
-            else frontend_runtime_current
-        ),
-        "ui_execution_protocol_current": (
-            True
-            if workflow_status not in _FRONTEND_RUNTIME_REQUIRED_STATUSES
-            else ui_execution_protocol_current
-        ),
+        "frontend_runtime_current": not runtime_required
+        or runtime_status
+        in {
+            EvidenceStatus.PASS.value,
+            EvidenceStatus.NOT_APPLICABLE.value,
+        },
+        "ui_execution_protocol_current": source is None or ui_status_ok(source.status),
         "workflow_harness_passed": True if not active_context else workflow_harness.passed,
         "framework_harness_passed": (
             True if not framework_harness.enabled else framework_harness.passed
@@ -197,19 +171,14 @@ def build_host_runtime_probe(
                 blockers.append("当前活动流程缺少完整三文档真源")
         if workflow_status in _SPEC_REQUIRED_STATUSES and not checks["spec_present"]:
             blockers.append("当前阶段缺少 Spec proposal / tasks 真源")
-        if (
-            workflow_status in _FRONTEND_RUNTIME_REQUIRED_STATUSES
-            and not checks["frontend_runtime_current"]
-        ):
-            blockers.append("当前阶段前端 runtime 证据缺失或已过期")
-        elif (
-            workflow_status in _FRONTEND_RUNTIME_REQUIRED_STATUSES
-            and not checks["ui_execution_protocol_current"]
-        ):
+        if not checks["frontend_runtime_current"]:
             blockers.append(
-                "当前阶段 frontend runtime 未证明 Claude-Design 风格 UI 执行协议已落地: "
-                + ",".join(missing_protocol_checks)
+                str(
+                    frontend_runtime_state.get("detail") or "当前阶段缺少有效的浏览器运行与交互记录"
+                )
             )
+        if source is not None and not checks["ui_execution_protocol_current"]:
+            blockers.append(ui_result_details([source]))
         if framework_harness.enabled and not checks["framework_harness_passed"]:
             blockers.extend(framework_harness.blockers[:1] or ["framework harness 未通过"])
             next_actions.extend(framework_harness.next_actions[:1])

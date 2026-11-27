@@ -652,4 +652,5 @@ def test_frontend_project_delivery_closure_keeps_ui_requirements(
     assert closure.passed is False
     assert "ui contract missing" in closure.detail
     assert "design tokens missing" in closure.detail
-    assert "frontend runtime missing" in closure.detail
+    runtime = closure.evidence["ui_results"]["frontend-runtime"]
+    assert runtime["status"] == "BLOCKED" and runtime["reason"] == "missing"

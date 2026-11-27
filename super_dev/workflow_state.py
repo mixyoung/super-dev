@@ -23,6 +23,7 @@ from .review_state import (
     load_ui_revision,
     load_workflow_state,
 )
+from .reviewers.ui_review_evidence import RUNTIME, UIReviewEvidence, ui_status_ok
 from .shadow_ledger_store import build_shadow_ledger_summary
 from .work_mode import detect_work_mode
 from .work_mode import work_mode_label as describe_work_mode
@@ -885,15 +886,16 @@ def detect_pipeline_summary(
     frontend_required = frontend_kind not in {"", "none"}
     backend_required = backend_kind not in {"", "none"}
 
+    runtime_result = UIReviewEvidence(
+        project_dir, artifact_prefix, required=frontend_required
+    ).result(RUNTIME)
+    frontend_runtime_path = str(runtime_result.path) if runtime_result.path else ""
+
     if active_change_id:
-        frontend_runtime_file = _active_output_path("frontend-runtime.json")
         ui_contract_file = _active_output_path("ui-contract.json")
         ui_alignment_file = _active_output_path("ui-contract-alignment.json")
         ui_review_file = _active_output_path("ui-review.json")
         quality_gate_file = _active_output_path("quality-gate.json")
-        frontend_runtime_payload, frontend_runtime_path = _latest_json(
-            [frontend_runtime_file] if frontend_runtime_file.is_file() else []
-        )
         ui_contract_payload, ui_contract_path = _latest_json(
             [ui_contract_file] if ui_contract_file.is_file() else []
         )
@@ -908,9 +910,6 @@ def detect_pipeline_summary(
         )
         uiux_files = [uiux_file] if uiux_file.is_file() else []
     else:
-        frontend_runtime_payload, frontend_runtime_path = _latest_json(
-            sorted(output_dir.glob("*-frontend-runtime.json"))
-        )
         ui_contract_payload, ui_contract_path = _latest_json(
             sorted(output_dir.glob("*-ui-contract.json"))
         )
@@ -929,9 +928,7 @@ def detect_pipeline_summary(
     )
 
     ui_runtime_dependencies: list[str | Path] = (
-        [path for path in [ui_contract_path, ui_alignment_path] if path]
-        if frontend_required
-        else []
+        [path for path in [ui_contract_path, latest_uiux_path] if path] if frontend_required else []
     )
     ui_contract_dependencies: list[str | Path] = (
         [latest_uiux_path] if frontend_required and latest_uiux_path else []
@@ -998,8 +995,10 @@ def detect_pipeline_summary(
         quality_gate_path,
         dependencies=quality_dependencies,
     )
-    frontend_runtime_passed = bool(frontend_runtime_payload.get("passed", False))
-    frontend_implementation_done = frontend_runtime_passed and not frontend_runtime_state["stale"]
+    frontend_implementation_done = frontend_required and ui_status_ok(runtime_result.status)
+    frontend_runtime_state["passed"] = frontend_implementation_done
+    frontend_runtime_state["evidence_status"] = runtime_result.status.value
+    frontend_runtime_state["detail"] = runtime_result.detail
     frontend_done = not frontend_required or frontend_implementation_done
 
     scaffold_backend_done = _has_any(
@@ -1145,13 +1144,8 @@ def detect_pipeline_summary(
         frontend_required
         and flow_variant != "seeai"
         and frontend_done
-        and not (
-            preview_confirmed
-            or backend_done
-            or quality_done
-            or delivery_done
-            or explicit_preview_revision_requested
-        )
+        and not preview_confirmed
+        and not explicit_preview_revision_requested
     )
 
     run = run or {}
@@ -1279,12 +1273,9 @@ def detect_pipeline_summary(
                 "name": "等待预览确认",
                 "status": (
                     "not_applicable"
-                    if not frontend_required
+                    if not frontend_required or flow_variant == "seeai"
                     else _stage_status(
-                        preview_confirmed
-                        or backend_implementation_done
-                        or quality_done
-                        or delivery_done,
+                        preview_confirmed,
                         waiting=preview_confirmation_waiting or explicit_preview_revision_requested,
                     )
                 ),
@@ -1471,12 +1462,7 @@ def detect_pipeline_summary(
             recommended_command = "在宿主里说“继续当前 SEEAI 流程，开始一体化快速开发”"
         else:
             recommended_command = "在宿主里说“继续当前流程，进入前端实现与运行验证”"
-        if frontend_runtime_state["exists"] and frontend_runtime_state["stale"]:
-            evidence = (
-                "output/*-frontend-runtime.json 已过期，需要基于最新 ui-contract/alignment 重新生成"
-            )
-        else:
-            evidence = "缺少通过的 output/*-frontend-runtime.json"
+        evidence = runtime_result.detail
     elif not backend_done:
         blocker = "当前尚未完成后端实现与联调。"
         checkpoint_status = "missing_backend"

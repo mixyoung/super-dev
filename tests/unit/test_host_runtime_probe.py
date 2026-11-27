@@ -1,13 +1,11 @@
-import json
 from pathlib import Path
 
 from super_dev.host_runtime_probe import build_host_runtime_probe
 from super_dev.review_state import (
-    save_docs_confirmation,
-    save_preview_confirmation,
     save_workflow_state,
     workflow_event_log_file,
 )
+from tests.support.ui_evidence_inputs import FIXTURE, create_ui_project, publish_browser
 
 
 def _prepare_core_docs(project_dir: Path) -> None:
@@ -97,94 +95,23 @@ def test_host_runtime_probe_fails_when_active_context_lacks_workflow_event_trail
     assert any("workflow-events.jsonl" in item for item in probe["blockers"])
 
 
-def test_host_runtime_probe_fails_when_frontend_runtime_misses_claude_design_protocol(
+def test_host_runtime_probe_does_not_confuse_browser_and_source_results(
     temp_project_dir: Path,
 ) -> None:
-    _prepare_core_docs(temp_project_dir)
-    (temp_project_dir / ".super-dev").mkdir(parents=True, exist_ok=True)
-    (temp_project_dir / ".super-dev" / "SESSION_BRIEF.md").write_text(
-        "当前步骤: 先做前端与运行验证\n",
-        encoding="utf-8",
+    evidence = create_ui_project(temp_project_dir)
+    (temp_project_dir / ".super-dev/changes" / FIXTURE / "proposal.md").write_text(
+        "# proposal", encoding="utf-8"
     )
-    save_workflow_state(
-        temp_project_dir,
-        {
-            "status": "missing_backend",
-            "workflow_mode": "continue",
-            "current_step_label": "前端已完成，进入后端阶段",
-            "recommended_command": "继续当前流程，进入后端实现",
-        },
+    (temp_project_dir / ".super-dev/changes" / FIXTURE / "tasks.md").write_text(
+        "# tasks", encoding="utf-8"
     )
-    save_docs_confirmation(temp_project_dir, {"status": "confirmed"})
-    save_preview_confirmation(temp_project_dir, {"status": "confirmed"})
-    output_dir = temp_project_dir / "output"
-    (output_dir / f"{temp_project_dir.name}-research.md").write_text(
-        "# research\n",
-        encoding="utf-8",
-    )
-    (output_dir / f"{temp_project_dir.name}-ui-contract.json").write_text(
-        json.dumps(
-            {
-                "screen_recipes": [
-                    {
-                        "label": "North Star Hero",
-                        "section_order": ["hero"],
-                        "trust_modules": ["案例"],
-                        "required_states": ["loading"],
-                    }
-                ],
-                "design_context_protocol": {
-                    "preferred_import_order": ["tokens"],
-                    "github_import_targets": ["theme.ts"],
-                    "single_source_rule": "single source",
-                },
-                "tweak_strategy": {
-                    "mode": "single-source prototype",
-                    "default_controls": ["信息密度"],
-                    "persistence_rule": "persist edits",
-                },
-                "verification_handoff": {
-                    "verification_order": ["preview"],
-                    "required_artifacts": ["output/frontend/index.html"],
-                    "acceptance_checks": ["no emoji"],
-                },
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    (output_dir / f"{temp_project_dir.name}-frontend-runtime.json").write_text(
-        json.dumps(
-            {
-                "passed": True,
-                "checks": {
-                    "ui_contract_json": True,
-                    "output_frontend_design_tokens": True,
-                    "ui_contract_alignment": True,
-                    "ui_theme_entry": True,
-                    "ui_navigation_shell": True,
-                    "ui_component_imports": True,
-                    "ui_banned_patterns": True,
-                    "ui_design_context_protocol": True,
-                    "ui_tweak_strategy": True,
-                },
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    probe = build_host_runtime_probe(
-        temp_project_dir,
-        target="codex-cli",
-        surface_ready=True,
-    )
+    publish_browser(evidence)
+    probe = build_host_runtime_probe(temp_project_dir, target="codex-cli", surface_ready=True)
 
     assert probe["status"] == "failed"
+    assert probe["checks"]["frontend_runtime_current"] is True
     assert probe["checks"]["ui_execution_protocol_current"] is False
-    assert any("Claude-Design" in item for item in probe["blockers"])
+    assert any("源码规则" in item for item in probe["blockers"])
 
 
 def test_host_runtime_probe_reports_missing_baseline_workflow_context(

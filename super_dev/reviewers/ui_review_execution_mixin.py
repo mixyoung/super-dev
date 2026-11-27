@@ -9,10 +9,7 @@ from typing import Any, cast
 from super_dev.artifact_utils import ui_contract_filename
 
 from ..design import UIIntelligenceAdvisor
-from ..ui_contract_governance import (
-    CLAUDE_DESIGN_RUNTIME_CHECKS,
-    required_claude_design_runtime_checks,
-)
+from ..ui_contract_governance import required_claude_design_runtime_checks
 from .ui_review_models import (
     UIReviewFinding,
     UIReviewReport,
@@ -50,13 +47,6 @@ class UIReviewExecutionMixin:
         )
         uiux_decisions = self._extract_uiux_decisions(uiux_content)
         ui_contract = self._load_ui_contract()
-        frontend_runtime = self._load_frontend_runtime_report()
-        runtime_checks = (
-            frontend_runtime.get("checks", {})
-            if isinstance(frontend_runtime.get("checks"), dict)
-            else {}
-        )
-
         source_files = self._collect_frontend_files()
         source_content = "\n".join(
             file_path.read_text(encoding="utf-8", errors="ignore")
@@ -66,11 +56,9 @@ class UIReviewExecutionMixin:
         preview_content = (
             preview_path.read_text(encoding="utf-8", errors="ignore") if preview_path else ""
         )
-        # 对源码与预览做运行态审查；UIUX 文档本身不应触发 emoji / 反模式扫描。
+        # 静态 HTML 只是源码输入，不是浏览器执行或视觉证据。
         combined_visual_content = "\n".join([source_content, preview_content])
         preview_summary = self._inspect_preview_html(preview_content) if preview_content else {}
-        screenshot_path = self._capture_preview_screenshot(preview_path) if preview_path else None
-        screenshot_metrics = self._analyze_screenshot(screenshot_path) if screenshot_path else {}
         design_tokens_path = self.project_dir / "output" / "frontend" / "design-tokens.css"
         design_tokens_content = (
             design_tokens_path.read_text(encoding="utf-8", errors="ignore")
@@ -359,62 +347,6 @@ class UIReviewExecutionMixin:
             "verification_handoff": verification_handoff_passed,
         }
         required_runtime_checks = required_claude_design_runtime_checks(ui_contract)
-        runtime_protocol_missing = [
-            check_name for check_name in required_runtime_checks if check_name not in runtime_checks
-        ]
-        runtime_protocol_failed = [
-            check_name
-            for check_name in required_runtime_checks
-            if check_name in runtime_checks and not bool(runtime_checks.get(check_name, False))
-        ]
-        runtime_protocol_mismatches = [
-            alignment_key
-            for check_name, alignment_key in CLAUDE_DESIGN_RUNTIME_CHECKS.items()
-            if check_name in required_runtime_checks
-            and check_name in runtime_checks
-            and bool(runtime_checks.get(check_name, False))
-            != bool(source_protocol_states.get(alignment_key, False))
-        ]
-        runtime_protocol_passed = (
-            bool(frontend_runtime)
-            and not runtime_protocol_missing
-            and not runtime_protocol_failed
-            and not runtime_protocol_mismatches
-        )
-        runtime_protocol_observed_parts: list[str] = []
-        if not frontend_runtime:
-            runtime_protocol_observed_parts.append("frontend runtime missing")
-        if runtime_protocol_missing:
-            runtime_protocol_observed_parts.append(
-                "missing="
-                + ", ".join(
-                    CLAUDE_DESIGN_RUNTIME_CHECKS.get(name, name)
-                    for name in runtime_protocol_missing
-                )
-            )
-        if runtime_protocol_failed:
-            runtime_protocol_observed_parts.append(
-                "failed="
-                + ", ".join(
-                    CLAUDE_DESIGN_RUNTIME_CHECKS.get(name, name) for name in runtime_protocol_failed
-                )
-            )
-        if runtime_protocol_mismatches:
-            runtime_protocol_observed_parts.append(
-                "mismatch=" + ", ".join(runtime_protocol_mismatches)
-            )
-        if runtime_protocol_passed:
-            runtime_protocol_observed_parts.append("aligned with frontend-runtime")
-        alignment_summary["runtime_claude_design_protocol"] = {
-            "label": "运行时 Claude-Design 协议一致性",
-            "passed": runtime_protocol_passed if required_runtime_checks else True,
-            "expected": "frontend-runtime 与 UI review 对同一套 screen recipes / protocol / tweaks / handoff 给出一致结论",
-            "observed": (
-                " | ".join(runtime_protocol_observed_parts)
-                if runtime_protocol_observed_parts
-                else "not required"
-            ),
-        }
         if required_runtime_checks:
             alignment_summary["source_claude_design_protocol"] = {
                 "label": "源码/预览 Claude-Design 协议信号",
@@ -613,54 +545,6 @@ class UIReviewExecutionMixin:
                     )
                 )
                 score -= 10
-            if required_runtime_checks and not frontend_runtime:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="frontend runtime 缺少 Claude-Design 协议证据",
-                        description="UI 契约已经冻结 Claude-Design 风格执行协议，但还没有 frontend runtime 报告来证明页面配方、上下文协议、Tweaks 和验证交付链已真实进入运行产物。",
-                        recommendation="先重新执行 frontend runtime，确保 runtime 报告写出 ui_screen_recipes / ui_design_context_protocol / ui_tweak_strategy / ui_verification_handoff 四项结果。",
-                        evidence=[
-                            "frontend-runtime missing",
-                            *[
-                                CLAUDE_DESIGN_RUNTIME_CHECKS.get(item, item)
-                                for item in required_runtime_checks
-                            ],
-                        ],
-                    )
-                )
-                score -= 8
-            elif runtime_protocol_mismatches:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="UI Review 与 frontend runtime 的 Claude-Design 结论不一致",
-                        description="源码/预览级 UI review 与 frontend runtime 对同一套 Claude-Design 协议给出了不同结论，这通常意味着 runtime 证据已经过期，或者 UI 改动后没有重新生成运行报告。",
-                        recommendation="不要继续沿用旧 runtime 证据；先重新执行 frontend runtime 与 UI review，确认两边对 screen_recipes / protocol / tweaks / handoff 的结论重新对齐。",
-                        evidence=runtime_protocol_mismatches,
-                    )
-                )
-                score -= 8
-            elif runtime_protocol_failed or runtime_protocol_missing:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="frontend runtime 未证明 Claude-Design 执行协议",
-                        description="虽然 UI 契约已经冻结 Claude-Design 风格执行协议，但 frontend runtime 仍未证明页面配方、上下文协议、Tweaks 或验证交付链已经真实进入运行态。",
-                        recommendation="按当前 UI 契约修正前端并重新执行 frontend runtime，重点补齐运行时对 screen_recipes / design_context_protocol / tweak_strategy / verification_handoff 的证据。",
-                        evidence=[
-                            *[
-                                CLAUDE_DESIGN_RUNTIME_CHECKS.get(item, item)
-                                for item in runtime_protocol_missing
-                            ],
-                            *[
-                                CLAUDE_DESIGN_RUNTIME_CHECKS.get(item, item)
-                                for item in runtime_protocol_failed
-                            ],
-                        ],
-                    )
-                )
-                score -= 8
             if cross_platform_frontend and not framework_playbook_passed:
                 findings.append(
                     UIReviewFinding(
@@ -862,19 +746,6 @@ class UIReviewExecutionMixin:
                 score -= 10
             else:
                 strengths.append("源码中已出现 design token / CSS variables 痕迹。")
-
-            if self.DEFAULT_FONT_RE.search(source_content) and "--font-" not in source_content:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="字体系统过于默认，品牌辨识度不足",
-                        description="源码里出现了 Inter / Arial / system-ui 等默认字体策略，但没有明显的品牌化字体 token 或排版系统。",
-                        recommendation="为商业页面定义更明确的字体体系与字号层级，不要只依赖默认 sans-serif 字体栈。",
-                    )
-                )
-                score -= 8
-            else:
-                strengths.append("源码未暴露明显的默认字体依赖，排版系统更接近品牌化实现。")
 
             icon_system = self._resolve_contract_or_doc_value(
                 contract=ui_contract,
@@ -1130,18 +1001,12 @@ class UIReviewExecutionMixin:
                     )
                     score -= 8
 
-            suspicious_hits = self.SUSPICIOUS_PATTERN_RE.findall(source_content)
-            if suspicious_hits:
-                findings.append(
-                    UIReviewFinding(
-                        level="high",
-                        title="检测到可疑的 AI 模板化视觉痕迹",
-                        description="源码中出现紫粉渐变、emoji 或过度模板化关键词，容易生成 AI 味较重的页面。",
-                        recommendation="回到 UI/UX 文档规定的品牌方向，删除渐变堆砌、emoji 图标和无意义装饰。",
-                        evidence=sorted({item for item in suspicious_hits})[:10],
-                    )
+            style_signals = self.SUSPICIOUS_PATTERN_RE.findall(source_content)
+            if style_signals:
+                notes.append(
+                    "源码风格线索（不计分，需结合确认设计看图）："
+                    + ", ".join(sorted(set(style_signals))[:10])
                 )
-                score -= 18
 
             emoji_hits = sorted({item for item in self.EMOJI_RE.findall(combined_visual_content)})[
                 :10
@@ -1178,20 +1043,7 @@ class UIReviewExecutionMixin:
                     observed_layout_parts.append(f"source_nav={', '.join(nav_markers[:6])}")
                 if clone_hits and not conversational_product:
                     observed_layout_parts.append("chat-shell pattern detected")
-                layout_shell_passed = True
-                if clone_hits and not conversational_product:
-                    layout_shell_passed = False
-                elif preview_summary:
-                    if product_type in {"landing", "saas", "ecommerce"}:
-                        layout_shell_passed = (
-                            preview_summary["sections"] >= 3
-                            and preview_summary["nav_links"] >= 2
-                            and preview_summary["first_section_cta"] >= 2
-                        )
-                    else:
-                        layout_shell_passed = (
-                            preview_summary["sections"] >= 2 and preview_summary["headings"] >= 2
-                        )
+                layout_shell_passed = not (clone_hits and not conversational_product)
                 alignment_summary["layout_shell"] = {
                     "label": "页面骨架",
                     "passed": layout_shell_passed,
@@ -1249,8 +1101,6 @@ class UIReviewExecutionMixin:
                 score -= 18
 
             banned_hits = []
-            if suspicious_hits:
-                banned_hits.extend(sorted({item for item in suspicious_hits}))
             if emoji_hits:
                 banned_hits.extend(emoji_hits)
             if clone_hits and not conversational_product:
@@ -1258,345 +1108,37 @@ class UIReviewExecutionMixin:
             alignment_summary["banned_patterns"] = {
                 "label": "反模式约束",
                 "passed": len(banned_hits) == 0,
-                "expected": "无 emoji 图标、无 Claude 聊天壳层、无模板化渐变/关键词",
+                "expected": "无 emoji 功能图标；非对话式项目不使用聊天壳层",
                 "observed": ", ".join(banned_hits[:10]),
             }
 
-            missing_state_terms = [
-                item for item in self.STATE_KEYWORDS if item not in source_content.lower()
-            ]
-            if len(missing_state_terms) >= 4:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="源码中缺少关键状态覆盖信号",
-                        description="未检测到足够多的 loading / empty / error / success 等状态处理痕迹。",
-                        recommendation="补齐列表、表单和关键模块的状态矩阵，不要只实现正常态。",
-                        evidence=missing_state_terms[:6],
-                    )
-                )
-                score -= 8
-            else:
-                strengths.append("源码中已体现出多态状态处理。")
-
-            if any(
-                term in description.lower()
-                for term in ("官网", "official website", "landing", "营销")
-            ):
-                marketing_hits = len(
-                    [item for item in self.MARKETING_KEYWORDS if item in source_content.lower()]
-                )
-                if marketing_hits < 2:
-                    findings.append(
-                        UIReviewFinding(
-                            level="medium",
-                            title="营销型页面缺少足够的转化与信任模块",
-                            description="对外页面没有明显体现案例、FAQ、定价、评价或 social proof 模块。",
-                            recommendation="补齐转化和信任模块，不要只有 Hero 和功能列表。",
-                        )
-                    )
-                    score -= 8
-                else:
-                    strengths.append("营销型页面已体现出转化与信任模块。")
         else:
             notes.append("当前未检测到前端源码，仅完成文档级 UI 审查；实现后建议再次运行。")
 
-        if preview_summary and "layout_shell" not in alignment_summary:
-            expected_layout = "非聊天壳层，按产品类型组织导航、主体内容和关键动作"
-            nav_markers = self._extract_navigation_shell_markers(source_content)
-            clone_hits = sorted({item for item in self.CLAUDE_CLONE_RE.findall(source_content)})[
-                :10
-            ]
-            suspicious_hits = self.SUSPICIOUS_PATTERN_RE.findall(source_content)
-            emoji_hits = sorted({item for item in self.EMOJI_RE.findall(combined_visual_content)})[
-                :10
-            ]
-            observed_layout_parts = [
-                f"sections={preview_summary['sections']}",
-                f"headings={preview_summary['headings']}",
-                f"nav_links={preview_summary['nav_links']}",
-                f"first_section_cta={preview_summary['first_section_cta']}",
-            ]
-            if nav_markers:
-                observed_layout_parts.append(f"source_nav={', '.join(nav_markers[:6])}")
-            if clone_hits and not conversational_product:
-                observed_layout_parts.append("chat-shell pattern detected")
-            if product_type in {"landing", "saas", "ecommerce"}:
-                layout_shell_passed = (
-                    preview_summary["sections"] >= 3
-                    and preview_summary["nav_links"] >= 1
-                    and preview_summary["first_section_cta"] >= 1
-                )
-            else:
-                layout_shell_passed = (
-                    preview_summary["sections"] >= 2 and preview_summary["headings"] >= 2
-                )
-            alignment_summary["layout_shell"] = {
-                "label": "页面骨架",
-                "passed": layout_shell_passed,
-                "expected": expected_layout,
-                "observed": " | ".join(observed_layout_parts),
-            }
-            alignment_summary["navigation_shell"] = {
-                "label": "导航骨架",
-                "passed": bool(preview_summary.get("nav_links", 0)),
-                "expected": "源码或预览中存在导航 / header / sidebar / breadcrumb 等骨架信号",
-                "observed": " | ".join(observed_layout_parts),
-            }
-            banned_hits = []
-            if suspicious_hits:
-                banned_hits.extend(sorted({item for item in suspicious_hits}))
-            if emoji_hits:
-                banned_hits.extend(emoji_hits)
-            if clone_hits and not conversational_product:
-                banned_hits.extend(clone_hits)
-            alignment_summary["banned_patterns"] = {
-                "label": "反模式约束",
-                "passed": len(banned_hits) == 0,
-                "expected": "无 emoji 图标、无 Claude 聊天壳层、无模板化渐变/关键词",
-                "observed": ", ".join(banned_hits[:10]),
-            }
-
         if preview_summary:
-            if preview_summary["sections"] < 3:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="可预览页面结构过于单薄",
-                        description="预览页的主结构层级不足，页面更像占位原型而不是商业级成品页面。",
-                        recommendation="补齐 Hero 之外的关键模块，至少形成价值、证据、功能和下一步动作的完整结构。",
-                        evidence=[
-                            f"sections={preview_summary['sections']}",
-                            f"headings={preview_summary['headings']}",
-                        ],
-                    )
-                )
-                score -= 8
-            else:
-                strengths.append("预览页已具备基础分区结构。")
-
-            if preview_summary["sections"] >= 3 and preview_summary["headings"] < 3:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="页面层级不足，排版节奏偏平",
-                        description="虽然页面已经拆成多个分区，但标题层级不足，信息节奏会更像占位稿而不是商业成品。",
-                        recommendation="为关键分区补足 h1/h2/h3 层级与辅助文案，拉开版式节奏。",
-                        evidence=[
-                            f"sections={preview_summary['sections']}",
-                            f"headings={preview_summary['headings']}",
-                        ],
-                    )
-                )
-                score -= 6
-
-            if preview_summary["buttons"] + preview_summary["links"] < 3:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="可预览页面缺少明确交互入口",
-                        description="可点击 CTA / 链接数量过少，容易形成只可观看、不可推进的静态页面。",
-                        recommendation="补充核心 CTA、次级 CTA、导航或下一步动作入口。",
-                    )
-                )
-                score -= 6
-
-            product_type = self._infer_product_type(description)
-            if product_type in {"landing", "saas", "ecommerce"}:
-                if preview_summary["nav_links"] < 2:
-                    findings.append(
-                        UIReviewFinding(
-                            level="medium",
-                            title="导航信息架构不足",
-                            description="预览页导航入口过少，用户难以快速理解页面结构与主要去向。",
-                            recommendation="为对外页面补齐导航层级，至少明确产品、方案、价格/案例、FAQ 或联系入口。",
-                            evidence=[f"nav_links={preview_summary['nav_links']}"],
-                        )
-                    )
-                    score -= 6
-
-                if preview_summary["first_section_cta"] < 2:
-                    findings.append(
-                        UIReviewFinding(
-                            level="medium",
-                            title="首屏 CTA 层级不足",
-                            description="首屏只有单一动作或几乎没有动作层级，不利于转化和分流。",
-                            recommendation="在首屏至少提供主 CTA 和次级 CTA，例如开始使用 + 查看演示 / 联系销售。",
-                            evidence=[f"first_section_cta={preview_summary['first_section_cta']}"],
-                        )
-                    )
-                    score -= 8
-
-                if (
-                    preview_summary["first_section_text_chars"] < 80
-                    and preview_summary["first_section_media"] == 0
-                ):
-                    findings.append(
-                        UIReviewFinding(
-                            level="medium",
-                            title="首屏信息密度不足",
-                            description="首屏文案信息量偏低，且没有产品截图或媒体证据，页面容易像占位稿。",
-                            recommendation="补充价值主张、辅助说明和产品证据，让首屏同时承担理解和转化任务。",
-                            evidence=[
-                                f"first_section_text_chars={preview_summary['first_section_text_chars']}",
-                                f"first_section_media={preview_summary['first_section_media']}",
-                            ],
-                        )
-                    )
-                    score -= 8
-
-            if preview_summary["media"] == 0 and self._infer_product_type(description) in {
-                "landing",
-                "saas",
-                "ecommerce",
-            }:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="可预览页面缺少截图或媒体证据",
-                        description="营销/产品型页面没有截图、图片、视频或产品演示区域，信任与理解成本偏高。",
-                        recommendation="加入产品截图、流程示意、客户案例图片或短视频演示。",
-                    )
-                )
-                score -= 8
-
-            product_type = self._infer_product_type(description)
-            if preview_summary["trust_hits"] < 2 and product_type in {
-                "landing",
-                "saas",
-                "ecommerce",
-            }:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="可预览页面信任信号不足",
-                        description="预览页文本中缺少明显的案例、客户、评价、安全、FAQ 等信任模块。",
-                        recommendation="为对外页面补齐信任区、FAQ、案例或安全说明。",
-                        evidence=[f"trust_hits={preview_summary['trust_hits']}"],
-                    )
-                )
-                score -= 8
-            elif preview_summary["trust_hits"] >= 2:
-                strengths.append("预览页已体现一定的信任/说明信号。")
-
-            if preview_summary["landmarks"] < 3:
-                findings.append(
-                    UIReviewFinding(
-                        level="low",
-                        title="页面语义 landmarks 偏少",
-                        description="缺少 header/main/nav/footer/section 等结构语义，后续可访问性和结构清晰度会受影响。",
-                        recommendation="补充语义化结构标签，提升信息架构和可访问性基线。",
-                        evidence=[f"landmarks={preview_summary['landmarks']}"],
-                    )
-                )
-                score -= 4
-        else:
             notes.append(
-                "未检测到 preview.html 或 output/frontend/index.html，未执行结构级视觉审查。"
+                "静态结构观察（不计分）："
+                + ", ".join(
+                    f"{key}={preview_summary[key]}"
+                    for key in (
+                        "sections",
+                        "headings",
+                        "first_section_cta",
+                        "first_section_text_chars",
+                        "media",
+                    )
+                )
             )
-
-        if screenshot_path and screenshot_metrics:
-            notes.append(f"已生成预览截图: {screenshot_path}")
-            alignment_summary["screenshot_visual_judge"] = {
-                "label": "截图级视觉验收",
-                "passed": (
-                    screenshot_metrics.get("blank_ratio", 1.0) <= 0.78
-                    and screenshot_metrics.get("contrast_span", 0.0) >= 0.18
-                    and screenshot_metrics.get("dominant_color_ratio", 1.0) <= 0.78
-                ),
-                "expected": "页面不能过空、过平、过单一，必须有足够的层级与视觉变化",
-                "observed": (
-                    f"blank={screenshot_metrics.get('blank_ratio', 0):.2f}, "
-                    f"contrast={screenshot_metrics.get('contrast_span', 0):.2f}, "
-                    f"dominant={screenshot_metrics.get('dominant_color_ratio', 0):.2f}"
-                ),
-            }
-            if screenshot_metrics["blank_ratio"] > 0.78:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="截图显示页面留白过多",
-                        description="截图中大面积为空白或浅色区域，页面可能更像占位稿而不是成熟产品页面。",
-                        recommendation="补齐信息层级、模块内容和可信证据，避免只有少量文字悬浮在大背景上。",
-                        evidence=[f"blank_ratio={screenshot_metrics['blank_ratio']:.2f}"],
-                    )
-                )
-                score -= 8
-            else:
-                strengths.append("截图层面未出现明显的超高留白占比。")
-
-            if screenshot_metrics["contrast_span"] < 0.18:
-                findings.append(
-                    UIReviewFinding(
-                        level="medium",
-                        title="截图明暗层级不足",
-                        description="截图整体亮度跨度过窄，界面可能只有一层浅色平面，缺少成熟商业产品应有的视觉起伏与层级反差。",
-                        recommendation="增强标题、卡片、分区、背景层和重点模块之间的明暗与材质差异，避免整页像一张平面白板。",
-                        evidence=[f"contrast_span={screenshot_metrics['contrast_span']:.2f}"],
-                    )
-                )
-                score -= 6
-            else:
-                strengths.append("截图具备基础的明暗层级变化。")
-
-            if screenshot_metrics["unique_colors"] < 24:
-                findings.append(
-                    UIReviewFinding(
-                        level="low",
-                        title="截图配色层次偏单薄",
-                        description="截图中的有效颜色层次较少，界面可能过平、过空或缺少视觉焦点。",
-                        recommendation="在保证克制的前提下，补充强调色、模块层级和更清晰的界面节奏。",
-                        evidence=[f"unique_colors={screenshot_metrics['unique_colors']}"],
-                    )
-                )
-                score -= 4
-
-            if screenshot_metrics["dominant_color_ratio"] > 0.78:
-                findings.append(
-                    UIReviewFinding(
-                        level="low",
-                        title="截图视觉表面过于单一",
-                        description="截图中单一颜色表面占比过高，页面可能只有一层背景和少量内容，更像占位稿或 AI 模板，而不是成熟商业界面。",
-                        recommendation="增加区块层、内容层、强调层和证明层的视觉切分，让页面形成更清晰的节奏与信息密度。",
-                        evidence=[
-                            f"dominant_color_ratio={screenshot_metrics['dominant_color_ratio']:.2f}"
-                        ],
-                    )
-                )
-                score -= 5
-            else:
-                strengths.append("截图没有出现单一表面吞没全页的问题。")
-
-            if screenshot_metrics["accent_ratio"] < 0.006:
-                findings.append(
-                    UIReviewFinding(
-                        level="low",
-                        title="截图中缺少明显视觉焦点",
-                        description="页面整体色彩变化过弱，CTA、重点模块或状态提示不够突出。",
-                        recommendation="增强 CTA、标题层级、状态色和关键卡片的强调关系。",
-                        evidence=[f"accent_ratio={screenshot_metrics['accent_ratio']:.4f}"],
-                    )
-                )
-                score -= 4
-            else:
-                strengths.append("截图中存在一定视觉焦点和强调关系。")
-        elif preview_path:
-            notes.append("存在预览页，但本次未成功生成截图，已回退为结构级审查。")
-
-        # UI/UX 专家视角检查
-        expert_perspective_findings = self._run_expert_perspective_checks(
+        for observation in self._run_expert_perspective_checks(
             source_content=source_content,
             preview_content=preview_content,
             uiux_content=uiux_content,
             ui_expert_dimensions=ui_expert_dimensions,
             ux_expert_dimensions=ux_expert_dimensions,
-        )
-        for epf in expert_perspective_findings:
-            findings.append(epf)
-            if epf.level == "high":
-                score -= 6
-            elif epf.level == "medium":
-                score -= 4
+        ):
+            notes.append(
+                f"人工复核线索（不计分）：{observation.title}。{observation.recommendation}"
+            )
 
         return UIReviewReport(
             project_name=self.name,
@@ -1605,4 +1147,18 @@ class UIReviewExecutionMixin:
             strengths=strengths,
             notes=notes,
             alignment_summary=alignment_summary,
+            source_inputs=tuple(
+                dict.fromkeys(
+                    path
+                    for path in [
+                        *source_files[:80],
+                        preview_path,
+                        design_tokens_path,
+                        self._package_json_path(),
+                    ]
+                    if path is not None and path.is_file()
+                )
+            ),
+            source_complete=bool(uiux_content and ui_contract and (source_files or preview_content))
+            and len(source_files) <= 80,
         )

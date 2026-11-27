@@ -14,6 +14,7 @@ from ..seeai_design_system import (
     get_seeai_design_packs,
 )
 from ..skills.skill_template import SkillTemplate
+from ..ui_contract_governance import UI_REVIEW_EVIDENCE_GUIDANCE
 from ..user_directories import UserDirectoryContext
 from ..workflow_contract import knowledge_authority_guidance, readonly_request_guidance
 
@@ -1175,6 +1176,8 @@ class IntegrationManagerContentMixin:
             "12. Do not use emoji as functional icons or placeholders, and do not leave icon decisions for later.\n"
             "13. For non-conversational AI products, default to avoiding Claude / ChatGPT-style sidebar chat shells, narrow-center conversation layouts, and the same neutral chat color shell unless the UI plan explicitly justifies it.\n"
             "14. UI implementation must use the recommended component ecosystem/design token direction from `output/*-uiux.md`, not switch ad hoc.\n"
+            "\n## UI 验收取证\n"
+            f"{UI_REVIEW_EVIDENCE_GUIDANCE}"
             "\n\n## Coding Constraints (active during ALL coding phases)\n\n"
             "These rules apply every time you write or edit a file:\n\n"
             "### Tech Stack Pre-Research\n"
@@ -1369,7 +1372,8 @@ class IntegrationManagerContentMixin:
             "- Check relevant imports and interfaces; UI-only icon and token rules do not constrain non-UI text or code.\n"
             "- After completing a feature, run build + lint. Fix errors before moving on.\n\n"
             "### Host-First Governance During Coding\n"
-            "- 完成 UI 后，优先在宿主里继续当前流程并触发 `/super-dev-review ui`，不要把内部 CLI 当成日常开发入口。\n"
+            f"{UI_REVIEW_EVIDENCE_GUIDANCE}"
+            "- 完成取证后，优先在宿主里触发 `/super-dev-review ui` 汇总已取得的证据，不把内部 CLI 当成日常开发入口。\n"
             "- 需要进入质量与交付时，优先在宿主里继续当前流程或用 `/super-dev-run quality`、`/super-dev-review quality` 这类宿主交互面。\n"
             "- 终端侧 `super-dev` CLI 保留给维护与治理补救，不负责日常脚手架、实现与返工调度。\n\n"
             "## Four-Layer Governance Model\n\n"
