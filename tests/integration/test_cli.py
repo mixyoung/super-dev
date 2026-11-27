@@ -27,6 +27,7 @@ from super_dev.review_state import (
     save_workflow_state,
 )
 from super_dev.reviewers.spec_compliance import _report_dependencies as spec_compliance_dependencies
+from super_dev.reviewers.ui_review_evidence import RUNTIME, UIReviewEvidence
 from super_dev.skills import SkillManager
 from super_dev.specs.generator import SpecGenerator
 from super_dev.workflow_guard import (
@@ -38,6 +39,7 @@ from tests.support.release_ready_inputs import (
     record_release_ready_acceptance,
     write_release_ready_docs,
 )
+from tests.support.ui_evidence_inputs import create_ui_project, publish_browser
 
 
 def _confirm_docs(temp_project_dir: Path) -> None:
@@ -4738,17 +4740,11 @@ class TestCLIPipeline:
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
         try:
-            _prepare_workflow_context(temp_project_dir)
-            _confirm_docs(temp_project_dir)
-            change_dir = temp_project_dir / ".super-dev" / "changes" / "preview-demo"
-            change_dir.mkdir(parents=True, exist_ok=True)
+            evidence = create_ui_project(temp_project_dir)
+            change_dir = temp_project_dir / ".super-dev" / "changes" / evidence.prefix
             (change_dir / "proposal.md").write_text("# proposal\n", encoding="utf-8")
             (change_dir / "tasks.md").write_text("- [ ] frontend\n", encoding="utf-8")
-            output_dir = temp_project_dir / "output"
-            (output_dir / f"{temp_project_dir.name}-frontend-runtime.json").write_text(
-                json.dumps({"passed": True, "summary": "frontend ready"}, ensure_ascii=False),
-                encoding="utf-8",
-            )
+            publish_browser(evidence)
 
             cli = SuperDevCLI()
             monkeypatch.setattr(
@@ -5007,7 +5003,7 @@ class TestCLIPipeline:
         )
 
         cli = SuperDevCLI()
-        payload = cli._write_frontend_runtime_validation(
+        payload = cli._write_frontend_source_checks(
             project_dir=temp_project_dir,
             output_dir=output_dir,
             project_name="emoji-demo",
@@ -5093,7 +5089,7 @@ class TestCLIPipeline:
         )
 
         cli = SuperDevCLI()
-        payload = cli._write_frontend_runtime_validation(
+        payload = cli._write_frontend_source_checks(
             project_dir=temp_project_dir,
             output_dir=output_dir,
             project_name="recipe-demo",
@@ -5332,8 +5328,9 @@ class TestCLIPipeline:
         finally:
             os.chdir(original_cwd)
 
+    @pytest.mark.parametrize("skip_scaffold", [False, True])
     def test_pipeline_resume_pauses_at_preview_confirmation_gate(
-        self, temp_project_dir: Path, monkeypatch
+        self, temp_project_dir: Path, monkeypatch, capsys, skip_scaffold: bool
     ):
         original_cwd = os.getcwd()
         os.chdir(temp_project_dir)
@@ -5341,25 +5338,35 @@ class TestCLIPipeline:
 
         try:
             cli = SuperDevCLI()
-            assert cli.run(["pipeline", "构建一个支持登录和看板的平台", "--offline"]) == 0
+            args = ["pipeline", "构建一个支持登录和看板的平台", "--offline"]
+            if skip_scaffold:
+                args.append("--skip-scaffold")
+            assert cli.run(args) == 0
             save_bound_docs_confirmation(
-                temp_project_dir,
-                {
-                    "status": "confirmed",
-                    "comment": "测试中预先确认三文档",
-                    "actor": "pytest",
-                    "run_id": "test-run",
-                },
+                temp_project_dir, {"status": "confirmed", "actor": "pytest"}
             )
 
-            result = cli.run(["run", "--resume"])
-            assert result == 0
-
-            output_dir = temp_project_dir / "output"
-            assert any(output_dir.glob("*-frontend-runtime.json"))
-            assert (temp_project_dir / "preview.html").exists()
-
+            assert cli.run(["run", "--resume"]) == 1
+            assert "受阻（BLOCKED）" in capsys.readouterr().out
+            evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+            assert not evidence.path(RUNTIME).exists()
+            assert not (temp_project_dir / "backend").exists()
             run_state_file = temp_project_dir / ".super-dev" / "runs" / "last-pipeline.json"
+            payload = json.loads(run_state_file.read_text(encoding="utf-8"))
+            assert payload["failed_stage"] == "3"
+            assert payload["failure_reason"] == "frontend_runtime_blocked"
+
+            asset = evidence.output / "frontend/index.html"
+            if skip_scaffold:
+                assert not asset.exists()
+                asset.parent.mkdir(exist_ok=True)
+                asset.write_text(
+                    "<!doctype html><title>Synthetic fixture</title>", encoding="utf-8"
+                )
+            publish_browser(evidence, asset=asset)
+            assert cli.run(["run", "--resume"]) == 0
+            assert not (temp_project_dir / "backend").exists()
+
             payload = json.loads(run_state_file.read_text(encoding="utf-8"))
             assert payload["status"] == "waiting_preview_confirmation"
             assert payload["resume_from_stage"] == "4"

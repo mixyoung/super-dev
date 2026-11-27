@@ -62,8 +62,16 @@ from .reviewers.quality_gate import (
     stored_quality_evidence_dependencies,
 )
 from .reviewers.redteam import load_redteam_evidence
+from .reviewers.ui_review_evidence import (
+    RUNTIME,
+    SOURCE,
+    VISUAL,
+    UIReviewEvidence,
+    aggregate_ui_status,
+    ui_result_details,
+    ui_status_ok,
+)
 from .specs import SpecValidator
-from .ui_contract_governance import missing_claude_design_runtime_checks
 from .workflow_harness import WorkflowHarnessBuilder
 from .workflow_state import detect_pipeline_summary
 
@@ -817,9 +825,15 @@ class ProofPackBuilder:
         self.delivery_applicability = derive_delivery_applicability(config)
         self.platform = str(self.delivery_applicability["platform"])
         self.frontend_required = bool(self.delivery_applicability["frontend_required"])
+        self._ui_evidence = UIReviewEvidence(
+            self.project_dir, self.project_name, required=self.frontend_required
+        )
         self.fresh_verification_required = fresh_verification_required(config)
 
     def build(self, verify_tests: bool = False) -> ProofPackReport:
+        self._ui_evidence = UIReviewEvidence(
+            self.project_dir, self.project_name, required=self.frontend_required
+        )
         report = ProofPackReport(
             project_name=self.project_name,
             target_version=self.target_version,
@@ -874,6 +888,8 @@ class ProofPackBuilder:
                 self._host_runtime_validation_artifact(),
                 self._workflow_continuity_artifact(),
                 self._frontend_runtime_artifact(),
+                self._ui_result_artifact("UI Source Review", SOURCE),
+                self._ui_result_artifact("UI Visual Review", VISUAL),
                 self._ui_review_artifact(),
                 self._quality_gate_artifact(),
                 self._delivery_manifest_artifact(),
@@ -922,11 +938,9 @@ class ProofPackBuilder:
             self.project_dir / ".super-dev" / "review-state" / "stage-ledger.json",
         ]
         if self.frontend_required:
-            dependencies[2:2] = [
-                self._latest("*-frontend-runtime.json"),
-                self._latest("*-ui-review.json"),
-                self._latest("*-ui-contract-alignment.json"),
-            ]
+            dependencies[2:2] = UIReviewEvidence(
+                self.project_dir, self.project_name
+            ).dependency_paths()
         return cast(
             dict[str, Any],
             build_evidence_identity(
@@ -1217,146 +1231,25 @@ class ProofPackBuilder:
             details={"json_path": str(json_path) if json_path else ""},
         )
 
-    def _frontend_runtime_artifact(self) -> ProofPackArtifact:
+    def _ui_result_artifact(self, name: str, kind: str) -> ProofPackArtifact:
+        result = self._ui_evidence.result(kind)
         if not self.frontend_required:
-            return self._not_applicable_artifact("Frontend Runtime")
-        file_path = self._latest("*-frontend-runtime.json")
-        if file_path is None:
-            return ProofPackArtifact(
-                name="Frontend Runtime", status="missing", summary="frontend runtime report missing"
-            )
-        ui_contract_path = self._latest("*-ui-contract.json")
-        ui_alignment_path = self._latest("*-ui-contract-alignment.json")
-        expected_identity = build_evidence_identity(
-            self.project_dir,
-            artifact_name="frontend-runtime",
-            dependencies=[ui_contract_path, ui_alignment_path],
-        )
-        try:
-            payload = json.loads(file_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            _logger.debug(f"Failed to parse frontend runtime JSON: {e}")
-            payload = {}
-        ui_contract_payload: dict[str, Any] = {}
-        if ui_contract_path is not None:
-            try:
-                loaded_contract = json.loads(ui_contract_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_contract, dict):
-                    ui_contract_payload = loaded_contract
-            except Exception:
-                ui_contract_payload = {}
-        identity_ok, identity_reason = evidence_identity_matches(
-            payload if isinstance(payload, dict) else {},
-            expected=expected_identity,
-        )
-        if not identity_ok:
-            summary = (
-                "frontend runtime evidence identity mismatches current UI contract/alignment"
-                if identity_reason == "digest_mismatch"
-                else "frontend runtime report is missing evidence identity"
-            )
-            return ProofPackArtifact(
-                name="Frontend Runtime",
-                status="pending",
-                summary=summary,
-                path=str(file_path),
-                details=payload if isinstance(payload, dict) else {},
-            )
-        if is_artifact_stale(file_path, dependencies=[ui_contract_path, ui_alignment_path]):
-            return ProofPackArtifact(
-                name="Frontend Runtime",
-                status="pending",
-                summary="frontend runtime report is stale relative to current UI contract/alignment",
-                path=str(file_path),
-                details=payload if isinstance(payload, dict) else {},
-            )
-        checks = payload.get("checks", {}) if isinstance(payload, dict) else {}
-        missing_protocol_checks = missing_claude_design_runtime_checks(
-            checks if isinstance(checks, dict) else {},
-            ui_contract_payload,
-        )
-        ui_review_path = self._latest("*-ui-review.json")
-        ui_review_payload = load_json_payload(ui_review_path) if ui_review_path is not None else {}
-        alignment_summary = (
-            ui_review_payload.get("alignment_summary", {})
-            if isinstance(ui_review_payload, dict)
-            and isinstance(ui_review_payload.get("alignment_summary"), dict)
-            else {}
-        )
-        runtime_protocol_alignment = (
-            alignment_summary.get("runtime_claude_design_protocol", {})
-            if isinstance(alignment_summary.get("runtime_claude_design_protocol"), dict)
-            else {}
-        )
-        source_protocol_alignment = (
-            alignment_summary.get("source_claude_design_protocol", {})
-            if isinstance(alignment_summary.get("source_claude_design_protocol"), dict)
-            else {}
-        )
-        screenshot_visual_judge = (
-            alignment_summary.get("screenshot_visual_judge", {})
-            if isinstance(alignment_summary.get("screenshot_visual_judge"), dict)
-            else {}
-        )
-        passed = bool(payload.get("passed", False)) if isinstance(payload, dict) else False
-        runtime_protocol_ok = not runtime_protocol_alignment or bool(
-            runtime_protocol_alignment.get("passed", False)
-        )
-        source_protocol_ok = not source_protocol_alignment or bool(
-            source_protocol_alignment.get("passed", False)
-        )
-        screenshot_visual_ok = not screenshot_visual_judge or bool(
-            screenshot_visual_judge.get("passed", False)
-        )
-        contract_aligned = not isinstance(checks, dict) or (
-            bool(checks.get("ui_contract_json", False))
-            and bool(checks.get("output_frontend_design_tokens", False))
-            and bool(checks.get("ui_contract_alignment", False))
-            and bool(checks.get("ui_theme_entry", False))
-            and bool(checks.get("ui_navigation_shell", False))
-            and bool(checks.get("ui_component_imports", False))
-            and bool(checks.get("ui_banned_patterns", False))
-            and bool(checks.get("ui_framework_playbook", True))
-            and bool(checks.get("ui_framework_execution", True))
-            and not missing_protocol_checks
-            and runtime_protocol_ok
-            and source_protocol_ok
-            and screenshot_visual_ok
-        )
+            artifact = self._not_applicable_artifact(name)
+            artifact.details.update(result.summary())
+            return artifact
+        status = "ready" if ui_status_ok(result.status) else "pending"
+        if result.reason == "missing":
+            status = "missing"
         return ProofPackArtifact(
-            name="Frontend Runtime",
-            status="ready" if passed and contract_aligned else "pending",
-            summary=(
-                "frontend runtime passed and UI contract / framework playbook are wired"
-                if passed and contract_aligned
-                else (
-                    "frontend runtime source/runtime evidence drift: "
-                    + str(runtime_protocol_alignment.get("observed", "")).strip()
-                    if runtime_protocol_alignment
-                    and not bool(runtime_protocol_alignment.get("passed", False))
-                    else (
-                        "frontend runtime source execution missing: "
-                        + str(source_protocol_alignment.get("observed", "")).strip()
-                        if source_protocol_alignment
-                        and not bool(source_protocol_alignment.get("passed", False))
-                        else (
-                            "frontend runtime screenshot visual gate failed: "
-                            + str(screenshot_visual_judge.get("observed", "")).strip()
-                            if screenshot_visual_judge
-                            and not bool(screenshot_visual_judge.get("passed", False))
-                            else (
-                                "frontend runtime missing Claude-Design execution protocol evidence: "
-                                + ", ".join(missing_protocol_checks)
-                                if missing_protocol_checks
-                                else "frontend runtime not passed or UI contract / framework evidence is incomplete"
-                            )
-                        )
-                    )
-                )
-            ),
-            path=str(file_path),
-            details=payload if isinstance(payload, dict) else {},
+            name=name,
+            status=status,
+            summary=ui_result_details([result]),
+            path=str(result.path) if result.path else "",
+            details=result.summary(),
         )
+
+    def _frontend_runtime_artifact(self) -> ProofPackArtifact:
+        return self._ui_result_artifact("Frontend Runtime", RUNTIME)
 
     def _ui_contract_artifact(self) -> ProofPackArtifact:
         if not self.frontend_required:
@@ -1810,60 +1703,17 @@ class ProofPackBuilder:
     def _ui_review_artifact(self) -> ProofPackArtifact:
         if not self.frontend_required:
             return self._not_applicable_artifact("UI Review")
-        file_path = self._latest("*-ui-review.json")
-        if file_path is None:
-            return ProofPackArtifact(
-                name="UI Review", status="missing", summary="UI review report missing"
-            )
-        ui_contract_path = self._latest("*-ui-contract.json")
-        uiux_path = self._latest("*-uiux.md")
-        expected_identity = build_evidence_identity(
-            self.project_dir,
-            artifact_name="ui-review",
-            dependencies=[ui_contract_path, uiux_path],
-        )
-        try:
-            payload = json.loads(file_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            _logger.debug(f"Failed to parse UI review JSON: {e}")
-            payload = {}
-        identity_ok, identity_reason = evidence_identity_matches(
-            payload if isinstance(payload, dict) else {},
-            expected=expected_identity,
-        )
-        if not identity_ok:
-            summary = (
-                "UI review evidence identity mismatches current UI contract/UIUX"
-                if identity_reason == "digest_mismatch"
-                else "UI review report is missing evidence identity"
-            )
-            return ProofPackArtifact(
-                name="UI Review",
-                status="pending",
-                summary=summary,
-                path=str(file_path),
-                details=payload if isinstance(payload, dict) else {},
-            )
-        if is_artifact_stale(file_path, dependencies=[ui_contract_path, uiux_path]):
-            return ProofPackArtifact(
-                name="UI Review",
-                status="pending",
-                summary="UI review report is stale relative to current UI contract/UIUX",
-                path=str(file_path),
-                details=payload if isinstance(payload, dict) else {},
-            )
-        score = payload.get("score") if isinstance(payload, dict) else None
-        critical = int(payload.get("critical_count", 0)) if isinstance(payload, dict) else 0
-        ready = critical == 0
-        summary = (
-            f"score={score}, critical={critical}" if score is not None else f"critical={critical}"
-        )
+        results = self._ui_evidence.results()
+        status = aggregate_ui_status(results)
         return ProofPackArtifact(
             name="UI Review",
-            status="ready" if ready else "pending",
-            summary=summary,
-            path=str(file_path),
-            details=payload if isinstance(payload, dict) else {},
+            status="ready" if ui_status_ok(status) else "pending",
+            summary=ui_result_details(results),
+            path=str(self._latest("*-ui-review.json") or ""),
+            details={
+                "status": status.value,
+                "results": {item.kind: item.summary() for item in results},
+            },
         )
 
     def _quality_gate_artifact(self) -> ProofPackArtifact:

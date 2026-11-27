@@ -4,6 +4,7 @@ from pathlib import Path
 
 from super_dev import __version__
 from super_dev.artifact_utils import resolve_active_change_id, resolve_current_artifact_prefix
+from super_dev.evidence_contract import EvidenceStatus
 from super_dev.evidence_identity import build_evidence_identity
 from super_dev.hooks.manager import HookManager
 from super_dev.release_readiness import (
@@ -26,6 +27,7 @@ from super_dev.reviewers.quality_gate import (
 from super_dev.reviewers.spec_compliance import (
     _report_dependencies as _spec_compliance_dependencies,
 )
+from super_dev.reviewers.ui_review_evidence import RUNTIME, SOURCE, VISUAL, UIReviewEvidence
 from super_dev.reviewers.uiux_compliance import (
     _report_dependencies as _uiux_compliance_dependencies,
 )
@@ -39,6 +41,7 @@ from tests.support.release_ready_inputs import (
     record_release_ready_acceptance,
     write_release_ready_docs,
 )
+from tests.support.ui_evidence_inputs import dump, publish_browser, publish_source, publish_vision
 
 
 def _prepare_release_ready_project(
@@ -176,7 +179,7 @@ def _prepare_release_ready_project(
             '    "final_selected": "shadcn/ui + Radix + Tailwind"\n'
             "  },\n"
             '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-            '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero", "proof-strip"], "trust_modules": ["客户案例"], "required_states": ["loading", "empty"]}],\n'
+            '  "screen_recipes": [{"id": "home", "label": "North Star Hero", "section_order": ["hero", "proof-strip"], "trust_modules": ["客户案例"], "required_states": ["loading", "empty"]}],\n'
             '  "design_context_protocol": {"preferred_import_order": ["tokens", "sections"], "github_import_targets": ["theme.ts", "src/components"], "single_source_rule": "single source prototype"},\n'
             '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度", "信任模块"], "persistence_rule": "persist tweak decisions into the same prototype"},\n'
             '  "verification_handoff": {"verification_order": ["preview", "ui-review"], "required_artifacts": ["output/frontend/index.html", "output/frontend/app.js"], "acceptance_checks": ["no emoji", "recipe visible"]}\n'
@@ -202,68 +205,14 @@ def _prepare_release_ready_project(
         json.dumps({"score": 92, "critical_count": 0}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (project_dir / "output" / f"{project_name}-uiux.md").write_text("# UIUX\n", encoding="utf-8")
-    quality_deps = quality_evidence_dependency_paths(
-        project_dir,
-        project_name=project_name,
-        frontend_required=True,
-    )
-    quality_gate_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="quality-gate",
-        dependencies=quality_deps,
-    )
-    (project_dir / "output" / f"{project_name}-quality-gate.json").write_text(
-        json.dumps(
-            {
-                "passed": True,
-                "total_score": 90,
-                "summary": {"executive_summary": "quality gate passed"},
-                "evidence_identity": quality_gate_identity,
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-    frontend_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="frontend-runtime",
-        dependencies=[
-            project_dir / "output" / f"{project_name}-ui-contract.json",
-            project_dir / "output" / f"{project_name}-ui-contract-alignment.json",
-        ],
-    )
     (project_dir / "output" / "frontend").mkdir(parents=True, exist_ok=True)
     (project_dir / "output" / "frontend" / "design-tokens.css").write_text(
-        ":root { --color-primary: #0f172a; }\n",
-        encoding="utf-8",
+        ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
     )
-    (project_dir / "output" / f"{project_name}-frontend-runtime.json").write_text(
-        (
-            "{\n"
-            '  "passed": true,\n'
-            '  "checks": {\n'
-            '    "output_frontend_index": true,\n'
-            '    "output_frontend_styles": true,\n'
-            '    "output_frontend_design_tokens": true,\n'
-            '    "output_frontend_script": true,\n'
-            '    "preview_html": true,\n'
-            '    "ui_contract_json": true,\n'
-            '    "ui_contract_alignment": true,\n'
-            '    "ui_theme_entry": true,\n'
-            '    "ui_navigation_shell": true,\n'
-            '    "ui_component_imports": true,\n'
-            '    "ui_banned_patterns": true,\n'
-            '    "ui_screen_recipes": true,\n'
-            '    "ui_design_context_protocol": true,\n'
-            '    "ui_tweak_strategy": true,\n'
-            '    "ui_verification_handoff": true\n'
-            "  },\n"
-            f'  "evidence_identity": {json.dumps(frontend_identity, ensure_ascii=False)}\n'
-            "}\n"
-        ),
-        encoding="utf-8",
+    frontend = project_dir / "frontend"
+    frontend.mkdir(exist_ok=True)
+    (frontend / "index.html").write_text(
+        "<!doctype html><title>Release fixture</title>", encoding="utf-8"
     )
     # 治理证据 mock（确保治理检查项通过）
     (project_dir / "output" / "governance-report-test.md").write_text(
@@ -307,17 +256,15 @@ def _prepare_release_ready_project(
     record_stage_progress(project_dir, stage="docs", status="completed")
     save_bound_docs_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
     record_stage_progress(project_dir, stage="spec", status="completed")
+    ui_contract = project_dir / "output" / f"{project_name}-ui-contract.json"
+    dump(ui_contract, json.loads(ui_contract.read_text(encoding="utf-8")))
+    evidence = UIReviewEvidence(project_dir, project_name)
+    publish_source(evidence)
+    publish_vision(evidence, publish_browser(evidence)["pages"])
     record_stage_progress(project_dir, stage="frontend", status="completed")
     save_bound_preview_confirmation(project_dir, {"status": "confirmed", "actor": "pytest"})
     record_stage_progress(project_dir, stage="backend", status="completed")
     record_stage_progress(project_dir, stage="quality", status="completed")
-
-    ui_contract_path = project_dir / "output" / f"{project_name}-ui-contract.json"
-    ui_contract_payload = json.loads(ui_contract_path.read_text(encoding="utf-8"))
-    ui_contract_path.write_text(
-        json.dumps(ui_contract_payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
 
     quality_deps = quality_evidence_dependency_paths(
         project_dir,
@@ -342,22 +289,6 @@ def _prepare_release_ready_project(
         ),
         encoding="utf-8",
     )
-    frontend_identity = build_evidence_identity(
-        project_dir,
-        artifact_name="frontend-runtime",
-        dependencies=[
-            project_dir / "output" / f"{project_name}-ui-contract.json",
-            project_dir / "output" / f"{project_name}-ui-contract-alignment.json",
-        ],
-    )
-    runtime_path = project_dir / "output" / f"{project_name}-frontend-runtime.json"
-    runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
-    runtime_payload["evidence_identity"] = frontend_identity
-    runtime_path.write_text(
-        json.dumps(runtime_payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
     spec_identity = build_evidence_identity(
         project_dir,
         artifact_name="spec-compliance",
@@ -720,162 +651,74 @@ def test_release_readiness_fails_when_ui_contract_closure_is_incomplete(
     assert "ui contract missing" in closure_check.detail
 
 
-def test_release_readiness_fails_when_frontend_runtime_structural_ui_checks_fail(
+def _ui_closure(project: Path) -> ReleaseReadinessCheck:
+    return ReleaseReadinessEvaluator(project)._check_delivery_closure()
+
+
+def test_release_readiness_blocks_legacy_runtime_and_retains_source(temp_project_dir: Path) -> None:
+    _prepare_release_ready_project(temp_project_dir)
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    dump(evidence.path(RUNTIME), {"passed": True, "checks": {"ui_theme_entry": True}})
+
+    closure = _ui_closure(temp_project_dir)
+    assert not closure.passed
+    assert closure.evidence["ui_status"] == "BLOCKED"
+    assert closure.evidence["ui_results"][RUNTIME]["reason"] == "legacy"
+    assert closure.evidence["ui_results"][SOURCE]["status"] == "PASS"
+
+
+def test_release_readiness_fails_on_current_browser_interaction_defect(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    runtime_file = (
-        temp_project_dir
-        / "output"
-        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
-    )
-    runtime_file.write_text(
-        (
-            "{\n"
-            '  "passed": true,\n'
-            '  "checks": {\n'
-            '    "output_frontend_index": true,\n'
-            '    "output_frontend_styles": true,\n'
-            '    "output_frontend_design_tokens": true,\n'
-            '    "output_frontend_script": true,\n'
-            '    "preview_html": true,\n'
-            '    "ui_contract_json": true,\n'
-            '    "ui_contract_alignment": true,\n'
-            '    "ui_theme_entry": false,\n'
-            '    "ui_navigation_shell": true,\n'
-            '    "ui_component_imports": true,\n'
-            '    "ui_banned_patterns": true\n'
-            "  }\n"
-            "}\n"
-        ),
-        encoding="utf-8",
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    publish_browser(evidence, fail=True)
+
+    closure = _ui_closure(temp_project_dir)
+    assert not closure.passed
+    assert closure.evidence["ui_status"] == "FAIL"
+    assert closure.evidence["ui_results"][RUNTIME]["reason"] == "browser_failed"
+    assert (
+        "Control unresponsive" in closure.evidence["ui_results"][RUNTIME]["findings"][0]["observed"]
     )
 
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
 
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "frontend runtime ui contract alignment missing" in closure_check.detail
-
-
-def test_release_readiness_fails_when_frontend_runtime_missing_claude_design_execution(
+def test_release_readiness_legacy_summary_does_not_override_current_visual_result(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    runtime_file = (
-        temp_project_dir
-        / "output"
-        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
-    )
-    runtime_file.write_text(
-        (
-            "{\n"
-            '  "passed": true,\n'
-            '  "checks": {\n'
-            '    "output_frontend_index": true,\n'
-            '    "output_frontend_styles": true,\n'
-            '    "output_frontend_design_tokens": true,\n'
-            '    "output_frontend_script": true,\n'
-            '    "preview_html": true,\n'
-            '    "ui_contract_json": true,\n'
-            '    "ui_contract_alignment": true,\n'
-            '    "ui_theme_entry": true,\n'
-            '    "ui_navigation_shell": true,\n'
-            '    "ui_component_imports": true,\n'
-            '    "ui_banned_patterns": true,\n'
-            '    "ui_screen_recipes": false,\n'
-            '    "ui_design_context_protocol": true,\n'
-            '    "ui_tweak_strategy": true,\n'
-            '    "ui_verification_handoff": false\n'
-            "  }\n"
-            "}\n"
-        ),
-        encoding="utf-8",
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    dump(
+        evidence.output / f"{evidence.prefix}-ui-review.json",
+        {
+            "alignment_summary": {"screenshot_visual_judge": {"passed": False}},
+        },
     )
 
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
-
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "frontend runtime claude-design execution missing" in closure_check.detail
-    assert "ui_screen_recipes" in closure_check.detail
-    assert "ui_verification_handoff" in closure_check.detail
+    closure = _ui_closure(temp_project_dir)
+    assert closure.evidence["ui_status"] == "PASS"
+    assert closure.evidence["ui_results"][VISUAL]["status"] == "PASS"
+    # Editing a report still invalidates the quality evidence that referenced it.
+    assert not closure.passed
+    assert "quality gate evidence mismatch" in closure.detail
 
 
-def test_release_readiness_fails_when_ui_review_runtime_protocol_drift(
+def test_release_readiness_fails_on_current_positioned_visual_findings(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    output_dir = temp_project_dir / "output"
-    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json").write_text(
-        json.dumps(
-            {
-                "alignment_summary": {
-                    "runtime_claude_design_protocol": {
-                        "passed": False,
-                        "observed": "mismatch=screen_recipes, verification_handoff",
-                    },
-                    "source_claude_design_protocol": {
-                        "passed": True,
-                        "observed": "screen_recipes, design_context_protocol, tweak_strategy, verification_handoff",
-                    },
-                }
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    screenshots = evidence.result(RUNTIME).payload["screenshots"]
+    publish_vision(evidence, screenshots, fail=True)
 
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
-
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "ui review/runtime claude-design mismatch" in closure_check.detail
-    assert "source/runtime 证据漂移" in report.executive_summary
-
-
-def test_release_readiness_fails_when_screenshot_visual_judge_fails(
-    temp_project_dir: Path,
-) -> None:
-    _prepare_release_ready_project(temp_project_dir)
-    output_dir = temp_project_dir / "output"
-    (output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-review.json").write_text(
-        json.dumps(
-            {
-                "alignment_summary": {
-                    "runtime_claude_design_protocol": {
-                        "passed": True,
-                        "observed": "aligned with frontend-runtime",
-                    },
-                    "source_claude_design_protocol": {
-                        "passed": True,
-                        "observed": "screen_recipes, design_context_protocol, tweak_strategy, verification_handoff",
-                    },
-                    "screenshot_visual_judge": {
-                        "passed": False,
-                        "observed": "blank=0.82, contrast=0.09, dominant=0.91",
-                    },
-                }
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
-
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
-
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "ui review screenshot visual judge failed" in closure_check.detail
-    assert "截图级视觉验收未通过" in report.executive_summary
-    assert "商业质感不足或像半成品" in report.executive_summary
-    assert "blank=0.82, contrast=0.09, dominant=0.91" in report.executive_summary
+    closure = _ui_closure(temp_project_dir)
+    assert not closure.passed
+    assert closure.evidence["ui_status"] == "FAIL"
+    assert closure.evidence["ui_results"][RUNTIME]["status"] == "PASS"
+    visual = closure.evidence["ui_results"][VISUAL]
+    assert visual["status"] == "FAIL"
+    assert visual["findings"][0]["screenshot_id"] == screenshots[0]["id"]
+    assert "视觉评审：失败（FAIL）" in closure.detail
 
 
 def test_release_readiness_executive_summary_exposes_framework_playbook_gap() -> None:
@@ -913,7 +756,7 @@ def test_release_readiness_executive_summary_speaks_in_release_decision_language
     assert "不适合直接做最终客户演示、上线签字或对外交付" in report.executive_summary
 
 
-def test_release_readiness_fails_when_cross_platform_runtime_missing_framework_execution(
+def test_release_readiness_fails_when_cross_platform_source_checks_fail(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
@@ -935,41 +778,13 @@ def test_release_readiness_fails_when_cross_platform_runtime_missing_framework_e
     }
     contract_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    runtime_file = (
-        temp_project_dir
-        / "output"
-        / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
-    )
-    runtime_file.write_text(
-        (
-            "{\n"
-            '  "passed": false,\n'
-            '  "checks": {\n'
-            '    "output_frontend_index": true,\n'
-            '    "output_frontend_styles": true,\n'
-            '    "output_frontend_design_tokens": true,\n'
-            '    "output_frontend_script": true,\n'
-            '    "preview_html": true,\n'
-            '    "ui_contract_json": true,\n'
-            '    "ui_contract_alignment": true,\n'
-            '    "ui_theme_entry": true,\n'
-            '    "ui_navigation_shell": true,\n'
-            '    "ui_component_imports": true,\n'
-            '    "ui_banned_patterns": true,\n'
-            '    "ui_framework_playbook": true,\n'
-            '    "ui_framework_execution": false\n'
-            "  }\n"
-            "}\n"
-        ),
-        encoding="utf-8",
-    )
-
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
-
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "uni-app frontend runtime framework execution missing" in closure_check.detail
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    publish_source(evidence, status=EvidenceStatus.FAIL)
+    publish_vision(evidence, publish_browser(evidence)["pages"])
+    closure = _ui_closure(temp_project_dir)
+    assert not closure.passed
+    assert closure.evidence["ui_status"] == "FAIL"
+    assert closure.evidence["ui_results"][SOURCE]["status"] == "FAIL"
 
 
 def test_release_readiness_fails_when_ui_contract_missing_emoji_policy(
@@ -1152,57 +967,19 @@ def test_release_readiness_exposes_baseline_confirmation_check(
     assert baseline_check.detail == "baseline confirmation pending_review"
 
 
-def test_release_readiness_fails_when_frontend_runtime_evidence_identity_mismatches(
+def test_release_readiness_blocks_stale_runtime_when_design_contract_changes(
     temp_project_dir: Path,
 ) -> None:
     _prepare_release_ready_project(temp_project_dir)
-    _prepare_spec_quality_change(temp_project_dir)
-    output_dir = temp_project_dir / "output"
-    identity = build_evidence_identity(
-        temp_project_dir,
-        artifact_name="frontend-runtime",
-        dependencies=[
-            output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json",
-            output_dir
-            / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract-alignment.json",
-        ],
-    )
-    runtime_file = (
-        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-frontend-runtime.json"
-    )
-    runtime_payload = json.loads(runtime_file.read_text(encoding="utf-8"))
-    runtime_payload["evidence_identity"] = identity
-    runtime_file.write_text(
-        json.dumps(runtime_payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (
-        output_dir / f"{resolve_current_artifact_prefix(temp_project_dir)}-ui-contract.json"
-    ).write_text(
-        json.dumps(
-            {
-                "style_direction": "changed",
-                "typography": {"heading": "Space Grotesk", "body": "Inter"},
-                "icon_system": "lucide-react",
-                "emoji_policy": {
-                    "allowed_in_ui": False,
-                    "allowed_as_icon": False,
-                    "allowed_during_development": False,
-                },
-                "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},
-                "design_tokens": {"color": {"primary": "#0f172a"}},
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    evidence = UIReviewEvidence(temp_project_dir, temp_project_dir.name)
+    assert evidence.result(RUNTIME).status is EvidenceStatus.PASS
+    payload = json.loads(evidence.contract.read_text(encoding="utf-8"))
+    dump(evidence.contract, {**payload, "style_direction": "changed"})
 
-    evaluator = ReleaseReadinessEvaluator(temp_project_dir)
-    report = evaluator.evaluate(verify_tests=False)
-
-    closure_check = next(check for check in report.checks if check.name == "Delivery Closure")
-    assert closure_check.passed is False
-    assert "frontend runtime evidence mismatch" in closure_check.detail
+    closure = _ui_closure(temp_project_dir)
+    assert not closure.passed
+    assert closure.evidence["ui_results"][RUNTIME]["status"] == "BLOCKED"
+    assert closure.evidence["ui_results"][RUNTIME]["reason"] == "invalid"
 
 
 def test_release_readiness_fails_when_active_workflow_recovery_trail_is_incomplete(

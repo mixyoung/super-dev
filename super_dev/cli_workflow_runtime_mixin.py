@@ -652,14 +652,6 @@ class CliWorkflowRuntimeMixin:
                 )
                 self.console.print("[dim]请回到宿主里明确回复：“文档确认，可以继续”[/dim]")
                 return 1
-            if any(
-                (project_dir / "output").glob("*-frontend-runtime.json")
-            ) and not self._preview_confirmation_is_confirmed(project_dir):
-                self.console.print(
-                    "[yellow]最近一次 pipeline 还缺前端预览确认，请先确认预览后再恢复[/yellow]"
-                )
-                self.console.print("[dim]请回到宿主里明确回复：“前端预览确认，可以继续”[/dim]")
-                return 1
             if not self._ui_revision_is_clear(project_dir):
                 self.console.print(
                     "[yellow]最近一次 pipeline 存在待处理 UI 改版请求，请先完成 UI 返工再恢复[/yellow]"

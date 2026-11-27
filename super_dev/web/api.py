@@ -42,6 +42,7 @@ from super_dev.catalogs import (
     PLATFORM_CATALOG,
 )
 from super_dev.config import ConfigManager
+from super_dev.evidence_contract import EvidenceStatus
 from super_dev.experts import (
     list_experts as list_expert_catalog,
 )
@@ -70,8 +71,17 @@ from super_dev.review_state import (
     save_ui_revision,
     ui_revision_file,
 )
+from super_dev.reviewers.ui_review_evidence import (
+    KINDS,
+    RUNTIME,
+    SOURCE,
+    UIResult,
+    UIReviewEvidence,
+    aggregate_ui_status,
+    ui_result_details,
+    ui_status_ok,
+)
 from super_dev.runtime_evidence import normalize_competition_evidence
-from super_dev.ui_contract_governance import missing_claude_design_runtime_checks
 from super_dev.web.rate_limit import RateLimitMiddleware
 from super_dev.workflow_guard import (
     WorkflowGateError,
@@ -600,109 +610,27 @@ def _resolve_run_project_dir(run_id: str, project_dir: str) -> tuple[dict[str, A
     return run, run_project_dir
 
 
-def _load_ui_review_summary(project_dir_path: Path) -> dict[str, Any] | None:
-    output_dir = project_dir_path / "output"
-    json_candidates = sorted(output_dir.glob("*-ui-review.json"))
-    if json_candidates:
-        try:
-            raw_payload = json.loads(json_candidates[-1].read_text(encoding="utf-8"))
-            if isinstance(raw_payload, dict):
-                payload: dict[str, Any] = raw_payload
-                payload.setdefault("json_path", str(json_candidates[-1]))
-                md_path = json_candidates[-1].with_suffix(".md")
-                if md_path.exists():
-                    payload.setdefault("report_path", str(md_path))
-                return payload
-        except Exception as e:
-            _api_logger.debug(f"Failed to parse UI review JSON: {e}")
+def _run_ui_evidence(project_dir: Path, run_id: str) -> UIReviewEvidence | None:
+    config = ConfigManager(project_dir).load()
+    evidence = UIReviewEvidence(
+        project_dir,
+        config.name or project_dir.name,
+        required=str(config.frontend or "").strip().lower() not in {"", "none"},
+    )
+    runtime = evidence.result(RUNTIME)
+    if not evidence.required or runtime.payload.get("workflow_run_id") == run_id:
+        return evidence
     return None
 
 
-def _load_latest_json_artifact(project_dir_path: Path, pattern: str) -> dict[str, Any]:
-    output_dir = project_dir_path / "output"
-    candidates = sorted(output_dir.glob(pattern))
-    if not candidates:
-        return {}
-    try:
-        payload = json.loads(candidates[-1].read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _extract_workflow_ui_governance_summary(
-    project_dir_path: Path,
-    summary: dict[str, Any] | None,
-) -> dict[str, str]:
-    ui_contract_payload = _load_latest_json_artifact(project_dir_path, "*-ui-contract.json")
-    frontend_runtime_payload = _load_latest_json_artifact(
-        project_dir_path, "*-frontend-runtime.json"
-    )
-    alignment_summary = (
-        summary.get("alignment_summary", {})
-        if isinstance(summary, dict) and isinstance(summary.get("alignment_summary"), dict)
-        else {}
-    )
-
-    required_contract_sections = (
-        "screen_recipes",
-        "design_context_protocol",
-        "tweak_strategy",
-        "verification_handoff",
-    )
-    missing_contract_sections = [
-        field for field in required_contract_sections if not ui_contract_payload.get(field)
-    ]
-    if missing_contract_sections:
-        return {
-            "state": "contract_freeze_incomplete",
-            "message": "Claude-Design 风格执行协议尚未完全冻结: "
-            + ", ".join(missing_contract_sections),
-        }
-
-    runtime_protocol = (
-        alignment_summary.get("runtime_claude_design_protocol", {})
-        if isinstance(alignment_summary.get("runtime_claude_design_protocol"), dict)
-        else {}
-    )
-    if runtime_protocol and not bool(runtime_protocol.get("passed", False)):
-        return {
-            "state": "source_runtime_drift",
-            "message": str(runtime_protocol.get("observed", "")).strip(),
-        }
-
-    source_protocol = (
-        alignment_summary.get("source_claude_design_protocol", {})
-        if isinstance(alignment_summary.get("source_claude_design_protocol"), dict)
-        else {}
-    )
-    if source_protocol and not bool(source_protocol.get("passed", False)):
-        return {
-            "state": "source_execution_missing",
-            "message": str(source_protocol.get("observed", "")).strip(),
-        }
-
-    runtime_checks = (
-        frontend_runtime_payload.get("checks", {})
-        if isinstance(frontend_runtime_payload.get("checks"), dict)
-        else {}
-    )
-    missing_runtime_checks = missing_claude_design_runtime_checks(
-        runtime_checks,
-        ui_contract_payload,
-    )
-    if missing_runtime_checks:
-        return {
-            "state": "runtime_execution_missing",
-            "message": ", ".join(missing_runtime_checks),
-        }
-
-    if runtime_protocol or source_protocol:
-        return {
-            "state": "ready",
-            "message": "Claude-Design 风格执行协议在 source/runtime 证据中已闭环。",
-        }
-    return {"state": "unknown", "message": ""}
+def _current_ui_screenshot(evidence: UIReviewEvidence | None) -> tuple[Path, str] | None:
+    if evidence is None:
+        return None
+    for item in evidence.result(RUNTIME).payload.get("screenshots", []):
+        if item["viewport"]["device"] == "desktop":
+            # The shared validator has checked containment, bytes, and run binding.
+            return evidence.project / item["file"]["path"], str(item["media_type"])
+    return None
 
 
 def _extract_frontend_governance_summary(payload: dict[str, Any]) -> dict[str, str]:
@@ -747,14 +675,6 @@ def _extract_compliance_governance_summary(payload: dict[str, Any]) -> dict[str,
     if "合规链证据与内容检查当前均已闭环" in executive_summary:
         return {"state": "ready", "message": executive_summary}
     return {"state": "unknown", "message": executive_summary}
-
-
-def _find_ui_review_screenshot(project_dir_path: Path) -> Path | None:
-    screenshot_dir = project_dir_path / "output" / "ui-review"
-    if not screenshot_dir.exists():
-        return None
-    candidates = sorted(screenshot_dir.glob("*-preview-desktop.png"))
-    return candidates[-1] if candidates else None
 
 
 def _normalize_string_list(values: list[str] | None) -> list[str]:
@@ -1718,20 +1638,64 @@ async def download_workflow_artifacts_archive(run_id: str, project_dir: str = ".
 async def get_workflow_ui_review(run_id: str, project_dir: str = ".") -> dict:
     """获取某次工作流的 UI 审查摘要。"""
     run, run_project_dir = _resolve_run_project_dir(run_id, project_dir)
-    summary = _load_ui_review_summary(run_project_dir)
-    screenshot = _find_ui_review_screenshot(run_project_dir)
-
-    qa_result = None
-    if isinstance(run.get("results"), list):
-        qa_result = next((item for item in run["results"] if item.get("phase") == "qa"), None)
-
-    if summary is None and qa_result and isinstance(qa_result.get("output"), dict):
-        nested = qa_result["output"].get("ui_review")
-        if isinstance(nested, dict):
-            summary = nested
-
-    if summary is None and screenshot is None:
-        raise HTTPException(status_code=404, detail="未找到 UI 审查结果")
+    evidence = _run_ui_evidence(run_project_dir, run_id)
+    capture = _current_ui_screenshot(evidence)
+    screenshot = capture[0] if capture else None
+    summary: dict[str, Any] = {}
+    if evidence is not None:
+        results = evidence.results()
+        status = aggregate_ui_status(results)
+        source = evidence.result(SOURCE)
+        summary = {
+            "project_name": evidence.prefix,
+            "passed": ui_status_ok(status),
+            "status": status.value,
+            "results": {item.kind: item.summary() for item in results},
+            "score": source.payload.get("score"),
+            "findings": source.payload.get("findings", []),
+            "alignment_summary": source.payload.get("alignment_summary", {}),
+        }
+        # Preserve existing links on a current run; never trust paths from JSON.
+        for key, suffix in (("json_path", "json"), ("report_path", "md")):
+            path = evidence.output / f"{evidence.prefix}-ui-review.{suffix}"
+            if path.resolve() == path and path.is_file():
+                summary[key] = str(path)
+        frontend_governance_summary = {
+            "state": status.value.lower(),
+            "message": ui_result_details(results),
+        }
+    else:
+        # A historical result stored inside this run is display-only. Never join
+        # it to the current project by time, by name sorting or by screenshot presence.
+        qa = next(
+            (
+                item
+                for item in (run.get("results") or [])
+                if isinstance(item, dict) and item.get("phase") == "qa"
+            ),
+            {},
+        )
+        output = qa.get("output")
+        historical = output.get("ui_review") if isinstance(output, dict) else None
+        if isinstance(historical, dict):
+            summary = {
+                key: historical[key]
+                for key in ("score", "findings", "alignment_summary")
+                if key in historical
+            }
+        results = tuple(
+            UIResult(
+                kind, EvidenceStatus.BLOCKED, "run_unbound", "没有与本次工作流绑定的当前证据。"
+            )
+            for kind in KINDS
+        )
+        summary.update(
+            status=EvidenceStatus.BLOCKED.value,
+            passed=False,
+            historical=bool(historical),
+            results={item.kind: item.summary() for item in results},
+        )
+        frontend_governance_summary = {"state": "blocked", "message": ui_result_details(results)}
 
     screenshot_url = ""
     screenshot_relative_path = ""
@@ -1745,10 +1709,6 @@ async def get_workflow_ui_review(run_id: str, project_dir: str = ".") -> dict:
         except ValueError:
             screenshot_relative_path = screenshot.name
 
-    frontend_governance_summary = _extract_workflow_ui_governance_summary(
-        run_project_dir,
-        summary if isinstance(summary, dict) else None,
-    )
     alignment_summary = (
         summary.get("alignment_summary", {})
         if isinstance(summary, dict) and isinstance(summary.get("alignment_summary"), dict)
@@ -1787,10 +1747,11 @@ async def download_workflow_ui_review_screenshot(
 ) -> FileResponse:
     """获取某次工作流 UI 审查截图。"""
     _, run_project_dir = _resolve_run_project_dir(run_id, project_dir)
-    screenshot = _find_ui_review_screenshot(run_project_dir)
-    if screenshot is None:
-        raise HTTPException(status_code=404, detail="未找到 UI 审查截图")
-    return FileResponse(path=screenshot, media_type="image/png", filename=screenshot.name)
+    capture = _current_ui_screenshot(_run_ui_evidence(run_project_dir, run_id))
+    if capture is None:
+        raise HTTPException(status_code=404, detail="未找到与本次工作流绑定的当前 UI 审查截图")
+    screenshot, media_type = capture
+    return FileResponse(path=screenshot, media_type=media_type, filename=screenshot.name)
 
 
 @app.get("/api/experts")

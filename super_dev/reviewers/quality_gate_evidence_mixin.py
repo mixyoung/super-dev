@@ -5,7 +5,6 @@ import re
 import shutil
 import subprocess  # nosec B404
 from pathlib import Path
-from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 from defusedxml import ElementTree
@@ -16,16 +15,14 @@ from ..artifact_utils import (
     latest_artifact,
     resolve_active_change_id,
 )
+from ..evidence_contract import EvidenceStatus
 from ..frameworks import framework_playbook_complete, is_cross_platform_frontend
-from ..ui_contract_governance import (
-    CLAUDE_DESIGN_RUNTIME_CHECKS,
-    required_claude_design_runtime_checks,
-)
 from .fresh_verification_evidence import (
     inspect_current_fresh_verification,
 )
 from .quality_gate_models import CheckStatus, HostProfileMetrics, QualityCheck
 from .redteam import RedTeamReport
+from .ui_review_evidence import SOURCE, UIReviewEvidence
 
 
 class QualityGateEvidenceMixin:
@@ -35,31 +32,22 @@ class QualityGateEvidenceMixin:
         ui_contract_path = output_dir / ui_contract_filename(self.name)
         frontend_dir = output_dir / "frontend"
         design_tokens_path = frontend_dir / "design-tokens.css"
-        runtime_path = output_dir / f"{self.name}-frontend-runtime.json"
-        alignment_path = output_dir / f"{self.name}-ui-contract-alignment.json"
-        ui_review_path = output_dir / f"{self.name}-ui-review.json"
-
-        if (
-            not ui_contract_path.exists()
-            and not frontend_dir.exists()
-            and not runtime_path.exists()
-        ):
-            warning_score = 70 if self.is_zero_to_one else 50
+        if not ui_contract_path.exists() and not frontend_dir.exists():
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.WARNING,
-                score=warning_score,
+                description="UI 源码契约与设计变量",
+                status=CheckStatus.BLOCKED,
+                score=0,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details="尚未检测到前端实现阶段证据，暂无法验证 UI 契约执行闭环",
+                details="未验证：缺少前端源码与 UI 契约。",
             )
 
         if not ui_contract_path.exists():
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
+                description="UI 源码契约与设计变量",
                 status=CheckStatus.FAILED,
                 score=20,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
@@ -72,7 +60,7 @@ class QualityGateEvidenceMixin:
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
+                description="UI 源码契约与设计变量",
                 status=CheckStatus.FAILED,
                 score=20,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
@@ -83,7 +71,7 @@ class QualityGateEvidenceMixin:
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
+                description="UI 源码契约与设计变量",
                 status=CheckStatus.FAILED,
                 score=20,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
@@ -184,7 +172,7 @@ class QualityGateEvidenceMixin:
                 return QualityCheck(
                     name="UI 契约执行",
                     category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
+                    description="UI 源码契约与设计变量",
                     status=CheckStatus.FAILED,
                     score=30,
                     weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
@@ -196,7 +184,7 @@ class QualityGateEvidenceMixin:
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
+                description="UI 源码契约与设计变量",
                 status=CheckStatus.FAILED,
                 score=30,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
@@ -207,300 +195,51 @@ class QualityGateEvidenceMixin:
             return QualityCheck(
                 name="UI 契约执行",
                 category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
+                description="UI 源码契约与设计变量",
                 status=CheckStatus.FAILED,
                 score=30,
                 weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
                 details="前端产物存在，但缺少 output/frontend/design-tokens.css",
             )
 
-        if not runtime_path.exists():
-            if frontend_dir.exists():
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=35,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details="前端产物已生成，但 frontend runtime 报告缺失，无法证明运行时已接入",
-                )
-            warning_score = 75 if self.is_zero_to_one else 55
-            return QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.WARNING,
-                score=warning_score,
-                weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details="已冻结 UI 契约，但尚未检测到 frontend runtime 报告，无法确认运行时已接入",
-            )
-
-        if not alignment_path.exists():
-            if frontend_dir.exists():
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=35,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details="前端产物和 runtime 已存在，但 UI 契约对齐报告缺失，无法证明源码已真正遵守 UI 契约",
-                )
-            warning_score = 80 if self.is_zero_to_one else 60
-            return QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.WARNING,
-                score=warning_score,
-                weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details="UI 契约和 frontend runtime 已存在，但 UI 契约对齐报告尚未生成，建议完成 UI review 后重新验证",
-            )
-
-        try:
-            runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
-        except Exception:
-            return QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.FAILED,
-                score=30,
-                weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details="frontend runtime JSON 不可解析",
-            )
-
-        if not isinstance(runtime_payload, dict):
-            return QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.FAILED,
-                score=30,
-                weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details="frontend runtime 必须是 JSON object",
-            )
-
-        checks = runtime_payload.get("checks", {})
-        required_runtime_checks = required_claude_design_runtime_checks(payload)
-        runtime_ready = (
-            isinstance(checks, dict)
-            and bool(runtime_payload.get("passed", False))
-            and bool(checks.get("ui_contract_json", False))
-            and bool(checks.get("output_frontend_design_tokens", False))
-            and bool(checks.get("ui_contract_alignment", False))
-            and bool(checks.get("ui_theme_entry", False))
-            and bool(checks.get("ui_navigation_shell", False))
-            and bool(checks.get("ui_component_imports", False))
-            and bool(checks.get("ui_banned_patterns", False))
-            and bool(checks.get("ui_framework_playbook", True))
-            and bool(checks.get("ui_framework_execution", True))
-            and all(bool(checks.get(name, False)) for name in required_runtime_checks)
+        report = self.latest_ui_review_report
+        source = (
+            report.results[0]
+            if report is not None
+            else UIReviewEvidence(self.project_dir, self.name).result(SOURCE)
         )
-        if not runtime_ready:
-            missing_protocol_checks = [
-                CLAUDE_DESIGN_RUNTIME_CHECKS.get(name, name)
-                for name in required_runtime_checks
-                if not bool(checks.get(name, False))
-            ]
-            if cross_platform_frontend:
-                framework_name = str(
-                    framework_playbook.get("framework") or frontend_value or "cross-platform"
-                ).strip()
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=35,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details=(
-                        f"frontend runtime 未证明 {framework_name} 跨平台框架 playbook 与专项执行已真实接入前端"
-                        + (
-                            f"；Claude-Design 协议缺口: {', '.join(missing_protocol_checks)}"
-                            if missing_protocol_checks
-                            else ""
-                        )
-                    ),
-                )
-            return QualityCheck(
-                name="UI 契约执行",
-                category="ui_quality",
-                description="UI 契约、Design Token 与运行时验证闭环",
-                status=CheckStatus.FAILED,
-                score=35,
-                weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                details=(
-                    "frontend runtime 未证明 UI 契约文件、Design Token 与跨平台框架 playbook 已真实接入前端"
-                    + (
-                        f"；Claude-Design 协议缺口: {', '.join(missing_protocol_checks)}"
-                        if missing_protocol_checks
-                        else ""
-                    )
-                ),
-            )
-
-        ui_review_payload: dict[str, Any] = {}
-        if ui_review_path.exists():
-            try:
-                loaded_ui_review = json.loads(ui_review_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_ui_review, dict):
-                    ui_review_payload = loaded_ui_review
-            except Exception:
-                ui_review_payload = {}
-        alignment_value = ui_review_payload.get("alignment_summary")
-        alignment_summary = alignment_value if isinstance(alignment_value, dict) else {}
-        runtime_alignment_value = alignment_summary.get("runtime_claude_design_protocol")
-        runtime_protocol_alignment = (
-            runtime_alignment_value if isinstance(runtime_alignment_value, dict) else {}
-        )
-        source_alignment_value = alignment_summary.get("source_claude_design_protocol")
-        source_protocol_alignment = (
-            source_alignment_value if isinstance(source_alignment_value, dict) else {}
-        )
-        screenshot_judge_value = alignment_summary.get("screenshot_visual_judge")
-        screenshot_visual_judge = (
-            screenshot_judge_value if isinstance(screenshot_judge_value, dict) else {}
-        )
-        premium_ui_contract_keys = [
-            ("brand_signal_manifest", "品牌信号与权威感"),
-            ("proof_composition_rules", "证明构图规则"),
-            ("component_craft_requirements", "组件工艺要求"),
-            ("layout_tension_rules", "布局张力纪律"),
-        ]
-        if required_runtime_checks and ui_review_payload:
-            if runtime_protocol_alignment and not bool(
-                runtime_protocol_alignment.get("passed", False)
-            ):
-                observed = str(runtime_protocol_alignment.get("observed", "")).strip()
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=35,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details=(
-                        "UI review 与 frontend runtime 的 Claude-Design 协议证据未闭环"
-                        + (f"；{observed}" if observed else "")
-                    ),
-                )
-            if source_protocol_alignment and not bool(
-                source_protocol_alignment.get("passed", False)
-            ):
-                observed = str(source_protocol_alignment.get("observed", "")).strip()
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=35,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details=(
-                        "UI review 未在源码/预览中看到 Claude-Design 协议落地信号"
-                        + (f"；observed={observed}" if observed else "")
-                    ),
-                )
-            if screenshot_visual_judge and not bool(screenshot_visual_judge.get("passed", False)):
-                observed = str(screenshot_visual_judge.get("observed", "")).strip()
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=40,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details=(
-                        "UI review 截图级视觉验收未通过，页面仍然过平、过空或过于单一"
-                        + (f"；{observed}" if observed else "")
-                    ),
-                )
-        if ui_review_payload:
-            failed_premium_contracts: list[str] = []
-            for key, label in premium_ui_contract_keys:
-                contract_result = alignment_summary.get(key)
-                if isinstance(contract_result, dict) and contract_result.get("passed") is False:
-                    failed_premium_contracts.append(label)
-            if failed_premium_contracts:
-                return QualityCheck(
-                    name="UI 契约执行",
-                    category="ui_quality",
-                    description="UI 契约、Design Token 与运行时验证闭环",
-                    status=CheckStatus.FAILED,
-                    score=42,
-                    weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-                    details=(
-                        "UI review 已指出高阶设计合同仍未冻结："
-                        + "、".join(failed_premium_contracts)
-                        + "；宿主还没有拿到足够强的品牌/证明/工艺/布局图纸。"
-                    ),
-                )
-
-        library = payload.get("ui_library_preference", {}).get("final_selected", "-")
         return QualityCheck(
             name="UI 契约执行",
             category="ui_quality",
-            description="UI 契约、Design Token 与运行时验证闭环",
-            status=CheckStatus.PASSED,
-            score=100,
+            description="UI 源码契约与设计变量",
+            status=self._ui_check_status(source.status),
+            score=int(source.payload.get("score", 0)),
             weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-            details=(
-                "UI 契约已冻结并接入 runtime；"
-                f"library={library}; icon={icon_system or '-'}; "
-                "emoji_policy=forbidden"
-            ),
+            details=source.detail,
         )
+
+    @staticmethod
+    def _ui_check_status(status: EvidenceStatus) -> CheckStatus:
+        return {
+            EvidenceStatus.PASS: CheckStatus.PASSED,
+            EvidenceStatus.NOT_APPLICABLE: CheckStatus.PASSED,
+            EvidenceStatus.FAIL: CheckStatus.FAILED,
+            EvidenceStatus.BLOCKED: CheckStatus.BLOCKED,
+        }[status]
 
     def _check_ui_review(self) -> QualityCheck:
-        """检查商业级 UI 基线和实现一致性"""
         from .ui_review import UIReviewReviewer
 
-        reviewer = UIReviewReviewer(
-            project_dir=self.project_dir,
-            name=self.name,
-            tech_stack=self.tech_stack,
-        )
-        report = reviewer.review()
+        report = UIReviewReviewer(self.project_dir, self.name, self.tech_stack).review()
         self.latest_ui_review_report = report
-
-        blocking_titles = {
-            "UI 系统决策未被完整冻结",
-            "源码未落实文档冻结的图标系统",
-            "源码未落实文档冻结的字体组合",
-            "源码未落实文档冻结的组件生态",
-        }
-        has_blocking_alignment_gap = any(item.title in blocking_titles for item in report.findings)
-
-        if report.critical_count > 0 or has_blocking_alignment_gap:
-            status = CheckStatus.FAILED
-        elif report.high_count > 0 or report.score < 80:
-            status = CheckStatus.WARNING
-        else:
-            status = CheckStatus.PASSED
-
-        detail_prefix = (
-            f"score={report.score}, critical={report.critical_count}, "
-            f"high={report.high_count}, medium={report.medium_count}"
-        )
-        if report.findings:
-            details = f"{detail_prefix}; top issue: {report.findings[0].title}"
-        else:
-            details = f"{detail_prefix}; 未发现明显 UI 商业级违例"
-
-        from ..design.ui_intelligence import UIIntelligenceAdvisor
-
-        checklist = UIIntelligenceAdvisor.PRE_DELIVERY_CHECKLIST
-        details += f" | 交付检查清单 ({len(checklist)} 项): " + "; ".join(checklist[:3]) + "..."
-
         return QualityCheck(
             name="UI 商业完成度",
             category="ui_quality",
-            description="UI 设计基线、实现一致性与反模式扫描",
-            status=status,
+            description="源码、实际运行及视觉证据",
+            status=self._ui_check_status(report.status),
             score=report.score,
             weight=self.CHECKS_CONFIG["ui_quality"]["weight"],
-            details=details,
+            details=report.executive_summary,
         )
 
     def _check_security(self, redteam_report: RedTeamReport | None) -> list[QualityCheck]:

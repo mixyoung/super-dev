@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from super_dev.artifact_utils import ui_contract_filename
-
 from .artifact_utils import (
     resolve_active_change_id,
     resolve_current_artifact_prefix,
@@ -275,7 +273,6 @@ class CliReleaseQualityMixin:
 
     def _cmd_quality(self, args) -> int:
         """质量检查"""
-        from .reviewers import QualityGateChecker, UIReviewReviewer
         from .reviewers.redteam import load_persisted_redteam_report
 
         project_dir = Path.cwd()
@@ -300,32 +297,16 @@ class CliReleaseQualityMixin:
         self.console.print(f"[cyan]运行质量检查: {args.type}[/cyan]")
 
         if args.type == "ui-review":
-            reviewer = UIReviewReviewer(
-                project_dir=project_dir,
-                name=project_name,
-                tech_stack=tech_stack,
-            )
-            report = reviewer.review()
-            review_file = output_dir / f"{project_name}-ui-review.md"
-            review_json_file = output_dir / f"{project_name}-ui-review.json"
-            alignment_file = output_dir / f"{project_name}-ui-contract-alignment.md"
-            alignment_json_file = output_dir / f"{project_name}-ui-contract-alignment.json"
-            review_file.write_text(report.to_markdown(), encoding="utf-8")
-            review_json_file.write_text(
-                json.dumps(report.to_dict(), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            alignment_file.write_text(report.alignment_markdown(), encoding="utf-8")
-            alignment_json_file.write_text(
-                json.dumps(report.alignment_summary, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            status = "[green]通过（PASS）[/green]" if report.passed else "[red]失败（FAIL）[/red]"
-            self.console.print(f"  {status} 总分: {report.score}/100")
-            self.console.print(f"  [green]✓[/green] 报告: {review_file}")
-            self.console.print(f"  [green]✓[/green] JSON: {review_json_file}")
-            self.console.print(f"  [green]✓[/green] UI 契约对齐: {alignment_file}")
-            self.console.print(f"  [green]✓[/green] UI 契约对齐 JSON: {alignment_json_file}")
+            from .reviewers import UIReviewReviewer
+            from .reviewers.ui_review_evidence import STATUS_LABELS
+            from .reviewers.ui_review_output import write_ui_review_artifacts
+
+            report = UIReviewReviewer(project_dir, project_name, tech_stack).review()
+            paths = write_ui_review_artifacts(project_dir, project_name, report)
+            self.console.print(f"  {STATUS_LABELS[report.status]}")
+            self.console.print(report.executive_summary, markup=False)
+            self.console.print(f"  报告: {paths['markdown']}")
+            self.console.print(f"  JSON: {paths['json']}")
             if report.findings:
                 self.console.print("[yellow]主要问题:[/yellow]")
                 for finding in report.findings[:5]:
@@ -402,6 +383,10 @@ class CliReleaseQualityMixin:
                 return 1
             attested_review_files[session_id.strip()] = normalized_digest
 
+        from .reviewers import QualityGateChecker
+        from .reviewers.fresh_verification_evidence import quality_evidence_dependency_paths
+        from .reviewers.ui_review_output import write_ui_review_artifacts
+
         gate_checker = QualityGateChecker(
             project_dir=project_dir,
             name=project_name,
@@ -416,86 +401,38 @@ class CliReleaseQualityMixin:
         gate_result = gate_checker.check(
             redteam_report=persisted_redteam[1] if persisted_redteam else None
         )
-
-        gate_file = output_dir / f"{project_name}-quality-gate.md"
-        gate_json_file = output_dir / f"{project_name}-quality-gate.json"
+        ui_report = gate_checker.latest_ui_review_report
+        if ui_report is not None:
+            write_ui_review_artifacts(project_dir, project_name, ui_report)
         quality_dependencies = [
-            output_dir / f"{project_name}-uiux.md",
+            *quality_evidence_dependency_paths(
+                project_dir,
+                project_name=project_name,
+                frontend_required=gate_checker.frontend_required,
+                include_fresh_verification=False,
+            ),
             *gate_checker.latest_fresh_verification_dependencies,
         ]
-        if gate_checker.frontend_required:
-            quality_dependencies[:0] = [
-                output_dir / f"{project_name}-ui-review.json",
-                output_dir / f"{project_name}-ui-contract-alignment.json",
-            ]
+        gate_file = output_dir / f"{project_name}-quality-gate.md"
+        gate_json_file = output_dir / f"{project_name}-quality-gate.json"
+        gate_payload = gate_result.to_dict()
+        gate_payload.pop("passed")  # Build the envelope from the authoritative status first.
+        if ui_report is not None:
+            gate_payload["ui_results"] = {item.kind: item.summary() for item in ui_report.results}
+        gate_payload = attach_evidence_identity(
+            gate_payload,
+            project_dir=project_dir,
+            artifact_name="quality-gate",
+            dependencies=quality_dependencies,
+        )
+        gate_payload["passed"] = gate_result.passed
         gate_file.write_text(gate_result.to_markdown(), encoding="utf-8")
         gate_json_file.write_text(
-            json.dumps(
-                attach_evidence_identity(
-                    gate_result.to_dict(),
-                    project_dir=project_dir,
-                    artifact_name="quality-gate",
-                    dependencies=quality_dependencies,
-                ),
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
+            json.dumps(gate_payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        if gate_checker.latest_ui_review_report is not None:
-            ui_review_file = output_dir / f"{project_name}-ui-review.md"
-            ui_review_json_file = output_dir / f"{project_name}-ui-review.json"
-            alignment_file = output_dir / f"{project_name}-ui-contract-alignment.md"
-            alignment_json_file = output_dir / f"{project_name}-ui-contract-alignment.json"
-            ui_review_file.write_text(
-                gate_checker.latest_ui_review_report.to_markdown(),
-                encoding="utf-8",
-            )
-            ui_review_json_file.write_text(
-                json.dumps(
-                    attach_evidence_identity(
-                        gate_checker.latest_ui_review_report.to_dict(),
-                        project_dir=project_dir,
-                        artifact_name="ui-review",
-                        dependencies=[
-                            output_dir / ui_contract_filename(project_name),
-                            output_dir / f"{project_name}-uiux.md",
-                        ],
-                    ),
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            alignment_file.write_text(
-                gate_checker.latest_ui_review_report.alignment_markdown(),
-                encoding="utf-8",
-            )
-            alignment_json_file.write_text(
-                json.dumps(
-                    attach_evidence_identity(
-                        gate_checker.latest_ui_review_report.alignment_summary,
-                        project_dir=project_dir,
-                        artifact_name="ui-contract-alignment",
-                        dependencies=[
-                            output_dir / ui_contract_filename(project_name),
-                            output_dir / f"{project_name}-uiux.md",
-                        ],
-                    ),
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            if (output_dir / "frontend" / "index.html").exists():
-                self._write_frontend_runtime_validation(
-                    project_dir=project_dir,
-                    output_dir=output_dir,
-                    project_name=project_name,
-                )
 
         scenario_label = "0-1 新建项目" if gate_result.scenario == "0-1" else "1-N+1 增量开发"
-        status = "[green]通过（PASS）[/green]" if gate_result.passed else "[red]失败（FAIL）[/red]"
+        status = gate_result.status_label
 
         self.console.print(f"  [dim]场景: {scenario_label}[/dim]")
         self.console.print(

@@ -12,6 +12,7 @@ from super_dev.artifact_utils import ui_contract_filename
 
 from .evidence_identity import attach_evidence_identity
 from .frameworks import framework_playbook_complete, is_cross_platform_frontend
+from .reviewers.ui_review_evidence import RUNTIME, UIReviewEvidence, ui_status_ok
 from .ui_contract_governance import required_claude_design_runtime_checks
 
 
@@ -27,14 +28,6 @@ class CliDeployRuntimeMixin:
 
     def _framework_playbook_complete(self, playbook: dict[str, Any]) -> bool:
         return framework_playbook_complete(playbook)
-
-    def _frontend_runtime_report_paths(
-        self, output_dir: Path, project_name: str
-    ) -> dict[str, Path]:
-        return {
-            "markdown": output_dir / f"{project_name}-frontend-runtime.md",
-            "json": output_dir / f"{project_name}-frontend-runtime.json",
-        }
 
     def _export_preview_from_output_frontend(self, preview_file: Path) -> bool:
         frontend_index = preview_file.parent / "output" / "frontend" / "index.html"
@@ -121,34 +114,15 @@ class CliDeployRuntimeMixin:
     def _load_frontend_runtime_validation(
         self, *, output_dir: Path, project_name: str
     ) -> dict[str, Any]:
-        report_file = self._frontend_runtime_report_paths(
-            output_dir=output_dir, project_name=project_name
-        )["json"]
-        if not report_file.exists():
-            return {
-                "passed": False,
-                "checks": {},
-                "preview_file": "",
-                "report_file": str(report_file),
-            }
-        try:
-            payload = json.loads(report_file.read_text(encoding="utf-8"))
-        except Exception:
-            return {
-                "passed": False,
-                "checks": {},
-                "preview_file": "",
-                "report_file": str(report_file),
-            }
-        if not isinstance(payload, dict):
-            return {
-                "passed": False,
-                "checks": {},
-                "preview_file": "",
-                "report_file": str(report_file),
-            }
-        payload["report_file"] = str(report_file)
-        return payload
+        evidence = UIReviewEvidence(output_dir.parent, project_name)
+        result = evidence.result(RUNTIME)
+        return {
+            **result.payload,
+            "passed": ui_status_ok(result.status),
+            "status": result.status.value,
+            "detail": result.detail,
+            "report_file": str(evidence.path(RUNTIME)),
+        }
 
     def _runtime_ui_source_blob(
         self, *, project_dir: Path, frontend_dir: Path, preview_file: Path
@@ -423,7 +397,7 @@ class CliDeployRuntimeMixin:
             )
         return checks
 
-    def _write_frontend_runtime_validation(
+    def _write_frontend_source_checks(
         self,
         *,
         project_dir: Path,
@@ -647,13 +621,15 @@ class CliDeployRuntimeMixin:
             "ui_alignment_key_areas": ui_alignment_key_areas,
             "ui_banned_pattern_probe": banned_pattern_probe,
         }
-        report_paths = self._frontend_runtime_report_paths(
-            output_dir=output_dir, project_name=project_name
-        )
+        # Legacy structural probes remain diagnostics, never a host runtime result.
+        report_paths = {
+            "json": output_dir / f"{project_name}-frontend-source-checks.json",
+            "markdown": output_dir / f"{project_name}-frontend-source-checks.md",
+        }
         report_with_identity = attach_evidence_identity(
             report,
             project_dir=project_dir,
-            artifact_name="frontend-runtime",
+            artifact_name="frontend-source-checks",
             dependencies=[ui_contract_file, ui_alignment_file],
         )
         report_paths["json"].write_text(
@@ -661,7 +637,7 @@ class CliDeployRuntimeMixin:
         )
 
         lines = [
-            "# Frontend Runtime Validation",
+            "# 前端源码结构探测（不是运行证据）",
             "",
             f"- Passed: {'yes' if passed else 'no'}",
             (

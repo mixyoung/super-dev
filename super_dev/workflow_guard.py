@@ -32,6 +32,8 @@ _DOC_PATTERNS = ("*-prd.md", "*-architecture.md", "*-uiux.md")
 _ACTIVE_DOC_PATTERNS = ("*-research.md", *_DOC_PATTERNS)
 _PREVIEW_PATTERNS = (
     "*-frontend-runtime.json",
+    "*-ui-source-review.json",
+    "*-ui-visual-review.json",
     "*-ui-review.md",
     "*-ui-review.json",
     "*-ui-contract.json",

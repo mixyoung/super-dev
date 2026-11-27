@@ -36,6 +36,7 @@ from .delivery_facts import (
     normalize_report_delivery_facts,
     resolve_project_target_version,
 )
+from .evidence_contract import EvidenceStatus
 from .evidence_identity import build_evidence_identity, evidence_identity_matches, load_json_payload
 from .extensions.evidence import build_candidate_identity
 from .framework_harness import FrameworkHarnessBuilder
@@ -61,9 +62,14 @@ from .reviewers.quality_gate import (
     stored_quality_evidence_dependencies,
 )
 from .reviewers.redteam import load_redteam_evidence
+from .reviewers.ui_review_evidence import (
+    UIReviewEvidence,
+    aggregate_ui_status,
+    ui_result_details,
+    ui_status_ok,
+)
 from .skills import SkillManager
 from .specs import SpecValidator
-from .ui_contract_governance import missing_claude_design_runtime_checks
 from .workflow_state import detect_pipeline_summary
 
 
@@ -709,17 +715,13 @@ class ReleaseReadinessEvaluator:
             self._latest("*-task-execution.md"),
             self._latest("*-product-audit.json"),
             self._latest("*-baseline-audit.json") or self._latest("*-baseline-audit.md"),
-            self._latest("*-uiux.md"),
         ]
         if self.frontend_required:
             dependencies.extend(
-                [
-                    self._latest("*-ui-contract.json"),
-                    self._latest("*-frontend-runtime.json"),
-                    self._latest("*-ui-review.json"),
-                    self._latest("*-ui-contract-alignment.json"),
-                ]
+                UIReviewEvidence(self.project_dir, self.project_name).dependency_paths()
             )
+        else:
+            dependencies.append(self._latest("*-uiux.md"))
         fresh_evidence = None
         if self.fresh_verification_required:
             fresh_evidence = inspect_current_fresh_verification(self.project_dir)
@@ -1342,13 +1344,6 @@ class ReleaseReadinessEvaluator:
         task_execution_file = self._latest("*-task-execution.md")
         product_audit_file = self._latest("*-product-audit.json")
         ui_contract_file = self._latest("*-ui-contract.json") if self.frontend_required else None
-        frontend_runtime_file = (
-            self._latest("*-frontend-runtime.json") if self.frontend_required else None
-        )
-        ui_review_file = self._latest("*-ui-review.json") if self.frontend_required else None
-        ui_alignment_file = (
-            self._latest("*-ui-contract-alignment.json") if self.frontend_required else None
-        )
         uiux_file = self._latest("*-uiux.md")
         design_tokens_file = self.output_dir / "frontend" / "design-tokens.css"
 
@@ -1428,7 +1423,9 @@ class ReleaseReadinessEvaluator:
                 ):
                     blockers.append("quality gate stale")
                 if quality_gate_payload:
-                    if quality_gate_payload.get("passed") is not True:
+                    if quality_gate_payload.get("status") == EvidenceStatus.BLOCKED.value:
+                        blockers.append("质量门禁未验证，验收受阻（BLOCKED）")
+                    elif quality_gate_payload.get("passed") is not True:
                         blockers.append("quality gate failed")
                 else:
                     quality_text = quality_gate_file.read_text(
@@ -1492,6 +1489,7 @@ class ReleaseReadinessEvaluator:
                 passed=passed,
                 detail="delivery closure evidence aligned" if passed else "; ".join(blockers),
                 severity="critical" if not passed else "low",
+                evidence={"ui_status": EvidenceStatus.NOT_APPLICABLE.value},
                 recommendation=(
                     "先补齐 redteam / quality gate / task execution / product audit 证据，"
                     "并确保它们指向同一轮交付；当前项目不要求前端证据。"
@@ -1581,151 +1579,14 @@ class ReleaseReadinessEvaluator:
         if not design_tokens_file.exists():
             blockers.append("design tokens missing")
 
-        if frontend_runtime_file is None or not frontend_runtime_file.exists():
-            blockers.append("frontend runtime missing")
-        else:
-            expected_frontend_identity = build_evidence_identity(
-                self.project_dir,
-                artifact_name="frontend-runtime",
-                dependencies=[ui_contract_file, ui_alignment_file],
+        ui_results = UIReviewEvidence(self.project_dir, self.project_name).results()
+        ui_status = aggregate_ui_status(ui_results)
+        if not ui_status_ok(ui_status):
+            blockers.append(
+                ui_result_details(
+                    result for result in ui_results if not ui_status_ok(result.status)
+                )
             )
-            if is_artifact_stale(
-                frontend_runtime_file,
-                dependencies=[ui_contract_file, ui_alignment_file],
-            ):
-                blockers.append("frontend runtime stale")
-            try:
-                frontend_runtime_payload = json.loads(
-                    frontend_runtime_file.read_text(encoding="utf-8")
-                )
-            except Exception:
-                blockers.append("frontend runtime unreadable")
-            else:
-                identity_ok, identity_reason = evidence_identity_matches(
-                    frontend_runtime_payload if isinstance(frontend_runtime_payload, dict) else {},
-                    expected=expected_frontend_identity,
-                )
-                if not identity_ok:
-                    blockers.append(
-                        "frontend runtime evidence mismatch"
-                        if identity_reason == "digest_mismatch"
-                        else "frontend runtime evidence identity missing"
-                    )
-                checks = (
-                    frontend_runtime_payload.get("checks", {})
-                    if isinstance(frontend_runtime_payload, dict)
-                    else {}
-                )
-                key_ui_checks = (
-                    "ui_contract_alignment",
-                    "ui_theme_entry",
-                    "ui_navigation_shell",
-                    "ui_component_imports",
-                    "ui_banned_patterns",
-                    "ui_framework_playbook",
-                    "ui_framework_execution",
-                )
-                missing_protocol_checks = missing_claude_design_runtime_checks(
-                    checks if isinstance(checks, dict) else {},
-                    ui_contract_payload if isinstance(ui_contract_payload, dict) else {},
-                )
-                runtime_ready = (
-                    isinstance(frontend_runtime_payload, dict)
-                    and bool(frontend_runtime_payload.get("passed", False))
-                    and isinstance(checks, dict)
-                    and bool(checks.get("ui_contract_json", False))
-                    and bool(checks.get("output_frontend_design_tokens", False))
-                    and all(bool(checks.get(name, True)) for name in key_ui_checks)
-                    and not missing_protocol_checks
-                )
-                if not runtime_ready:
-                    if cross_platform_frontend:
-                        framework_name = str(
-                            framework_playbook.get("framework")
-                            or frontend_value
-                            or "cross-platform"
-                        ).strip()
-                        blockers.append(
-                            f"{framework_name} frontend runtime framework execution missing"
-                        )
-                    else:
-                        blockers.append("frontend runtime ui contract alignment missing")
-                    if missing_protocol_checks:
-                        blockers.append(
-                            "frontend runtime claude-design execution missing:"
-                            + ",".join(missing_protocol_checks)
-                        )
-                ui_review_payload = {}
-                if ui_review_file is not None and ui_review_file.exists():
-                    try:
-                        ui_review_payload = json.loads(ui_review_file.read_text(encoding="utf-8"))
-                    except Exception:
-                        ui_review_payload = {}
-                alignment_summary = (
-                    ui_review_payload.get("alignment_summary", {})
-                    if isinstance(ui_review_payload, dict)
-                    and isinstance(ui_review_payload.get("alignment_summary"), dict)
-                    else {}
-                )
-                runtime_protocol_alignment = (
-                    alignment_summary.get("runtime_claude_design_protocol", {})
-                    if isinstance(alignment_summary.get("runtime_claude_design_protocol"), dict)
-                    else {}
-                )
-                source_protocol_alignment = (
-                    alignment_summary.get("source_claude_design_protocol", {})
-                    if isinstance(alignment_summary.get("source_claude_design_protocol"), dict)
-                    else {}
-                )
-                screenshot_visual_judge = (
-                    alignment_summary.get("screenshot_visual_judge", {})
-                    if isinstance(alignment_summary.get("screenshot_visual_judge"), dict)
-                    else {}
-                )
-                premium_ui_contract_labels = {
-                    "brand_signal_manifest": "品牌信号与权威感",
-                    "proof_composition_rules": "证明构图规则",
-                    "component_craft_requirements": "组件工艺要求",
-                    "layout_tension_rules": "布局张力纪律",
-                }
-                if missing_claude_design_runtime_checks(
-                    checks if isinstance(checks, dict) else {},
-                    ui_contract_payload if isinstance(ui_contract_payload, dict) else {},
-                ):
-                    pass
-                elif runtime_protocol_alignment and not bool(
-                    runtime_protocol_alignment.get("passed", False)
-                ):
-                    blockers.append(
-                        "ui review/runtime claude-design mismatch:"
-                        + str(runtime_protocol_alignment.get("observed", "")).strip()
-                    )
-                elif source_protocol_alignment and not bool(
-                    source_protocol_alignment.get("passed", False)
-                ):
-                    blockers.append(
-                        "ui review source claude-design protocol missing:"
-                        + str(source_protocol_alignment.get("observed", "")).strip()
-                    )
-                elif screenshot_visual_judge and not bool(
-                    screenshot_visual_judge.get("passed", False)
-                ):
-                    blockers.append(
-                        "ui review screenshot visual judge failed:"
-                        + str(screenshot_visual_judge.get("observed", "")).strip()
-                    )
-                else:
-                    failed_premium_contracts = [
-                        label
-                        for key, label in premium_ui_contract_labels.items()
-                        if isinstance(alignment_summary.get(key), dict)
-                        and alignment_summary[key].get("passed") is False
-                    ]
-                    if failed_premium_contracts:
-                        blockers.append(
-                            "ui review premium coaching contract missing:"
-                            + ",".join(failed_premium_contracts)
-                        )
 
         passed = not blockers
         detail = "delivery closure evidence aligned" if passed else "; ".join(blockers)
@@ -1734,6 +1595,10 @@ class ReleaseReadinessEvaluator:
             passed=passed,
             detail=detail,
             severity="critical" if not passed else "low",
+            evidence={
+                "ui_status": ui_status.value,
+                "ui_results": {item.kind: item.summary() for item in ui_results},
+            },
             recommendation=(
                 "先补齐 redteam / quality gate / task execution / product audit / ui contract / frontend runtime 证据，并确保它们指向同一轮交付。"
             ),

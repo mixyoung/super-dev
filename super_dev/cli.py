@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from . import __description__, __version__
+from .artifact_utils import resolve_active_change_id, resolve_current_artifact_prefix
 from .catalogs import (
     CICD_PLATFORM_IDS,
     DOMAIN_IDS,
@@ -46,7 +47,7 @@ from .cli_pipeline_runtime_mixin import CliPipelineRuntimeMixin
 from .cli_release_quality_mixin import CliReleaseQualityMixin
 from .cli_spec_mixin import CliSpecMixin
 from .cli_workflow_runtime_mixin import CliWorkflowRuntimeMixin
-from .config import get_config_manager
+from .config import ConfigManager, get_config_manager
 from .error_handler import handle_cli_error
 from .review_state import (
     architecture_revision_file,
@@ -60,6 +61,7 @@ from .review_state import (
     quality_revision_file,
     ui_revision_file,
 )
+from .reviewers.ui_review_evidence import RUNTIME, UIReviewEvidence, ui_result_details, ui_status_ok
 from .terminal import (
     create_console,
 )
@@ -681,10 +683,17 @@ class SuperDevCLI(
     def _ensure_preview_confirmation_for_execution(
         self, project_dir: Path, *, action_label: str
     ) -> bool:
-        output_dir = project_dir / "output"
-        frontend_ready = any(output_dir.glob("*-frontend-runtime.json"))
-        if not frontend_ready:
+        config = ConfigManager(project_dir).load()
+        if str(config.frontend or "").strip().lower() in {"", "none"}:
             return True
+        prefix = resolve_current_artifact_prefix(project_dir, configured_name=config.name)
+        evidence = UIReviewEvidence(project_dir, prefix)
+        if not evidence.path(RUNTIME).is_file():
+            return True  # Creating a Spec may precede frontend implementation.
+        runtime = evidence.result(RUNTIME)
+        if not ui_status_ok(runtime.status):
+            self.console.print(f"[red]{action_label}前：{ui_result_details([runtime])}[/red]")
+            return False
         if self._preview_confirmation_is_confirmed(project_dir):
             return True
 
@@ -1149,6 +1158,7 @@ class SuperDevCLI(
         output_dir: Path,
         project_name: str,
         resume_from_stage: int | None,
+        frontend_required: bool = True,
     ) -> tuple[int | None, list[str]]:
         if resume_from_stage is None:
             return None, []
@@ -1170,23 +1180,16 @@ class SuperDevCLI(
             adjusted = 2
             reasons.append("未检测到可用 Spec 变更目录")
 
-        if adjusted in {4, 5, 6, 7, 8}:
-            frontend_runtime_report = output_dir / f"{project_name}-frontend-runtime.json"
-            if not frontend_runtime_report.exists():
+        if frontend_required and adjusted in {4, 5, 6, 7, 8}:
+            runtime = UIReviewEvidence(project_dir, project_name).result(RUNTIME)
+            if not ui_status_ok(runtime.status):
                 adjusted = 3
-                reasons.append("缺少前端运行验证报告")
+                reasons.append(ui_result_details([runtime]))
 
         return adjusted, reasons
 
     def _detect_latest_change_id(self, project_dir: Path) -> str:
-        changes_dir = project_dir / ".super-dev" / "changes"
-        if not changes_dir.exists():
-            return ""
-        change_dirs = [item for item in changes_dir.iterdir() if item.is_dir()]
-        if not change_dirs:
-            return ""
-        latest = max(change_dirs, key=lambda item: item.stat().st_mtime)
-        return latest.name
+        return resolve_active_change_id(project_dir)
 
     def _extract_resume_context(
         self,

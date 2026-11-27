@@ -22,6 +22,7 @@ from ..seeai_design_system import (
     get_seeai_archetype_playbooks,
     get_seeai_design_packs,
 )
+from ..ui_contract_governance import UI_REVIEW_EVIDENCE_GUIDANCE
 from ..workflow_contract import knowledge_authority_guidance, readonly_request_guidance
 
 SUPER_DEV_VERSION = "2.6.0"
@@ -1746,7 +1747,9 @@ class SuperDevSkillContent:
             "验证可以复用，新改动、失败或未解决疑点才触发补测。\n"
             "- 验证新增功能接入实际调用路径；公共库接口按其消费者或测试验证，"
             "不因当前项目尚未调用而自动删除。\n"
-            "- 新增日志、告警和埋点按实际需求检查触发路径；缺少运行条件时说明未验证。"
+            "- 新增日志、告警和埋点按实际需求检查触发路径；缺少运行条件时说明未验证。\n\n"
+            "### UI 验收取证\n\n"
+            f"{UI_REVIEW_EVIDENCE_GUIDANCE.rstrip()}"
         )
 
     def _section_never_do(self) -> str:

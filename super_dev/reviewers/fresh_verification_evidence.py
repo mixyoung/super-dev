@@ -17,6 +17,7 @@ from ..extensions.builtins.fresh_verification import (
     parse_junit_summary,
 )
 from ..extensions.evidence import EvidenceStore, build_candidate_identity, candidate_matches
+from .ui_review_evidence import UIReviewEvidence
 
 
 def fresh_verification_required(config: object) -> bool:
@@ -265,12 +266,11 @@ def quality_evidence_dependency_paths(
     include_fresh_verification: bool = True,
 ) -> list[Path]:
     output_dir = Path(project_dir) / "output"
-    dependencies = [output_dir / f"{project_name}-uiux.md"]
-    if frontend_required:
-        dependencies[:0] = [
-            output_dir / f"{project_name}-ui-review.json",
-            output_dir / f"{project_name}-ui-contract-alignment.json",
-        ]
+    dependencies = (
+        UIReviewEvidence(project_dir, project_name).dependency_paths()
+        if frontend_required
+        else [output_dir / f"{project_name}-uiux.md"]
+    )
     config = ConfigManager(project_dir).load()
     if include_fresh_verification and fresh_verification_required(config):
         evidence = inspect_current_fresh_verification(project_dir)

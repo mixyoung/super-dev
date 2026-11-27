@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from super_dev.change_ledger import ChangeLedger
+from super_dev.evidence_contract import EvidenceStatus
 from super_dev.extensions.builtins.fresh_verification import parse_junit_summary
 from super_dev.extensions.evidence import build_candidate_identity
 from super_dev.review_state import save_host_runtime_validation, save_workflow_state
@@ -20,8 +21,10 @@ from super_dev.reviewers.quality_gate import (
     QualityGateResult,
     inspect_current_fresh_verification,
 )
+from super_dev.reviewers.ui_review_evidence import RUNTIME, VISUAL
 from super_dev.scope_advisory import build_scope_advisory
 from super_dev.workflow_guard import save_bound_docs_confirmation
+from tests.support.ui_evidence_inputs import create_ui_project, dump, publish_source
 
 
 def _write_quality_config(
@@ -1890,607 +1893,101 @@ class TestQualityGateChecker:
         check = checker._check_knowledge_governance()
         assert check.status.value == "warning"
 
-    def test_ui_contract_execution_passed_when_contract_tokens_and_runtime_align(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            (
-                "{\n"
-                '  "ui_contract": {"label": "UI 契约文件", "passed": true, "expected": "frozen", "observed": "frozen"},\n'
-                '  "icon_system": {"label": "图标系统", "passed": true, "expected": "lucide-react", "observed": "lucide-react"},\n'
-                '  "font_pair": {"label": "字体组合", "passed": true, "expected": "Space Grotesk / Inter", "observed": "Space Grotesk / Inter"},\n'
-                '  "component_ecosystem": {"label": "组件生态", "passed": true, "expected": "shadcn/ui + Radix + Tailwind", "observed": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "theme_entry": {"label": "主题入口", "passed": true, "expected": "theme provider or tokens import", "observed": "tokens import"},\n'
-                '  "navigation_shell": {"label": "导航骨架", "passed": true, "expected": "app shell", "observed": "app shell"},\n'
-                '  "component_imports": {"label": "组件导入路径", "passed": true, "expected": "components/ui", "observed": "components/ui"},\n'
-                '  "banned_patterns": {"label": "反模式约束", "passed": true, "expected": "no emoji / no chat shell", "observed": "clean"},\n'
-                '  "design_tokens": {"label": "Design Token 接入", "passed": true, "expected": "wired", "observed": "wired"},\n'
-                '  "token_usage": {"label": "冻结 Token 使用率", "passed": true, "expected": "majority", "observed": "majority"}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_theme_entry": true,\n'
-                '    "ui_navigation_shell": true,\n'
-                '    "ui_component_imports": true,\n'
-                '    "ui_banned_patterns": true,\n'
-                '    "ui_framework_playbook": true,\n'
-                '    "ui_framework_execution": true,\n'
-                '    "ui_screen_recipes": true,\n'
-                '    "ui_design_context_protocol": true,\n'
-                '    "ui_tweak_strategy": true,\n'
-                '    "ui_verification_handoff": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "passed"
-        assert "library=shadcn/ui + Radix + Tailwind" in check.details
-
-    def test_ui_contract_execution_failed_when_runtime_missing_contract_alignment(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            (
-                "{\n"
-                '  "ui_contract": {"label": "UI 契约文件", "passed": true, "expected": "frozen", "observed": "frozen"},\n'
-                '  "icon_system": {"label": "图标系统", "passed": true, "expected": "lucide-react", "observed": "lucide-react"},\n'
-                '  "font_pair": {"label": "字体组合", "passed": true, "expected": "Space Grotesk / Inter", "observed": "Space Grotesk / Inter"},\n'
-                '  "component_ecosystem": {"label": "组件生态", "passed": true, "expected": "shadcn/ui + Radix + Tailwind", "observed": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"label": "Design Token 接入", "passed": true, "expected": "wired", "observed": "wired"},\n'
-                '  "token_usage": {"label": "冻结 Token 使用率", "passed": true, "expected": "majority", "observed": "majority"}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": false,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "frontend runtime 未证明 UI 契约文件" in check.details
-
-    def test_ui_contract_execution_failed_when_contract_missing_emoji_policy(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_banned_patterns": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "emoji_policy" in check.details
-
-    def test_ui_contract_execution_failed_when_claude_design_protocol_missing(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_theme_entry": true,\n'
-                '    "ui_navigation_shell": true,\n'
-                '    "ui_component_imports": true,\n'
-                '    "ui_banned_patterns": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "screen_recipes" in check.details
-
-    def test_ui_contract_execution_failed_when_ui_review_runtime_protocol_mismatches(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            json.dumps({"theme_entry": {"passed": True}}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_theme_entry": true,\n'
-                '    "ui_navigation_shell": true,\n'
-                '    "ui_component_imports": true,\n'
-                '    "ui_banned_patterns": true,\n'
-                '    "ui_screen_recipes": true,\n'
-                '    "ui_design_context_protocol": true,\n'
-                '    "ui_tweak_strategy": true,\n'
-                '    "ui_verification_handoff": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-ui-review.json").write_text(
-            json.dumps(
+    @staticmethod
+    def _ui_contract_fixture(project_dir: Path):
+        evidence = create_ui_project(project_dir)
+        contract = {
+            "style_direction": "Editorial workspace",
+            "typography": {"heading": "Space Grotesk", "body": "Inter"},
+            "icon_system": "lucide-react",
+            "emoji_policy": {
+                "allowed_in_ui": False,
+                "allowed_as_icon": False,
+                "allowed_during_development": False,
+            },
+            "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},
+            "design_tokens": {"color": {"primary": "#0f172a"}},
+            "screen_recipes": [
                 {
-                    "alignment_summary": {
-                        "runtime_claude_design_protocol": {
-                            "passed": False,
-                            "observed": "mismatch=screen_recipes, verification_handoff",
-                        },
-                        "source_claude_design_protocol": {
-                            "passed": True,
-                            "observed": "screen_recipes, design_context_protocol, tweak_strategy, verification_handoff",
-                        },
-                    }
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
+                    "id": "home",
+                    "section_order": ["main"],
+                    "trust_modules": ["案例"],
+                    "required_states": ["loading"],
+                }
+            ],
+            "design_context_protocol": {
+                "preferred_import_order": ["tokens"],
+                "github_import_targets": ["theme.ts"],
+                "single_source_rule": "single source",
+            },
+            "tweak_strategy": {
+                "mode": "single source",
+                "default_controls": ["密度"],
+                "persistence_rule": "persist",
+            },
+            "verification_handoff": {
+                "verification_order": ["preview"],
+                "required_artifacts": ["index.html"],
+                "acceptance_checks": ["no emoji"],
+            },
+        }
+        dump(evidence.contract, contract)
+        tokens = evidence.output / "frontend/design-tokens.css"
+        tokens.parent.mkdir()
+        tokens.write_text(":root { --color-primary: #0f172a; }", encoding="utf-8")
         checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
+            project_dir=project_dir,
+            name=evidence.prefix,
             tech_stack={"frontend": "react", "backend": "python"},
             scenario_override="1-N+1",
         )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "UI review 与 frontend runtime 的 Claude-Design 协议证据未闭环" in check.details
+        return evidence, contract, checker
 
-    def test_ui_contract_execution_failed_when_ui_review_source_protocol_missing(
+    def test_ui_contract_execution_source_pass_does_not_pass_runtime_or_vision(
         self, temp_project_dir: Path
     ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            json.dumps({"theme_entry": {"passed": True}}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_theme_entry": true,\n'
-                '    "ui_navigation_shell": true,\n'
-                '    "ui_component_imports": true,\n'
-                '    "ui_banned_patterns": true,\n'
-                '    "ui_screen_recipes": true,\n'
-                '    "ui_design_context_protocol": true,\n'
-                '    "ui_tweak_strategy": true,\n'
-                '    "ui_verification_handoff": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-ui-review.json").write_text(
-            json.dumps(
-                {
-                    "alignment_summary": {
-                        "runtime_claude_design_protocol": {
-                            "passed": True,
-                            "observed": "aligned with frontend-runtime",
-                        },
-                        "source_claude_design_protocol": {
-                            "passed": False,
-                            "observed": "design_context_protocol",
-                        },
-                    }
+        evidence, _, checker = self._ui_contract_fixture(temp_project_dir)
+        publish_source(evidence)
+        assert checker._check_ui_contract_execution().status is CheckStatus.PASSED
+        assert evidence.result(RUNTIME).status is EvidenceStatus.BLOCKED
+        assert evidence.result(VISUAL).status is EvidenceStatus.BLOCKED
+
+    @pytest.mark.parametrize("summary_passed", [True, False])
+    def test_ui_contract_execution_does_not_use_legacy_reports(
+        self, temp_project_dir: Path, summary_passed: bool
+    ):
+        evidence, _, checker = self._ui_contract_fixture(temp_project_dir)
+        dump(evidence.path(RUNTIME), {"passed": True, "checks": {"ui_contract_json": True}})
+        dump(
+            evidence.output / f"{evidence.prefix}-ui-review.json",
+            {
+                "passed": summary_passed,
+                "alignment_summary": {
+                    "runtime_claude_design_protocol": {"passed": summary_passed},
+                    "source_claude_design_protocol": {"passed": summary_passed},
+                    "screenshot_visual_judge": {"passed": summary_passed},
                 },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
+            },
         )
+        assert checker._check_ui_contract_execution().status is CheckStatus.BLOCKED
+        assert evidence.result(RUNTIME).reason == "legacy"
+        assert evidence.result(VISUAL).status is EvidenceStatus.BLOCKED
 
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "UI review 未在源码/预览中看到 Claude-Design 协议落地信号" in check.details
-
-    def test_ui_contract_execution_failed_when_screenshot_visual_judge_fails(
-        self, temp_project_dir: Path
+    @pytest.mark.parametrize("missing", ["emoji_policy", "screen_recipes", "framework_playbook"])
+    def test_ui_contract_execution_fails_when_required_contract_sections_are_missing(
+        self, temp_project_dir: Path, missing: str
     ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "style_direction": "Editorial workspace",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "shadcn/ui + Radix + Tailwind"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "North Star Hero", "section_order": ["hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["theme.ts"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["信息密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["no emoji"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            json.dumps({"theme_entry": {"passed": True}}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_theme_entry": true,\n'
-                '    "ui_navigation_shell": true,\n'
-                '    "ui_component_imports": true,\n'
-                '    "ui_banned_patterns": true,\n'
-                '    "ui_screen_recipes": true,\n'
-                '    "ui_design_context_protocol": true,\n'
-                '    "ui_tweak_strategy": true,\n'
-                '    "ui_verification_handoff": true\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-ui-review.json").write_text(
-            json.dumps(
-                {
-                    "alignment_summary": {
-                        "runtime_claude_design_protocol": {
-                            "passed": True,
-                            "observed": "aligned with frontend-runtime",
-                        },
-                        "source_claude_design_protocol": {
-                            "passed": True,
-                            "observed": "screen_recipes, design_context_protocol, tweak_strategy, verification_handoff",
-                        },
-                        "screenshot_visual_judge": {
-                            "passed": False,
-                            "observed": "blank=0.82, contrast=0.09, dominant=0.91",
-                        },
-                    }
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "python"},
-            scenario_override="1-N+1",
-        )
+        evidence, contract, checker = self._ui_contract_fixture(temp_project_dir)
+        if missing == "framework_playbook":
+            contract["analysis"] = {"frontend": "uni-app"}
+        else:
+            contract.pop(missing)
+        dump(evidence.contract, contract)
         check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "UI review 截图级视觉验收未通过" in check.details
+        assert check.status is CheckStatus.FAILED
+        assert missing in check.details
 
-    def test_ui_contract_execution_failed_when_cross_platform_contract_missing_framework_playbook(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "analysis": {"frontend": "uni-app"},\n'
-                '  "style_direction": "可信商城",\n'
-                '  "typography": {"heading": "Space Grotesk", "body": "Inter"},\n'
-                '  "icon_system": "lucide-react",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "TDesign 小程序 + Taro / UniApp + Tailwind(TW 适配)"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "Miniapp Entry", "section_order": ["navigation", "hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["pages.json"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["导航密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["platform proof"]}\n'
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": true,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_framework_playbook": false\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "uni-app", "backend": "node"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "uni-app 跨平台框架 playbook" in check.details
-
-    def test_ui_contract_execution_failed_when_cross_platform_runtime_missing_framework_execution(
-        self, temp_project_dir: Path
-    ):
-        output_dir = temp_project_dir / "output"
-        frontend_dir = output_dir / "frontend"
-        frontend_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-contract.json").write_text(
-            (
-                "{\n"
-                '  "analysis": {"frontend": "uni-app"},\n'
-                '  "style_direction": "可信商城",\n'
-                '  "typography": {"heading": "Alibaba PuHuiTi", "body": "PingFang SC"},\n'
-                '  "icon_system": "TDesign Icons",\n'
-                '  "emoji_policy": {"allowed_in_ui": false, "allowed_as_icon": false, "allowed_during_development": false},\n'
-                '  "ui_library_preference": {"final_selected": "TDesign 小程序 + Taro / UniApp"},\n'
-                '  "design_tokens": {"color": {"primary": "#0f172a"}},\n'
-                '  "screen_recipes": [{"label": "Miniapp Entry", "section_order": ["navigation", "hero"], "trust_modules": ["案例"], "required_states": ["loading"]}],\n'
-                '  "design_context_protocol": {"preferred_import_order": ["tokens"], "github_import_targets": ["pages.json"], "single_source_rule": "single source"},\n'
-                '  "tweak_strategy": {"mode": "single-source prototype", "default_controls": ["导航密度"], "persistence_rule": "persist edits"},\n'
-                '  "verification_handoff": {"verification_order": ["preview"], "required_artifacts": ["output/frontend/index.html"], "acceptance_checks": ["platform proof"]},\n'
-                '  "framework_playbook": {\n'
-                '    "framework": "uni-app",\n'
-                '    "implementation_modules": ["自定义导航栏高度"],\n'
-                '    "platform_constraints": ["status bar 与安全区"],\n'
-                '    "execution_guardrails": ["先冻结 navigationStyle"],\n'
-                '    "native_capabilities": ["登录 provider"],\n'
-                '    "validation_surfaces": ["微信小程序导航"],\n'
-                '    "delivery_evidence": ["三端差异说明"]\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-        (frontend_dir / "design-tokens.css").write_text(
-            ":root { --color-primary: #0f172a; }\n", encoding="utf-8"
-        )
-        (output_dir / "demo-ui-contract-alignment.json").write_text(
-            '{"framework_execution":{"label":"框架 Playbook 执行","passed":false,"expected":"uni., #ifdef, provider","observed":"uni."}}',
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            (
-                "{\n"
-                '  "passed": false,\n'
-                '  "checks": {\n'
-                '    "ui_contract_json": true,\n'
-                '    "output_frontend_design_tokens": true,\n'
-                '    "ui_contract_alignment": true,\n'
-                '    "ui_framework_playbook": true,\n'
-                '    "ui_framework_execution": false\n'
-                "  }\n"
-                "}\n"
-            ),
-            encoding="utf-8",
-        )
-
-        checker = QualityGateChecker(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "uni-app", "backend": "node"},
-            scenario_override="1-N+1",
-        )
-        check = checker._check_ui_contract_execution()
-        assert check.status.value == "failed"
-        assert "uni-app 跨平台框架 playbook" in check.details
+    def test_ui_contract_execution_retains_actual_source_failure(self, temp_project_dir: Path):
+        evidence, _, checker = self._ui_contract_fixture(temp_project_dir)
+        publish_source(evidence, status=EvidenceStatus.FAIL)
+        assert checker._check_ui_contract_execution().status is CheckStatus.FAILED

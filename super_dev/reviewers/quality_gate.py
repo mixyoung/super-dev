@@ -127,6 +127,26 @@ class QualityGateResult:
         return [c for c in self.checks if c.status == CheckStatus.WARNING]
 
     @property
+    def blocked_checks(self) -> list[QualityCheck]:
+        return [check for check in self.checks if check.status == CheckStatus.BLOCKED]
+
+    @property
+    def status_code(self) -> str:
+        if self.passed:
+            return "PASS"
+        if self.blocked_checks and not self.critical_failures:
+            return "BLOCKED"
+        return "FAIL"
+
+    @property
+    def status_label(self) -> str:
+        return {
+            "PASS": "通过（PASS）",
+            "FAIL": "失败（FAIL）",
+            "BLOCKED": "未验证，门禁受阻（BLOCKED）",
+        }[self.status_code]
+
+    @property
     def executive_summary(self) -> str:
         layered_runtime_text = str(self.summary_context.get("host_runtime_layered_gap", "")).strip()
         compliance_text = str(self.summary_context.get("compliance_signal_summary", "")).strip()
@@ -138,17 +158,22 @@ class QualityGateResult:
                 f"阈值 {self.threshold:g}/100；未加权平均分 {self.total_score}/100。"
                 f"{workflow_text}{baseline_text}{layered_runtime_text}{compliance_text}"
             )
-        priority_checks = self.failed_checks or sorted(
-            self.warning_checks,
-            key=lambda check: check.score,
+        priority_checks = (
+            self.failed_checks
+            or self.blocked_checks
+            or sorted(
+                self.warning_checks,
+                key=lambda check: check.score,
+            )
         )
         priority_names = "、".join(check.name for check in priority_checks[:3])
         if not priority_names:
             priority_names = "提升低分检查项"
+        priority_action = "优先补齐验证证据" if self.status_code == "BLOCKED" else "优先修复"
         return (
-            f"质量门禁未通过，门禁分（加权）{self.gate_score:.1f}/100，"
+            f"质量门禁未通过：{self.status_label}，门禁分（加权）{self.gate_score:.1f}/100，"
             f"阈值 {self.threshold:g}/100；未加权平均分 {self.total_score}/100。"
-            f"优先修复：{priority_names}。{workflow_text}{baseline_text}{layered_runtime_text}{compliance_text}"
+            f"{priority_action}：{priority_names}。{workflow_text}{baseline_text}{layered_runtime_text}{compliance_text}"
         )
 
     @property
@@ -174,16 +199,20 @@ class QualityGateResult:
             for check in self.checks:
                 expert = rule_to_expert.get(check.category, "CODE")
                 if expert not in expert_results:
-                    expert_results[expert] = {"passed": 0, "failed": 0, "score": 0, "checks": []}
+                    expert_results[expert] = {
+                        "passed": 0,
+                        "failed": 0,
+                        "blocked": 0,
+                        "warning": 0,
+                        "score": 0,
+                        "checks": [],
+                    }
                 expert_results[expert]["checks"].append(check)
-                if check.status == CheckStatus.PASSED:
-                    expert_results[expert]["passed"] += 1
-                else:
-                    expert_results[expert]["failed"] += 1
+                expert_results[expert][check.status.value] += 1
 
             # 计算每个专家的平均分
             for expert, data in expert_results.items():
-                total = data["passed"] + data["failed"]
+                total = len(data["checks"])
                 if total > 0:
                     data["score"] = int(sum(c.score for c in data["checks"]) / total)
 
@@ -193,7 +222,7 @@ class QualityGateResult:
 
     def to_markdown(self) -> str:
         """生成 Markdown 报告"""
-        status_icon = "通过" if self.passed else "未通过"
+        status_icon = self.status_label
         status_color = "green" if self.passed else "red"
 
         lines = [
@@ -216,6 +245,7 @@ class QualityGateResult:
             f"- 通过: {len(self.passed_checks)} 项",
             f"- 警告: {len(self.warning_checks)} 项",
             f"- 失败: {len(self.failed_checks)} 项",
+            f"- 受阻: {len(self.blocked_checks)} 项",
             "",
         ]
 
@@ -258,7 +288,11 @@ class QualityGateResult:
                 status_icon = (
                     "✓"
                     if check.status == CheckStatus.PASSED
-                    else "⚠" if check.status == CheckStatus.WARNING else "✗"
+                    else (
+                        "⚠"
+                        if check.status == CheckStatus.WARNING
+                        else "受阻（BLOCKED）" if check.status == CheckStatus.BLOCKED else "✗"
+                    )
                 )
                 lines.append(
                     f"| {check.name} | {status_icon} | {check.score}/100 | {check.description} |"
@@ -296,19 +330,24 @@ class QualityGateResult:
                     [
                         "## 专家视角总结",
                         "",
-                        "| 专家 | 通过 | 失败 | 平均分 | 评价 |",
-                        "|------|------|------|--------|------|",
+                        "| 专家 | 通过 | 失败 | 受阻 | 警告 | 平均分 | 评价 |",
+                        "|------|------|------|------|------|--------|------|",
                     ]
                 )
 
                 for expert, data in expert_data.items():
                     rating = (
-                        "优秀"
-                        if data["score"] >= 80
-                        else "需改进" if data["score"] >= 60 else "不合格"
+                        "有未验证项"
+                        if data["blocked"]
+                        else (
+                            "优秀"
+                            if data["score"] >= 80
+                            else "需改进" if data["score"] >= 60 else "不合格"
+                        )
                     )
                     lines.append(
-                        f"| {expert} | {data['passed']} | {data['failed']} | {data['score']} | {rating} |"
+                        f"| {expert} | {data['passed']} | {data['failed']} | {data['blocked']} | "
+                        f"{data['warning']} | {data['score']} | {rating} |"
                     )
 
                 lines.append("")
@@ -423,6 +462,7 @@ class QualityGateResult:
     def to_dict(self) -> dict[str, object]:
         return {
             "passed": self.passed,
+            "status": self.status_code,
             "total_score": self.total_score,
             "weighted_score": self.weighted_score,
             "gate_score": self.gate_score,
@@ -780,11 +820,10 @@ class QualityGateChecker(QualityGateEvidenceMixin):
             # 5.6 前端性能预算检查
             checks.extend(self._check_performance_budget())
 
-            # 5.7 UI 契约执行检查
+            # Independent UI results and the existing deterministic contract checks.
+            ui_review = self._check_ui_review()
             checks.append(self._check_ui_contract_execution())
-
-            # 6. UI 审查
-            checks.append(self._check_ui_review())
+            checks.append(ui_review)
 
         # 7. 执行可编程验证规则
         if self._rule_engine:
@@ -1076,7 +1115,12 @@ class QualityGateChecker(QualityGateEvidenceMixin):
 
         # 检查是否通过：加权分必须达到阈值，且必检项不能失败。
         # CHECKS_CONFIG 为高风险维度声明了更高权重；门禁判定必须与该模型一致。
-        passed = weighted_score >= threshold and not critical_failures
+        required_blocked = any(
+            check.status == CheckStatus.BLOCKED
+            and self.CHECKS_CONFIG.get(check.category, {}).get("required", False)
+            for check in checks
+        )
+        passed = weighted_score >= threshold and not critical_failures and not required_blocked
 
         # Webhook notification on quality gate failure
         if not passed:

@@ -75,6 +75,7 @@ class CliPipelineRuntimeMixin:
             "backend": args.backend,
             "domain": args.domain,
         }
+        frontend_required = str(args.frontend or "").strip().lower() not in {"", "none"}
         declared_changed_surfaces = getattr(args, "changed_surfaces", None)
         normalized_declared_surfaces = sorted(
             {
@@ -363,6 +364,9 @@ class CliPipelineRuntimeMixin:
                         failed_stage=failed_stage,
                         skip_redteam=bool(args.skip_redteam),
                     )
+                    if failed_stage == 3 and self._detect_latest_change_id(project_dir):
+                        # The host can supply runtime evidence without regenerating confirmed docs.
+                        resume_from_stage = 3
                     initial_resume_stage = resume_from_stage
                     adjusted_resume_stage, fallback_reasons = (
                         self._adjust_resume_stage_for_artifacts(
@@ -370,6 +374,7 @@ class CliPipelineRuntimeMixin:
                             output_dir=output_dir,
                             project_name=project_name,
                             resume_from_stage=resume_from_stage,
+                            frontend_required=frontend_required,
                         )
                     )
                     if (
@@ -893,65 +898,89 @@ class CliPipelineRuntimeMixin:
                 )
                 _update_run_context(change_id=change_id, shadow_ledger=shadow_result)
 
-            # ========== 第 3 阶段: 生成前端实施蓝图 ==========
+            # ========== 第 3 阶段: 前端实施蓝图与实际运行证据 ==========
             _start_stage("3", "前端实施蓝图与预览")
-            if _should_skip_for_resume(3):
-                self.console.print(
-                    "[yellow]第 3 阶段: 生成前端实施蓝图与预览 (resume 跳过)[/yellow]"
-                )
-                self.console.print("")
-                _record_stage(True, details={"skipped": True, "reason": "resume"})
+            frontend_runtime = None
+            if not frontend_required:
+                self.console.print("[dim]前端运行与预览确认：不适用。[/dim]")
+                _record_stage(True, details={"skipped": True, "reason": "non_ui"})
             else:
-                self.console.print("[cyan]第 3 阶段: 生成前端实施蓝图与预览...[/cyan]")
-                from .creators import FrontendScaffoldBuilder
-
-                frontend_builder = FrontendScaffoldBuilder(
-                    project_dir=project_dir,
-                    name=project_name,
-                    description=args.description,
-                    frontend=args.frontend,
-                )
-                frontend_files = frontend_builder.generate(
-                    requirements=requirements,
-                    phases=phases,
-                    docs={
-                        "prd": str(prd_file),
-                        "architecture": str(arch_file),
-                        "uiux": str(uiux_file),
-                        "plan": str(plan_file),
-                        "frontend_blueprint": str(frontend_blueprint_file),
-                    },
-                )
-                self.console.print(f"  [green]✓[/green] 页面: {frontend_files['html']}")
-                self.console.print(f"  [green]✓[/green] 样式: {frontend_files['css']}")
-                self.console.print(f"  [green]✓[/green] 脚本: {frontend_files['js']}")
-                frontend_runtime = self._write_frontend_runtime_validation(
-                    project_dir=project_dir,
+                frontend_runtime = self._load_frontend_runtime_validation(
                     output_dir=output_dir,
                     project_name=project_name,
                 )
-                self.console.print(
-                    f"  [green]✓[/green] 前端运行验证: {frontend_runtime['report_files']['markdown']}"
-                )
-                if frontend_runtime["preview_file"]:
-                    self.console.print(
-                        f"  [green]✓[/green] 预览页: {frontend_runtime['preview_file']}"
+                frontend_details = {}
+                if (
+                    not frontend_runtime["passed"]
+                    and not _should_skip_for_resume(3)
+                    and not args.skip_scaffold
+                    and not (output_dir / "frontend" / "index.html").is_file()
+                ):
+                    from .creators import FrontendScaffoldBuilder
+
+                    frontend_builder = FrontendScaffoldBuilder(
+                        project_dir=project_dir,
+                        name=project_name,
+                        description=args.description,
+                        frontend=args.frontend,
                     )
+                    frontend_details["files"] = frontend_builder.generate(
+                        requirements=requirements,
+                        phases=phases,
+                        docs={
+                            "prd": str(prd_file),
+                            "architecture": str(arch_file),
+                            "uiux": str(uiux_file),
+                            "plan": str(plan_file),
+                            "frontend_blueprint": str(frontend_blueprint_file),
+                        },
+                    )
+                    source_checks = self._write_frontend_source_checks(
+                        project_dir=project_dir,
+                        output_dir=output_dir,
+                        project_name=project_name,
+                    )
+                    frontend_details["frontend_source_checks"] = source_checks["report_files"][
+                        "json"
+                    ]
+                    frontend_details["preview_file"] = source_checks["preview_file"]
+                    self.console.print(
+                        f"  前端源码探测（不代表实际运行）: {source_checks['report_files']['markdown']}"
+                    )
+                # Resume and --skip-scaffold only skip generation, never actual evidence.
                 if not frontend_runtime["passed"]:
-                    raise RuntimeError("前端运行验证未通过，当前不得进入后端与交付阶段")
-                self.console.print("")
-                _record_stage(
-                    True,
-                    details={
-                        "files": frontend_files,
-                        "frontend_runtime_report": frontend_runtime["report_files"]["json"],
-                        "preview_file": frontend_runtime["preview_file"],
-                    },
-                )
+                    from .evidence_contract import EvidenceStatus
+                    from .reviewers.ui_review_evidence import STATUS_LABELS
+
+                    status = EvidenceStatus(frontend_runtime["status"])
+                    reason = "frontend_runtime_" + status.value.lower()
+                    _record_stage(
+                        False, details={**frontend_details, "evidence_status": status.value}
+                    )
+                    metric_files = _finalize_metrics(success=False, reason=reason)
+                    contract_files = _finalize_contract(success=False, reason=reason)
+                    _persist_run_state(
+                        "failed",
+                        {
+                            "failed_stage": "3",
+                            "failure_reason": reason,
+                            "metrics_file": str(metric_files["json"]),
+                            "contract_file": str(contract_files["json"]),
+                        },
+                    )
+                    _flush_resume_audit(status="failed", failure_reason=reason)
+                    self.console.print(
+                        f"[yellow]浏览器运行与交互：{STATUS_LABELS[status]}。"
+                        f"{frontend_runtime['detail']}[/yellow]"
+                    )
+                    self.console.print("请在宿主实际运行页面并导入有效浏览器证据，再继续预览确认。")
+                    return 1
+                frontend_details["frontend_runtime_report"] = frontend_runtime["report_file"]
+                _record_stage(True, details=frontend_details)
 
             preview_confirmation = self._get_preview_confirmation_state(project_dir)
             _update_run_context(preview_confirmation=preview_confirmation)
-            if not self._preview_confirmation_is_confirmed(project_dir):
+            if frontend_required and not self._preview_confirmation_is_confirmed(project_dir):
                 waiting_reason = (
                     "revision_requested"
                     if preview_confirmation["status"] == "revision_requested"
@@ -1015,13 +1044,6 @@ class CliPipelineRuntimeMixin:
                     self.console.print("[cyan]第 4 阶段: 生成宿主实现参考...[/cyan]")
                     from .creators import ImplementationScaffoldBuilder, SpecTaskExecutor
 
-                    frontend_runtime = self._load_frontend_runtime_validation(
-                        output_dir=output_dir,
-                        project_name=project_name,
-                    )
-                    if not frontend_runtime.get("passed", False):
-                        raise RuntimeError("前端运行验证未通过，禁止进入宿主实现参考与后端阶段")
-
                     implementation_builder = ImplementationScaffoldBuilder(
                         project_dir=project_dir,
                         name=project_name,
@@ -1063,10 +1085,8 @@ class CliPipelineRuntimeMixin:
                         details={
                             "frontend_files": len(scaffold_result["frontend_files"]),
                             "backend_files": len(scaffold_result["backend_files"]),
-                            "frontend_runtime_report": str(
-                                self._frontend_runtime_report_paths(
-                                    output_dir=output_dir, project_name=project_name
-                                )["json"]
+                            "frontend_runtime_report": (
+                                frontend_runtime["report_file"] if frontend_runtime else ""
                             ),
                             "task_completed": (
                                 f"{task_execution_summary.completed_tasks}/{task_execution_summary.total_tasks}"
@@ -1208,96 +1228,53 @@ class CliPipelineRuntimeMixin:
                 # 保存质量门禁报告
                 gate_file = project_dir / "output" / f"{project_name}-quality-gate.md"
                 gate_file.parent.mkdir(parents=True, exist_ok=True)
-                if gate_checker.latest_ui_review_report is not None:
-                    ui_review_file = project_dir / "output" / f"{project_name}-ui-review.md"
-                    ui_review_json_file = project_dir / "output" / f"{project_name}-ui-review.json"
-                    alignment_file = (
-                        project_dir / "output" / f"{project_name}-ui-contract-alignment.md"
-                    )
-                    alignment_json_file = (
-                        project_dir / "output" / f"{project_name}-ui-contract-alignment.json"
-                    )
-                    ui_review_file.write_text(
-                        gate_checker.latest_ui_review_report.to_markdown(),
-                        encoding="utf-8",
-                    )
-                    ui_review_json_file.write_text(
-                        json.dumps(
-                            attach_evidence_identity(
-                                gate_checker.latest_ui_review_report.to_dict(),
-                                project_dir=project_dir,
-                                artifact_name="ui-review",
-                                dependencies=[
-                                    project_dir / "output" / ui_contract_filename(project_name),
-                                    project_dir / "output" / f"{project_name}-uiux.md",
-                                ],
-                            ),
-                            ensure_ascii=False,
-                            indent=2,
-                        ),
-                        encoding="utf-8",
-                    )
-                    alignment_file.write_text(
-                        gate_checker.latest_ui_review_report.alignment_markdown(),
-                        encoding="utf-8",
-                    )
-                    alignment_json_file.write_text(
-                        json.dumps(
-                            attach_evidence_identity(
-                                gate_checker.latest_ui_review_report.alignment_summary,
-                                project_dir=project_dir,
-                                artifact_name="ui-contract-alignment",
-                                dependencies=[
-                                    project_dir / "output" / ui_contract_filename(project_name),
-                                    project_dir / "output" / f"{project_name}-uiux.md",
-                                ],
-                            ),
-                            ensure_ascii=False,
-                            indent=2,
-                        ),
-                        encoding="utf-8",
-                    )
-                    frontend_index = output_dir / "frontend" / "index.html"
-                    if frontend_index.exists():
-                        frontend_runtime = self._write_frontend_runtime_validation(
-                            project_dir=project_dir,
-                            output_dir=output_dir,
-                            project_name=project_name,
-                        )
-                gate_result = gate_checker.check(redteam_report)
+                from .reviewers.fresh_verification_evidence import quality_evidence_dependency_paths
+                from .reviewers.ui_review_output import write_ui_review_artifacts
+
+                ui_report = gate_checker.latest_ui_review_report
+                ui_paths = (
+                    write_ui_review_artifacts(project_dir, project_name, ui_report)
+                    if ui_report is not None
+                    else {}
+                )
                 gate_file.write_text(gate_result.to_markdown(), encoding="utf-8")
-                gate_json_file = project_dir / "output" / f"{project_name}-quality-gate.json"
-                gate_json_file.write_text(
-                    json.dumps(
-                        attach_evidence_identity(
-                            gate_result.to_dict(),
-                            project_dir=project_dir,
-                            artifact_name="quality-gate",
-                            dependencies=[
-                                project_dir / "output" / f"{project_name}-ui-review.json",
-                                project_dir
-                                / "output"
-                                / f"{project_name}-ui-contract-alignment.json",
-                                project_dir / "output" / f"{project_name}-uiux.md",
-                            ],
+                gate_json_file = output_dir / f"{project_name}-quality-gate.json"
+                gate_payload = gate_result.to_dict()
+                gate_payload.pop("passed")
+                if ui_report is not None:
+                    gate_payload["ui_results"] = {
+                        item.kind: item.summary() for item in ui_report.results
+                    }
+                gate_payload = attach_evidence_identity(
+                    gate_payload,
+                    project_dir=project_dir,
+                    artifact_name="quality-gate",
+                    dependencies=[
+                        *quality_evidence_dependency_paths(
+                            project_dir,
+                            project_name=project_name,
+                            frontend_required=gate_checker.frontend_required,
+                            include_fresh_verification=False,
                         ),
-                        ensure_ascii=False,
-                        indent=2,
-                    ),
-                    encoding="utf-8",
+                        *gate_checker.latest_fresh_verification_dependencies,
+                    ],
+                )
+                gate_payload["passed"] = gate_result.passed
+                gate_json_file.write_text(
+                    json.dumps(gate_payload, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
 
-                status = "[green]通过[/green]" if gate_result.passed else "[red]未通过[/red]"
+                status = gate_result.status_label
                 self.console.print(
                     f"  {status} 门禁分（加权）: {gate_result.gate_score:.1f}/100 "
                     f"(阈值 {gate_result.threshold:g}/100)"
                 )
                 self.console.print(f"  [dim]{gate_result.executive_summary}[/dim]")
                 self.console.print(f"  [green]✓[/green] 报告: {gate_file}")
-                if gate_checker.latest_ui_review_report is not None:
-                    self.console.print(f"  [green]✓[/green] UI 审查: {ui_review_file}")
-                    self.console.print(f"  [green]✓[/green] UI 审查 JSON: {ui_review_json_file}")
-                    self.console.print(f"  [green]✓[/green] UI 契约对齐: {alignment_file}")
+                if ui_paths:
+                    self.console.print(f"  UI 审查: {ui_paths['markdown']}")
+                    self.console.print(f"  UI 审查 JSON: {ui_paths['json']}")
+                    self.console.print(f"  UI 契约对齐: {ui_paths['alignment']}")
                 self.console.print("")
 
                 # 质量门禁未通过，停止流水线

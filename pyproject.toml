@@ -52,7 +52,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "setuptools>=68.0",
-    "pillow>=12.3.0",
     # Security floors for pip-audit's existing transitive dependencies.
     "pip>=26.2",
     "msgpack>=1.2.1",
@@ -74,7 +73,6 @@ dev = [
 [dependency-groups]
 dev = [
     "setuptools>=68.0",
-    "pillow>=12.3.0",
     # Keep the editable-install extra and uv development group aligned.
     "pip>=26.2",
     "msgpack>=1.2.1",

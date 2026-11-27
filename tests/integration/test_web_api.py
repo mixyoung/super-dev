@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
 
 import super_dev.web.api as web_api
 from super_dev import __version__ as _super_dev_version
@@ -46,6 +45,7 @@ from tests.support.release_ready_inputs import (
     record_release_ready_acceptance,
     write_release_ready_docs,
 )
+from tests.support.ui_evidence_inputs import PNG, create_ui_project, publish_browser, publish_source
 
 # Fixed API key for all integration tests
 _TEST_API_KEY = "test-integration-key-super-dev-2026"
@@ -2478,98 +2478,42 @@ class TestWebAPI:
             results=[],
         )
 
-        output_dir = temp_project_dir / "output"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "demo-ui-review.json").write_text(
-            json.dumps(
-                {
-                    "project_name": "demo",
-                    "score": 88,
-                    "critical_count": 0,
-                    "high_count": 1,
-                    "medium_count": 2,
-                    "passed": True,
-                    "findings": [
-                        {
-                            "level": "high",
-                            "title": "CTA 层级不足",
-                            "description": "首屏 CTA 不够突出",
-                            "recommendation": "增强 CTA 层级",
-                            "evidence": [],
-                        }
-                    ],
-                    "strengths": ["结构完整"],
-                    "notes": [],
-                    "alignment_summary": {
-                        "runtime_claude_design_protocol": {
-                            "passed": False,
-                            "observed": "mismatch=screen_recipes",
-                        },
-                        "source_claude_design_protocol": {
-                            "passed": True,
-                            "observed": "source aligned",
-                        },
-                    },
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-ui-contract.json").write_text(
-            json.dumps(
-                {
-                    "style_direction": "Editorial workspace",
-                    "screen_recipes": [{"label": "North Star Hero"}],
-                    "design_context_protocol": {"single_source_rule": "single source"},
-                    "tweak_strategy": {"mode": "single-source prototype"},
-                    "verification_handoff": {"verification_order": ["preview"]},
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-frontend-runtime.json").write_text(
-            json.dumps(
-                {
-                    "passed": True,
-                    "checks": {
-                        "ui_screen_recipes": True,
-                        "ui_design_context_protocol": True,
-                        "ui_tweak_strategy": True,
-                        "ui_verification_handoff": True,
-                    },
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-        (output_dir / "demo-ui-review.md").write_text("# ui review", encoding="utf-8")
-        screenshot_dir = output_dir / "ui-review"
-        screenshot_dir.mkdir(parents=True, exist_ok=True)
-        Image.new("RGB", (40, 30), "#ffffff").save(screenshot_dir / "demo-preview-desktop.png")
+        evidence = create_ui_project(temp_project_dir)
+        publish_browser(evidence, workflow_run_id=run_id)
+        publish_source(evidence)
+        # An unrelated filename is never selected instead of a bound screenshot.
+        (evidence.output / "zz-ui-review.json").write_text('{"passed": true}', encoding="utf-8")
+        before = {
+            path.relative_to(temp_project_dir): path.read_bytes()
+            for path in temp_project_dir.rglob("*")
+            if path.is_file()
+        }
 
         resp = client.get(
-            f"/api/workflow/ui-review/{run_id}",
-            params={"project_dir": str(temp_project_dir)},
+            f"/api/workflow/ui-review/{run_id}", params={"project_dir": str(temp_project_dir)}
         )
         assert resp.status_code == 200
         payload = resp.json()
         assert payload["run_id"] == run_id
-        assert payload["summary"]["score"] == 88
-        assert payload["frontend_governance_summary"]["state"] == "source_runtime_drift"
-        assert payload["runtime_claude_design_protocol"]["observed"] == "mismatch=screen_recipes"
-        assert payload["source_claude_design_protocol"]["observed"] == "source aligned"
+        assert payload["summary"]["score"] == 98
+        assert payload["summary"]["status"] == "BLOCKED"
+        assert payload["summary"]["results"]["frontend-runtime"]["status"] == "PASS"
         assert payload["screenshot"]["exists"] is True
-        assert payload["report_path"].endswith("demo-ui-review.md")
 
-        screenshot_resp = client.get(
-            f"/api/workflow/ui-review/{run_id}/screenshot",
-            params={"project_dir": str(temp_project_dir)},
-        )
+        shot_url = f"/api/workflow/ui-review/{run_id}/screenshot"
+        screenshot_resp = client.get(shot_url, params={"project_dir": str(temp_project_dir)})
         assert screenshot_resp.status_code == 200
         assert screenshot_resp.headers.get("content-type", "").startswith("image/png")
+        assert screenshot_resp.content == PNG
+        assert before == {
+            path.relative_to(temp_project_dir): path.read_bytes()
+            for path in temp_project_dir.rglob("*")
+            if path.is_file()
+        }
+        (temp_project_dir / "frontend/index.html").write_text("changed", encoding="utf-8")
+        assert (
+            client.get(shot_url, params={"project_dir": str(temp_project_dir)}).status_code == 404
+        )
 
     def test_workflow_cancel_not_found(self):
         client = _make_client()

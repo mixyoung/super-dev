@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-from PIL import Image
-
 from super_dev.design import UIIntelligenceAdvisor
 from super_dev.reviewers.ui_review import UIReviewReviewer
 
@@ -186,7 +184,9 @@ class TestUIReviewReviewer:
         assert report.score < 100
         assert any("缺少关键商业级章节" in item.title for item in report.findings)
 
-    def test_review_uses_preview_surface_signals(self, temp_project_dir: Path):
+    def test_review_records_static_surface_signals_without_visual_credit(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "site-uiux.md").write_text(
@@ -219,19 +219,18 @@ class TestUIReviewReviewer:
         report = reviewer.review()
 
         assert report.score > 40
-        assert any("预览页已具备基础分区结构" in item for item in report.strengths)
-        assert report.alignment_summary["layout_shell"]["passed"] is True
-        assert report.alignment_summary["navigation_shell"]["passed"] is True
-        assert report.alignment_summary["banned_patterns"]["passed"] is True
-        # 验证 UI/UX 专家视角检查已注入
-        expert_findings = [
-            f
-            for f in report.findings
-            if f.title.startswith("[UI 专家]") or f.title.startswith("[UX 专家]")
-        ]
-        assert len(expert_findings) > 0, "UI/UX 专家视角检查应产生至少一项发现"
+        assert any(
+            "静态结构观察（不计分）" in item and "sections=3" in item for item in report.notes
+        )
+        results = report.to_dict()["results"]
+        assert results["frontend-runtime"]["status"] == "BLOCKED"
+        assert results["ui-visual-review"]["status"] == "BLOCKED"
+        assert any("人工复核线索（不计分）" in item for item in report.notes)
+        assert not any(f.title.startswith(("[UI 专家]", "[UX 专家]")) for f in report.findings)
 
-    def test_review_flags_generic_typography_and_flat_hierarchy(self, temp_project_dir: Path):
+    def test_review_does_not_rate_typography_or_hierarchy_without_contract(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "brand-uiux.md").write_text(
@@ -270,10 +269,12 @@ class TestUIReviewReviewer:
         report = reviewer.review()
 
         titles = [item.title for item in report.findings]
-        assert any("字体系统过于默认" in title for title in titles)
-        assert any("页面层级不足" in title for title in titles)
+        assert not any("字体系统过于默认" in title or "页面层级不足" in title for title in titles)
+        assert report.to_dict()["results"]["ui-visual-review"]["status"] == "BLOCKED"
 
-    def test_review_flags_weak_hero_conversion_signals(self, temp_project_dir: Path):
+    def test_review_reports_unconfirmed_cta_and_density_as_observations(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "landing-uiux.md").write_text(
@@ -306,9 +307,19 @@ class TestUIReviewReviewer:
         report = reviewer.review()
 
         titles = [item.title for item in report.findings]
-        assert any("导航信息架构不足" in title for title in titles)
-        assert any("首屏 CTA 层级不足" in title for title in titles)
-        assert any("首屏信息密度不足" in title for title in titles)
+        assert not any("导航信息架构不足" in title or "首屏" in title for title in titles)
+        assert any(
+            "静态结构观察（不计分）" in item and "first_section_cta=1" in item
+            for item in report.notes
+        )
+        preview = temp_project_dir / "preview.html"
+        preview.write_text(
+            preview.read_text(encoding="utf-8").replace(
+                "</button>", "</button><button>Later</button>"
+            ),
+            encoding="utf-8",
+        )
+        assert reviewer.review().score == report.score
 
     def test_review_flags_missing_art_direction_guardrails(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
@@ -613,7 +624,7 @@ export function App() {
         assert any("Claude-Design 风格执行协议未冻结" in title for title in titles)
         assert report.alignment_summary["screen_recipes"]["passed"] is False
 
-    def test_review_flags_missing_frontend_runtime_for_claude_design_protocol(
+    def test_review_keeps_source_protocol_when_browser_evidence_is_missing(
         self, temp_project_dir: Path
     ):
         output_dir = temp_project_dir / "output"
@@ -674,11 +685,13 @@ export function App() {
         )
         report = reviewer.review()
 
-        titles = [item.title for item in report.findings]
-        assert any("frontend runtime 缺少 Claude-Design 协议证据" in title for title in titles)
-        assert report.alignment_summary["runtime_claude_design_protocol"]["passed"] is False
+        assert report.alignment_summary["source_claude_design_protocol"]["passed"] is True
+        runtime = report.to_dict()["results"]["frontend-runtime"]
+        assert runtime["status"] == "BLOCKED" and runtime["reason"] == "missing"
 
-    def test_review_flags_runtime_mismatch_for_claude_design_protocol(self, temp_project_dir: Path):
+    def test_review_does_not_use_legacy_runtime_flags_for_source_protocol(
+        self, temp_project_dir: Path
+    ):
         output_dir = temp_project_dir / "output"
         frontend_output = output_dir / "frontend"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -751,12 +764,10 @@ export function App() {
         )
         report = reviewer.review()
 
-        titles = [item.title for item in report.findings]
-        assert any(
-            "UI Review 与 frontend runtime 的 Claude-Design 结论不一致" in title for title in titles
-        )
-        assert report.alignment_summary["runtime_claude_design_protocol"]["passed"] is False
+        assert "runtime_claude_design_protocol" not in report.alignment_summary
         assert report.alignment_summary["source_claude_design_protocol"]["passed"] is True
+        runtime = report.to_dict()["results"]["frontend-runtime"]
+        assert runtime["status"] == "BLOCKED" and runtime["reason"] == "legacy"
 
     def test_review_tracks_framework_playbook_execution_for_uniapp(self, temp_project_dir: Path):
         output_dir = temp_project_dir / "output"
@@ -1074,67 +1085,17 @@ export function App() {
         assert report.alignment_summary["theme_entry"]["passed"] is False
         assert report.alignment_summary["navigation_shell"]["passed"] is False
 
-    def test_screenshot_analysis_extracts_visual_metrics(self, temp_project_dir: Path):
-        image_path = temp_project_dir / "shot.png"
-        image = Image.new("RGB", (120, 80), "#ffffff")
-        for x in range(20, 100):
-            for y in range(20, 60):
-                image.putpixel((x, y), (15, 124, 250))
-        image.save(image_path)
-
-        reviewer = UIReviewReviewer(
-            project_dir=temp_project_dir,
-            name="demo",
-            tech_stack={"frontend": "react", "backend": "node", "platform": "web"},
-        )
-        metrics = reviewer._analyze_screenshot(image_path)
-
-        assert metrics["blank_ratio"] < 1
-        assert metrics["accent_ratio"] > 0
-        assert metrics["unique_colors"] >= 2
-        assert "dominant_color_ratio" in metrics
-        assert "contrast_span" in metrics
-
-    def test_screenshot_analysis_detects_flat_single_surface_risk(self, temp_project_dir: Path):
-        image_path = temp_project_dir / "flat-shot.png"
-        image = Image.new("RGB", (180, 120), "#f7f7f7")
-        for x in range(70, 110):
-            for y in range(48, 72):
-                image.putpixel((x, y), (235, 235, 235))
-        image.save(image_path)
-
-        reviewer = UIReviewReviewer(
-            project_dir=temp_project_dir,
-            name="flat",
-            tech_stack={"frontend": "react", "backend": "node", "platform": "web"},
-        )
-        metrics = reviewer._analyze_screenshot(image_path)
-
-        assert metrics["dominant_color_ratio"] > 0.78
-        assert metrics["contrast_span"] < 0.18
-
-    def test_review_flags_flat_screenshot_visual_risk(self, temp_project_dir: Path):
+    def test_few_sections_and_plain_dark_colors_are_only_static_observations(
+        self, temp_project_dir: Path
+    ):
         (temp_project_dir / "preview.html").write_text(
-            "<!doctype html><html><body><main><section><h1>Preview</h1></section></main></body></html>",
+            "<!doctype html><body style='background:#121212;color:white'><main><section><h1>Preview</h1><button>Save</button></section></main></body>",
             encoding="utf-8",
         )
-        image_path = temp_project_dir / "flat-review.png"
-        image = Image.new("RGB", (200, 140), "#f7f7f7")
-        for x in range(88, 112):
-            for y in range(58, 82):
-                image.putpixel((x, y), (236, 236, 236))
-        image.save(image_path)
-
-        reviewer = UIReviewReviewer(
-            project_dir=temp_project_dir,
-            name="flat-review",
-            tech_stack={"frontend": "react", "backend": "node", "platform": "web"},
+        report = UIReviewReviewer(temp_project_dir, "demo", {"frontend": "react"}).review()
+        assert any("不计分" in note and "sections=1" in note for note in report.notes)
+        assert "screenshot_visual_judge" not in report.alignment_summary
+        assert report.to_dict()["results"]["ui-visual-review"]["status"] == "BLOCKED"
+        assert not any(
+            "留白" in finding.title or "首屏" in finding.title for finding in report.findings
         )
-        reviewer._capture_preview_screenshot = lambda _: image_path  # type: ignore[method-assign]
-
-        report = reviewer.review()
-
-        titles = [item.title for item in report.findings]
-        assert any("截图明暗层级不足" in title for title in titles)
-        assert any("截图视觉表面过于单一" in title for title in titles)
-        assert report.alignment_summary["screenshot_visual_judge"]["passed"] is False

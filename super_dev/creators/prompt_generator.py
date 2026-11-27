@@ -14,6 +14,7 @@ from typing import cast
 
 from ..artifact_utils import resolve_active_change_id, sanitize_artifact_name
 from ..specs.models import TaskStatus
+from ..ui_contract_governance import UI_REVIEW_EVIDENCE_GUIDANCE
 from ..workflow_contract import knowledge_authority_guidance, readonly_request_guidance
 from .prompt_sections import PromptBuilder, PromptSection
 from .requirement_parser import RequirementParser
@@ -396,7 +397,8 @@ Super Dev 内置 11 位专家 Agent，每位专家有独立的角色定义、专
         elif ui_required:
             frontend_steps = (
                 "### 阶段 3. 前端优先实现并运行验证（CODE + UI 专家主导）\n\n"
-                "仅实施本轮已确认的界面范围，先验证可运行并展示预览方式、状态和风险。\n\n"
+                "仅实施本轮已确认的界面范围，展示预览方式、状态和风险。\n\n"
+                f"{UI_REVIEW_EVIDENCE_GUIDANCE}\n"
                 "### 阶段 3.5. 预览确认\n\n"
                 "暂停等待用户预览确认后再进入后端主实现；有效确认不重复索取，"
                 "变更后按既有产物绑定检查确认是否仍有效，不用可运行代替确认。"
